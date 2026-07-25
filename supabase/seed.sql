@@ -1,0 +1,1 @@
+-- seed.sql — Yerel geliştirme için başlangıç verisi. npx supabase db reset ile uygulanır.
