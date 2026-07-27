@@ -1,8 +1,10 @@
 # GuestMatrix
 
-QR-basiertes Gast-UGC- und Feedback-Tool für kleine Touroperatoren und Reiseleiter.
+QR-basiertes Gast-UGC- und Feedback-Tool für mehrere Branchen: Tourismus, Immobilien und Hochzeit/Event.
 
-Gäste scannen einen QR-Code, laden Fotos und Videos hoch und bewerten die Veranstaltung — ohne App-Installation und ohne eigenen Account. Reiseleiter verwalten Events, moderieren Inhalte und laden QR-Codes herunter.
+Gäste scannen einen QR-Code, teilen Fotos/Videos oder geben Feedback (Bewertung + Kommentar) — ohne App-Installation und ohne eigenen Account. Der Ablauf richtet sich nach dem Kampagnentyp: eine Galerie mit Reziprozitätssperre (Tour, Hochzeit) oder ein privates Feedback (Hotel-Aufenthalt, Immobilien-Besichtigung). Tenants verwalten Kampagnen, moderieren Inhalte und laden QR-Codes herunter.
+
+Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerbüro, ein Event-Veranstalter) mit genau einem **Sektor**. Kein Sektor ist Standard; neue Sektoren lassen sich über eine zentrale Registry ergänzen.
 
 ---
 
@@ -40,24 +42,44 @@ Gäste scannen einen QR-Code, laden Fotos und Videos hoch und bewerten die Veran
 
 ## Funktionsübersicht
 
-### Tenant (Reiseleiter / Operator)
+### Tenant (Kundenorganisation)
 
 - Anmeldung per E-Mail und Passwort
-- Event erstellen (Name, Datum, Beschreibung)
-- QR-Code pro Event als PNG herunterladen
-- Mediengalerie im Dashboard: Thumbnail-Raster mit Moderationsstatus
+- Branche (Sektor) unter **Einstellungen** wählen
+- Kampagne erstellen (Name, Datum, Beschreibung) mit sektorabhängigem **Kampagnentyp**; bei Immobilien zusätzlich **Galerie oder Feedback** wählbar
+- QR-Code pro Kampagne als PNG herunterladen
+- Galerie-Kampagnen: Thumbnail-Raster mit Moderationsstatus
+- Feedback-Kampagnen: Liste aus Bewertung + Kommentar
 - Inhalte sperren / freigeben (Moderations-Flag)
 - Inhalte löschen (DSGVO-konform: Soft Delete + Storage-Löschung)
-- KPI-Übersicht: Anzahl Uploads, Durchschnittsbewertung pro Event
+- Kampagnen archivieren / reaktivieren
+- KPI-Übersicht: aktive Kampagnen, Beiträge gesamt, Durchschnittsbewertung
 
 ### Gast (anonym, kein Account erforderlich)
 
-- QR-Code scannen → Veranstaltungsseite
+- QR-Code scannen → Kampagnenseite
 - DSGVO-Einwilligung bestätigen (Consent-Checkbox)
-- Foto oder Video hochladen (JPEG, PNG, MP4, MOV · max. 100 MB) mit Fortschrittsanzeige
-- Galerie aller genehmigten Inhalte einsehen (erst nach eigenem Upload — Reziprozitätssperre)
-- Veranstaltung mit 1–5 Sternen bewerten
-- Eigene Inhalte jederzeit löschen (DSGVO-Recht auf Vergessenwerden)
+- **Galerie-Ablauf** (Tour, Hochzeit): Foto/Video hochladen (JPEG, PNG, MP4, MOV · max. 50 MB) mit Fortschrittsanzeige, Galerie erst nach eigenem Upload (Reziprozitätssperre), 1–5-Sterne-Bewertung
+- **Feedback-Ablauf** (Hotel-Aufenthalt, Immobilien-Besichtigung): Bewertung (1–5) und/oder Kommentar, Medien optional, keine öffentliche Galerie
+- Eigene Beiträge jederzeit löschen (DSGVO-Recht auf Vergessenwerden)
+
+---
+
+## Sektoren & Kampagnentypen
+
+Ein Tenant gehört zu genau einem Sektor. Jeder Sektor enthält einen oder mehrere Kampagnentypen; der Kampagnentyp legt den **Flow-Modus** des Gäste-Ablaufs fest. Die Registry unter [`lib/campaigns/config.ts`](lib/campaigns/config.ts) ist die einzige Quelle der Wahrheit — ein neuer Sektor = ein Eintrag dort plus ein Wert in der CHECK-Liste der Migration.
+
+| Sektor | Kampagnentyp | Flow-Modus |
+|--------|--------------|------------|
+| Tourismus (`tourism`) | Tour (`tour`) | `gallery` |
+| Tourismus (`tourism`) | Hotel / Aufenthalt (`stay`) | `feedback` |
+| Immobilien (`real_estate`) | Immobilie (`property`) | `gallery` **oder** `feedback` (wählbar) |
+| Hochzeit / Event (`event`) | Hochzeit / Event (`wedding`) | `gallery` |
+
+| Flow-Modus | Verhalten |
+|------------|-----------|
+| `gallery` | Medien-Pflicht · öffentliche Galerie · Reziprozitätssperre · Bewertung |
+| `feedback` | Medien optional · keine Galerie/Reziprozität · Bewertung + Kommentar (privat) |
 
 ---
 
@@ -70,8 +92,8 @@ Browser / Mobil
 Next.js 15 (Vercel)
   ├── App Router — Server Components (Standard)
   ├── Route Handler — API-Endpunkte (app/api/)
-  ├── Server Actions — Formulare (Login, Event erstellen, Moderation)
-  └── Client Components — Interaktive UI (GuestFlow, QrSection)
+  ├── Server Actions — Formulare (Login, Kampagne erstellen, Sektor, Moderation, Archivieren)
+  └── Client Components — Interaktive UI (GalleryFlow, FeedbackFlow, QrSection)
       │
       ├── Supabase Postgres (RLS auf jeder Tabelle)
       ├── Supabase Auth (Tenant: Email/PW · Gast: anonym)
@@ -84,16 +106,22 @@ Next.js 15 (Vercel)
 auth.users (Supabase Auth)
     │ 1:1
     ▼
-tenants  (id, user_id, name, brand_name)
+tenants  (id, user_id, name, brand_name, sector)
     │ 1:N
     ▼
-events   (id, tenant_id, name, date, description)
+events   (id, tenant_id, name, date, description,
+          campaign_type, flow_mode, archived_at)
     │ 1:N
     ▼
 submissions  (id, tenant_id, event_id, guest_user_id,
-              media_url, file_type, consent_at,
-              uploaded_at, moderation_flag, rating, deleted_at)
+              media_url, file_type, consent_at, uploaded_at,
+              moderation_flag, rating, comment, deleted_at)
 ```
+
+- `tenants.sector` — Sektor der Kundenorganisation (`tourism` · `real_estate` · `event`); ohne Default, beim Onboarding gesetzt.
+- `events.campaign_type` / `flow_mode` — Kampagnentyp und daraus abgeleiteter Gäste-Ablauf.
+- `events.archived_at` — aktive Kampagne = `archived_at is null`.
+- `submissions.comment` — Freitext-Feedback; `file_type` ist optional (Feedback ohne Medien).
 
 ### Upload-Ablauf (3 Schritte)
 
@@ -130,10 +158,11 @@ app/
 ├── api/
 │   ├── auth/logout/route.ts          # Abmelden
 │   ├── events/
-│   │   ├── route.ts                  # GET Liste · POST Erstellen
+│   │   ├── route.ts                  # GET Liste · POST Erstellen (mit Kampagnentyp/Flow-Modus)
 │   │   └── [eventId]/
-│   │       ├── public/route.ts       # Öffentliche Event-Info (für Gäste)
+│   │       ├── public/route.ts       # Öffentliche Kampagnen-Info + Flow-Modus + Labels
 │   │       ├── gallery/route.ts      # Galerie (Reziprozitätssperre)
+│   │       ├── feedback/route.ts     # Feedback (Bewertung + Kommentar, Medien optional)
 │   │       └── submissions/route.ts  # Dashboard-Submissions mit signierten URLs
 │   ├── sessions/route.ts             # Anonyme Gast-Session erstellen
 │   ├── submissions/
@@ -146,11 +175,14 @@ app/
 │   └── health/route.ts              # Liveness-Check
 ├── dashboard/
 │   ├── layout.tsx                    # Sidebar-Navigation
-│   ├── page.tsx                      # KPI-Übersicht + Event-Liste
+│   ├── page.tsx                      # KPI-Übersicht (aktive Kampagnen) + Kampagnen-Liste
+│   ├── actions.ts                    # Kampagne archivieren / reaktivieren
+│   ├── settings/                     # Branche (Sektor) wählen
 │   └── events/
-│       ├── new/                      # Event erstellen
-│       └── [eventId]/                # Event-Detail: Mediengrid + QR + Moderation
-├── e/[eventId]/                      # Gäste-Flow (mehrstufig)
+│       ├── new/                      # Kampagne erstellen (Typ + ggf. Flow-Modus)
+│       └── [eventId]/                # Kampagnen-Detail: Mediengrid oder Feedback-Liste + QR
+├── e/[eventId]/                      # Gäste-Flow — GuestFlow (Dispatcher),
+│                                     #   GalleryFlow, FeedbackFlow, GuestShell
 ├── login/                            # Tenant-Anmeldung
 ├── forgot-password/                  # Passwort zurücksetzen (E-Mail)
 └── reset-password/                   # Neues Passwort setzen (PKCE)
@@ -159,6 +191,8 @@ lib/
 ├── auth/
 │   ├── session.ts      # requireTenantAuth · requireAnyAuth · requireEventOwnership
 │   └── errors.ts       # AppError-Hierarchie · handleRouteError
+├── campaigns/
+│   └── config.ts       # Sektor-/Kampagnen-Registry (Sektoren, Typen, Flow-Modi, Labels)
 ├── supabase/
 │   ├── browser.ts      # Browser-Client (Client Components)
 │   ├── server.ts       # Server-Client (SSR + Cookies)
@@ -179,8 +213,9 @@ types/
 └── database.ts         # Generierte Supabase-Typen (nicht manuell bearbeiten)
 
 tests/
-├── schemas.test.ts     # Zod-Schema-Tests
-└── mime.test.ts        # Magic-Byte-Validierungstests
+├── schemas.test.ts        # Zod-Schema-Tests
+├── campaign-config.test.ts # Sektor-/Kampagnen-Registry-Tests
+└── mime.test.ts           # Magic-Byte-Validierungstests
 ```
 
 ---
@@ -244,7 +279,7 @@ Alle Routen geben `{ error: string }` mit dem passenden HTTP-Statuscode zurück.
 
 | Methode | Route | Beschreibung |
 |---------|-------|--------------|
-| `GET` | `/api/events/[eventId]/public` | Event-Name, Beschreibung, Markenname |
+| `GET` | `/api/events/[eventId]/public` | Name, Beschreibung, Markenname, Kampagnentyp, Flow-Modus, Labels |
 | `POST` | `/api/sessions` | Anonyme Gast-Session erstellen |
 | `GET` | `/api/events/[eventId]/gallery` | Galerie (nur nach eigenem Upload) |
 | `GET` | `/api/health` | Liveness-Check |
@@ -256,14 +291,15 @@ Alle Routen geben `{ error: string }` mit dem passenden HTTP-Statuscode zurück.
 | `POST` | `/api/submissions/presign` | Presigned Upload-URL anfordern |
 | `PATCH` | `/api/submissions/[id]/confirm` | Upload bestätigen + MIME prüfen |
 | `PATCH` | `/api/submissions/[id]/rate` | Bewertung speichern (eigene Submission) |
+| `POST` | `/api/events/[eventId]/feedback` | Feedback abgeben (Bewertung + Kommentar, Medien optional) |
 | `DELETE` | `/api/submissions/[id]` | Submission löschen (DSGVO) |
 
 ### Nur Tenant (Dashboard)
 
 | Methode | Route | Beschreibung |
 |---------|-------|--------------|
-| `GET` | `/api/events` | Alle eigenen Events auflisten |
-| `POST` | `/api/events` | Neues Event erstellen |
+| `GET` | `/api/events` | Alle eigenen Kampagnen auflisten |
+| `POST` | `/api/events` | Neue Kampagne erstellen (Kampagnentyp + Flow-Modus) |
 | `GET` | `/api/events/[eventId]/submissions` | Submissions mit signierten URLs |
 | `PATCH` | `/api/submissions/[id]/moderate` | Moderations-Flag setzen / aufheben |
 | `POST` | `/api/auth/logout` | Abmelden |

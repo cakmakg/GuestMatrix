@@ -24,6 +24,8 @@ create table tenants (
   user_id     uuid not null references auth.users(id) on delete cascade,
   name        text not null,        -- Unternehmensname
   brand_name  text not null,        -- Markenname, der auf der Gästeseite angezeigt wird
+  sector      text not null         -- Branche: 'tourism' | 'real_estate' | 'event'
+              check (sector in ('tourism', 'real_estate', 'event')),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   constraint tenants_user_id_key unique (user_id)
@@ -32,6 +34,11 @@ create table tenants (
 
 **Beziehung:** `auth.users` ↔ `tenants` → 1:1. Jeder Unternehmensbenutzer in Supabase Auth
 entspricht einer Zeile in dieser Tabelle.
+
+**Sektor:** Jede Kundenorganisation gehört zu genau einem Sektor. Es gibt **keinen Default** —
+der Sektor wird beim Onboarding gesetzt (Bestandszeilen wurden in der Multi-Sektor-Migration
+einmalig auf `tourism` backfillt). Die zulässigen Sektoren und ihre Kampagnentypen sind in
+`lib/campaigns/config.ts` definiert (siehe Abschnitt 1.4).
 
 **Index:** `user_id` (der Unique Constraint erzeugt bereits einen Index)
 
@@ -57,21 +64,36 @@ create policy "tenant_update_own"
 
 ```sql
 create table events (
-  id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references tenants(id) on delete cascade,
-  name        text not null,
-  date        date not null,
-  description text,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  tenant_id     uuid not null references tenants(id) on delete cascade,
+  name          text not null,
+  date          date not null,
+  description   text,
+  campaign_type text not null        -- 'tour' | 'stay' | 'property' | 'wedding'
+                check (campaign_type in ('tour', 'stay', 'property', 'wedding')),
+  flow_mode     text not null        -- 'gallery' | 'feedback' (aus dem Kampagnentyp abgeleitet)
+                check (flow_mode in ('gallery', 'feedback')),
+  archived_at   timestamptz,         -- aktive Kampagne = archived_at is null
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 ```
+
+**Kampagnentyp & Flow-Modus:** Jede Kampagne (`event`) hat einen `campaign_type`, der zum
+Sektor des Tenants passen muss, und einen daraus abgeleiteten `flow_mode`. Der Server setzt
+`flow_mode` über `resolveFlowMode()` aus der Registry; nur der Typ `property` (Immobilien)
+erlaubt dem Operator, zwischen `gallery` und `feedback` zu wählen. Bestandszeilen wurden auf
+`tour` / `gallery` backfillt.
 
 **Indizes:**
 
 ```sql
 create index events_tenant_created_idx on events (tenant_id, created_at desc);
 create index events_id_tenant_idx      on events (id, tenant_id);
+
+-- Zählung aktiver Kampagnen je Tenant
+create index events_tenant_active_idx
+  on events (tenant_id) where archived_at is null;
 ```
 
 **RLS:**
@@ -123,15 +145,21 @@ create table submissions (
   event_id         uuid not null references events(id),
   guest_user_id    uuid not null references auth.users(id),  -- anonyme Auth
   media_url        text,            -- Supabase-Storage-Pfad; wird nach Bestätigung gesetzt
-  file_type        text not null,   -- 'image' | 'video'
+  file_type        text,            -- 'image' | 'video'; NULL bei Feedback ohne Medien
   consent_at       timestamptz not null,
-  uploaded_at      timestamptz,
+  uploaded_at      timestamptz,     -- gesetzt nach Upload-Bestätigung bzw. bei Feedback-Abgabe
   moderation_flag  boolean not null default false,
   rating           smallint check (rating between 1 and 5),
+  comment          text,            -- Freitext-Feedback (Feedback-Modus)
   deleted_at       timestamptz,     -- Soft Delete
   created_at       timestamptz not null default now()
 );
 ```
+
+**Feedback vs. UGC:** Eine `submission` trägt sowohl UGC (Medien) als auch Feedback
+(`rating`, `comment`). Im `gallery`-Modus ist ein Medium Pflicht (`file_type` gesetzt); im
+`feedback`-Modus ist das Medium optional, dann bleibt `file_type` NULL, und `uploaded_at`
+markiert die Feedback-Abgabe als abgeschlossen.
 
 **Indizes:**
 
@@ -204,6 +232,41 @@ submissions ◄── auth.users (anonymer Gast, guest_user_id)
 
 `submissions.tenant_id` wird denormalisiert gespeichert. Grund: RLS-Prüfungen können
 direkt erfolgen, ohne bei jeder Submission-Abfrage einen JOIN auf `events` durchzuführen.
+
+---
+
+### 1.4 Sektoren, Kampagnentypen & Flow-Modi (Registry)
+
+Die Multi-Sektor-Fähigkeit ist **config-getrieben**. Die einzige Quelle der Wahrheit ist
+`lib/campaigns/config.ts` (client- und serverseitig importierbar, keine Secrets). Die
+DB-Spalten `sector`, `campaign_type`, `flow_mode` sind bewusst `text` + `CHECK` (statt
+Postgres-`enum`), damit ein neuer Sektor ohne `ALTER TYPE` auskommt — nur die CHECK-Liste
+und ein Registry-Eintrag ändern sich.
+
+**Modell:** Tenant → Sektor (1); Sektor → Kampagnentypen (1:N); Kampagnentyp → Default-Flow-Modus.
+
+| Sektor | Kampagnentypen | Flow-Modus |
+| ------------- | -------------------- | ---------------------------------- |
+| `tourism`     | `tour`, `stay`       | `gallery` (tour) · `feedback` (stay) |
+| `real_estate` | `property`           | `gallery` **oder** `feedback` (wählbar) |
+| `event`       | `wedding`            | `gallery`                          |
+
+**Flow-Modus-Fähigkeiten** (`FLOW_MODE_CAPABILITIES`):
+
+| Modus      | mediaRequired | gallery | reciprocity | rating | comment |
+| ---------- | ------------- | ------- | ----------- | ------ | ------- |
+| `gallery`  | ✅            | ✅      | ✅          | ✅     | ❌      |
+| `feedback` | ❌            | ❌      | ❌          | ✅     | ✅      |
+
+Registry-Helfer (Auszug): `campaignTypesForSector`, `isValidCampaignForSector`,
+`resolveFlowMode`, `getCapabilities`, `resolveLabels` sowie die Narrowing-Guards
+`isSector` / `isCampaignType` / `isFlowMode` (die `text`-Spalten kommen als `string` zurück).
+
+**RLS-Hinweis:** Die neuen Spalten führen **keine neuen Policies** ein. `sector` liegt in der
+`tenants`-Zeile des Benutzers (bestehende Tenant-Policies); `campaign_type` / `flow_mode` /
+`archived_at` / `comment` liegen in `events` bzw. `submissions` und sind durch die vorhandene
+Tenant-Isolierung (`current_tenant_id()`) bereits abgedeckt. Die Tenant-Sektor-Zuordnung wird
+über die bestehende `tenant_update_own`-Policy geändert.
 
 ---
 
@@ -297,6 +360,20 @@ Pfad:   {tenant_id}/{event_id}/{submission_id}/{uuid}.{ext}
 - Zugelassene MIME-Typen: `image/jpeg`, `image/png`, `video/mp4`, `video/quicktime`
 - Max. Größe: 50 MB (als Supabase-Storage-Upload-Limit gesetzt)
 - Dateityp wird serverseitig validiert; reine Extension-Prüfung reicht nicht aus.
+
+### Feedback-Ablauf (`feedback`-Modus)
+
+Kampagnen im `feedback`-Modus (Hotel-Aufenthalt, Immobilien-Besichtigung) benötigen kein
+Medium. Endpunkt: `POST /api/events/[eventId]/feedback` (Gast-Session via `requireAnyAuth`,
+`feedbackSchema`: mindestens Bewertung **oder** Kommentar).
+
+- **Ohne Medium:** Der Endpunkt legt direkt eine `submission` an (`file_type` NULL,
+  `consent_at` + `uploaded_at` serverseitig gesetzt, `rating` / `comment`).
+- **Mit Medium:** Zuerst der normale Presigned-Upload (`presign` → PUT → `confirm`); danach
+  hängt derselbe Endpunkt `rating` / `comment` per `submissionId` an die bestehende `submission`.
+
+Keine Galerie, keine Reziprozitätssperre. Das Dashboard zeigt für diese Kampagnen eine
+Feedback-Liste (Bewertung + Kommentar) statt eines Medienrasters.
 
 ---
 
