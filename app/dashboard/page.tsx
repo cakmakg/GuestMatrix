@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { getCampaignConfig, isCampaignType } from '@/lib/campaigns/config'
+import { getCampaignConfig, isCampaignType } from '@/lib/sectors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 

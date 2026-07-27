@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 
-import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/campaigns/config'
+import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/sectors'
 import { handleRouteError, ValidationError } from '@/lib/auth/errors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'

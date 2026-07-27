@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 
-import type { FlowMode, GuestFlowLabels } from '@/lib/campaigns/config'
+import type { FlowMode, GuestFlowLabels } from '@/lib/sectors'
 
 import GuestFlow from './GuestFlow'
 

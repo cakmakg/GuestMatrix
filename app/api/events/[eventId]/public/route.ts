@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 
-import { getCapabilities, isCampaignType, isFlowMode, resolveLabels } from '@/lib/campaigns/config'
+import { getCapabilities, isCampaignType, isFlowMode, resolveLabels } from '@/lib/sectors'
 import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { eventIdParam } from '@/lib/validation/schemas'

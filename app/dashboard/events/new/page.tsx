@@ -7,7 +7,7 @@ import {
   campaignTypesForSector,
   getCampaignConfig,
   isSector,
-} from '@/lib/campaigns/config'
+} from '@/lib/sectors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -38,8 +38,10 @@ export default async function NewEventPage({
 
   const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
 
+  // Branche wird vom Betreiber zugewiesen (kein Self-Service). Fehlt sie, zeigt die
+  // Einstellungsseite den Hinweis zum Support-Kontakt.
   if (!sector) {
-    redirect('/dashboard/settings?error=' + encodeURIComponent('Bitte zuerst eine Branche wählen.'))
+    redirect('/dashboard/settings')
   }
 
   const types = campaignTypesForSector(sector)

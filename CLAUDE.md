@@ -14,9 +14,11 @@ Kampagnentyp bestimmt den Flow-Modus des Gäste-Ablaufs (`gallery` oder `feedbac
 - Immobilien → Immobilie (Galerie **oder** Feedback, vom Operator wählbar)
 - Hochzeit/Event → Hochzeit/Event (Galerie)
 
-Die Sektor-/Kampagnen-Registry (`lib/campaigns/config.ts`) ist die einzige Quelle der
-Wahrheit. Ein neuer Sektor = ein Eintrag dort + ein Wert in der CHECK-Liste der Migration;
-kein Sonderfall-Code.
+Sektoren gehören dem **Betreiber** und werden als Code entwickelt: ein Ordner je Sektor
+unter `lib/sectors/<id>/`, aggregiert von `lib/sectors/index.ts` (einzige Quelle der Wahrheit).
+Kunden können keinen Sektor anlegen; der Betreiber **weist** den Sektor zu (`tenants.sector`),
+der Kunde sieht ihn nur schreibgeschützt. Ein neuer Sektor = ein Ordner unter `lib/sectors/` +
+Registry-Eintrag + CHECK-Wert in der Migration; kein Sonderfall-Code.
 
 Vor jeder Arbeit: Spec-Dateien unter docs/ lesen.
 
@@ -34,7 +36,7 @@ Vor jeder Arbeit: Spec-Dateien unter docs/ lesen.
 - Tenant-Isolierung wird über RLS durchgesetzt. RLS ist auf jeder Tabelle aktiv; Tabellen ohne Policy sind nicht erreichbar. Das ist Sicherheit, keine Option.
 - Secrets nur in Umgebungsvariablen. Keine Secrets im Repository. .env.example bleibt aktuell.
 - Gästemedien = personenbezogene Daten. Kein Feature gilt als „fertig" ohne Consent + Moderations-Flag + Löschpfad.
-- Kein Sektor ist Standard. Sektor / Kampagnentyp / Flow-Modus werden aus `lib/campaigns/config.ts` abgeleitet; ein neuer Sektor wird dort ergänzt (plus CHECK-Wert in der Migration), nicht über Sonderfälle im Code.
+- Kein Sektor ist Standard; Sektoren gehören dem Betreiber. Sektor / Kampagnentyp / Flow-Modus werden aus `lib/sectors/` abgeleitet (ein Ordner je Sektor + Registry `index.ts`); ein neuer Sektor wird dort ergänzt (plus CHECK-Wert in der Migration), nicht über Sonderfälle im Code. Den Sektor eines Kunden weist der Betreiber zu (`tenants.sector`); Kunden können keinen Sektor anlegen oder ändern.
 - „Fertig" = funktioniert + Input-Validierung + Fehlerfälle behandelt + mindestens 1 Test + deploybar.
 
 ## Arbeitsstil
@@ -47,7 +49,7 @@ Vor jeder Arbeit: Spec-Dateien unter docs/ lesen.
 
 ```
 app/              # Next.js App Router — Seiten und API-Routen
-lib/campaigns/    # Sektor-/Kampagnen-Registry (config.ts) — Sektoren, Kampagnentypen, Flow-Modi
+lib/sectors/      # Sektor-Module (ein Ordner je Sektor) + Registry (index.ts) — Kampagnentypen, Flow-Modi
 lib/supabase/     # Drei Supabase-Clients (browser / server / admin)
 types/            # database.ts — wird mit supabase gen types erzeugt, nicht manuell bearbeiten
 supabase/         # supabase-init-Ausgabe; migrations/ und seed.sql

@@ -4,7 +4,8 @@
 > Kundenorganisation mit genau einem **Sektor** (`tourism`, `real_estate`, `event`). Jeder
 > Sektor enthält einen oder mehrere **Kampagnentypen**, die den **Flow-Modus** des
 > Gäste-Ablaufs bestimmen (`gallery` oder `feedback`). Kein Sektor ist Standard. Details in
-> Abschnitt 0; die Registry liegt in `lib/campaigns/config.ts`.
+> Abschnitt 0. Sektoren gehören dem Betreiber und liegen je Sektor in einem eigenen Ordner
+> unter `lib/sectors/<id>/`; der Kunde bekommt einen Sektor zugewiesen und kann keinen anlegen.
 
 ## 0. Sektoren, Kampagnentypen & Flow-Modi
 
@@ -17,7 +18,7 @@
 
 - **`gallery`:** Medium Pflicht · öffentliche Galerie · Reziprozitätssperre · optionale Bewertung.
 - **`feedback`:** Medium optional · keine Galerie/Reziprozität · Bewertung + Kommentar, privat an den Tenant.
-- Neuer Sektor = Eintrag in `lib/campaigns/config.ts` + Wert in der CHECK-Liste der Migration.
+- Neuer Sektor = neuer Ordner unter `lib/sectors/<id>/` + Registry-Eintrag + Wert in der CHECK-Liste der Migration.
 
 ## 1. User Stories
 
@@ -26,7 +27,7 @@
 | #   | Story                                                                                                           | Akzeptanzkriterium                                                                                                                                              |
 | --- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A-1 | Ich möchte mich im System anmelden, um meine Veranstaltungen verwalten zu können.                               | Gültige Anmeldedaten → Dashboard. Falsche Anmeldedaten → Fehlermeldung, kein Stack-Trace.                                                                       |
-| A-0 | Ich möchte die Branche (Sektor) meiner Organisation festlegen, damit ich die passenden Kampagnentypen anlegen kann. | Einstellungen: Auswahl aus `tourism` / `real_estate` / `event`. Kein Default; bestimmt die verfügbaren Kampagnentypen. Speichert in `tenants.sector`.        |
+| A-0 | Ich möchte meine zugewiesene Branche (Sektor) einsehen, damit ich weiß, welche Kampagnentypen ich anlegen kann. | Einstellungen zeigt die vom Betreiber zugewiesene Branche **schreibgeschützt** (aus `tenants.sector`) samt verfügbarer Kampagnentypen. Kunden können keinen Sektor anlegen oder ändern.        |
 | A-2 | Ich möchte eine neue Kampagne erstellen, um QR-Codes an Gäste verteilen zu können.                             | Formular: Kampagnentyp (nach Sektor) + Name + Datum (Pflicht); bei Immobilien zusätzlich Galerie/Feedback. POST → DB-Eintrag mit tenantId, campaign_type, flow_mode. Antwort: eventId + QR-URL. |
 | A-3 | Ich möchte den QR-Code einer Kampagne herunterladen, um ihn vor Ort einsetzen zu können.                        | QR als PNG herunterladbar. Kodierte URL: `/e/[eventId]`.                                                                                                        |
 | A-4 | Ich möchte hochgeladene Inhalte bzw. Feedback einer Kampagne einsehen können.                                   | `gallery`-Modus: Thumbnail-Raster mit Moderationsstatus. `feedback`-Modus: Liste aus Bewertung + Kommentar. Nur eigene tenantId-Inhalte sichtbar.               |

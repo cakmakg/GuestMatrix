@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { CAMPAIGN_TYPE_TUPLE, FLOW_MODE_TUPLE, SECTOR_TUPLE } from '@/lib/campaigns/config'
+import { CAMPAIGN_TYPE_TUPLE, FLOW_MODE_TUPLE } from '@/lib/sectors'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -56,14 +56,6 @@ export const createEventSchema = z.object({
   }),
   // Only honoured when the campaign type allows a choice (real estate); ignored otherwise.
   flowMode: z.enum(FLOW_MODE_TUPLE).optional(),
-})
-
-// ─── Tenant settings ──────────────────────────────────────────────────────────
-
-export const sectorSchema = z.object({
-  sector: z.enum(SECTOR_TUPLE, {
-    errorMap: () => ({ message: 'Invalid sector.' }),
-  }),
 })
 
 // ─── Submissions ──────────────────────────────────────────────────────────────

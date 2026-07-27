@@ -38,7 +38,7 @@ entspricht einer Zeile in dieser Tabelle.
 **Sektor:** Jede Kundenorganisation gehört zu genau einem Sektor. Es gibt **keinen Default** —
 der Sektor wird beim Onboarding gesetzt (Bestandszeilen wurden in der Multi-Sektor-Migration
 einmalig auf `tourism` backfillt). Die zulässigen Sektoren und ihre Kampagnentypen sind in
-`lib/campaigns/config.ts` definiert (siehe Abschnitt 1.4).
+`lib/sectors/` definiert (ein Ordner je Sektor + Registry; siehe Abschnitt 1.4).
 
 **Index:** `user_id` (der Unique Constraint erzeugt bereits einen Index)
 
@@ -237,11 +237,14 @@ direkt erfolgen, ohne bei jeder Submission-Abfrage einen JOIN auf `events` durch
 
 ### 1.4 Sektoren, Kampagnentypen & Flow-Modi (Registry)
 
-Die Multi-Sektor-Fähigkeit ist **config-getrieben**. Die einzige Quelle der Wahrheit ist
-`lib/campaigns/config.ts` (client- und serverseitig importierbar, keine Secrets). Die
-DB-Spalten `sector`, `campaign_type`, `flow_mode` sind bewusst `text` + `CHECK` (statt
-Postgres-`enum`), damit ein neuer Sektor ohne `ALTER TYPE` auskommt — nur die CHECK-Liste
-und ein Registry-Eintrag ändern sich.
+Die Multi-Sektor-Fähigkeit ist **config-getrieben** und **Betreiber-eigen**. Sektoren werden
+als Code entwickelt: je Sektor ein Ordner unter `lib/sectors/<id>/`, aggregiert von
+`lib/sectors/index.ts` (einzige Quelle der Wahrheit; client- und serverseitig importierbar,
+keine Secrets). So bleiben die Änderungen eines Sektors in seinem Ordner isoliert und über
+`git diff` je Sektor nachvollziehbar. Die DB-Spalten `sector`, `campaign_type`, `flow_mode`
+sind bewusst `text` + `CHECK` (statt Postgres-`enum`), damit ein neuer Sektor ohne `ALTER TYPE`
+auskommt — nur die CHECK-Liste und ein Registry-Eintrag ändern sich. Den Sektor eines Kunden
+weist der Betreiber zu (`tenants.sector`); Kunden können keinen Sektor anlegen.
 
 **Modell:** Tenant → Sektor (1); Sektor → Kampagnentypen (1:N); Kampagnentyp → Default-Flow-Modus.
 

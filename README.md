@@ -45,7 +45,7 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 ### Tenant (Kundenorganisation)
 
 - Anmeldung per E-Mail und Passwort
-- Branche (Sektor) unter **Einstellungen** wählen
+- Zugewiesene Branche (Sektor) unter **Einstellungen** einsehen (schreibgeschützt; wird vom Betreiber zugewiesen)
 - Kampagne erstellen (Name, Datum, Beschreibung) mit sektorabhängigem **Kampagnentyp**; bei Immobilien zusätzlich **Galerie oder Feedback** wählbar
 - QR-Code pro Kampagne als PNG herunterladen
 - Galerie-Kampagnen: Thumbnail-Raster mit Moderationsstatus
@@ -67,7 +67,7 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 
 ## Sektoren & Kampagnentypen
 
-Ein Tenant gehört zu genau einem Sektor. Jeder Sektor enthält einen oder mehrere Kampagnentypen; der Kampagnentyp legt den **Flow-Modus** des Gäste-Ablaufs fest. Die Registry unter [`lib/campaigns/config.ts`](lib/campaigns/config.ts) ist die einzige Quelle der Wahrheit — ein neuer Sektor = ein Eintrag dort plus ein Wert in der CHECK-Liste der Migration.
+Ein Tenant gehört zu genau einem Sektor. Jeder Sektor enthält einen oder mehrere Kampagnentypen; der Kampagnentyp legt den **Flow-Modus** des Gäste-Ablaufs fest. Sektoren gehören dem **Betreiber** und werden als Code entwickelt: je Sektor ein Ordner unter [`lib/sectors/`](lib/sectors), aggregiert von `lib/sectors/index.ts` (einzige Quelle der Wahrheit). Ein neuer Sektor = ein Ordner dort plus Registry-Eintrag und ein Wert in der CHECK-Liste der Migration. Den Sektor eines Kunden **weist der Betreiber zu** (`tenants.sector`); der Kunde sieht ihn nur schreibgeschützt und kann keinen Sektor anlegen.
 
 | Sektor | Kampagnentyp | Flow-Modus |
 |--------|--------------|------------|
@@ -177,7 +177,7 @@ app/
 │   ├── layout.tsx                    # Sidebar-Navigation
 │   ├── page.tsx                      # KPI-Übersicht (aktive Kampagnen) + Kampagnen-Liste
 │   ├── actions.ts                    # Kampagne archivieren / reaktivieren
-│   ├── settings/                     # Branche (Sektor) wählen
+│   ├── settings/                     # Zugewiesene Branche einsehen (schreibgeschützt)
 │   └── events/
 │       ├── new/                      # Kampagne erstellen (Typ + ggf. Flow-Modus)
 │       └── [eventId]/                # Kampagnen-Detail: Mediengrid oder Feedback-Liste + QR
@@ -191,8 +191,12 @@ lib/
 ├── auth/
 │   ├── session.ts      # requireTenantAuth · requireAnyAuth · requireEventOwnership
 │   └── errors.ts       # AppError-Hierarchie · handleRouteError
-├── campaigns/
-│   └── config.ts       # Sektor-/Kampagnen-Registry (Sektoren, Typen, Flow-Modi, Labels)
+├── sectors/            # Ein Ordner je Sektor (Betreiber-eigene Code-Module) + Registry
+│   ├── types.ts        # Vertrag: Typen, Tupel, Flow-Modus-Konstanten
+│   ├── index.ts        # Registry: aggregiert die Sektor-Module + Helfer
+│   ├── tourism/        # Sektor-Modul (tour, stay)
+│   ├── real_estate/    # Sektor-Modul (property)
+│   └── event/          # Sektor-Modul (wedding)
 ├── supabase/
 │   ├── browser.ts      # Browser-Client (Client Components)
 │   ├── server.ts       # Server-Client (SSR + Cookies)

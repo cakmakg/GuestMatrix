@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 
-import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/campaigns/config'
+import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/sectors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createEventSchema } from '@/lib/validation/schemas'

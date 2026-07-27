@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 
-import type { GuestFlowLabels } from '@/lib/campaigns/config'
+import type { GuestFlowLabels } from '@/lib/sectors'
 
 import GuestShell from './GuestShell'
 

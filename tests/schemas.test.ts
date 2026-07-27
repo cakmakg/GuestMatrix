@@ -8,7 +8,6 @@ import {
   presignSchema,
   ratingSchema,
   resetPasswordSchema,
-  sectorSchema,
 } from '@/lib/validation/schemas'
 
 describe('loginSchema', () => {
@@ -201,17 +200,5 @@ describe('feedbackSchema', () => {
 
   it('rejects an out-of-range rating', () => {
     expect(feedbackSchema.safeParse({ rating: 6 }).success).toBe(false)
-  })
-})
-
-describe('sectorSchema', () => {
-  it('accepts known sectors', () => {
-    for (const sector of ['tourism', 'real_estate', 'event']) {
-      expect(sectorSchema.safeParse({ sector }).success).toBe(true)
-    }
-  })
-
-  it('rejects an unknown sector', () => {
-    expect(sectorSchema.safeParse({ sector: 'retail' }).success).toBe(false)
   })
 })

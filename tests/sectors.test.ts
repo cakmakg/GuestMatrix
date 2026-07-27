@@ -15,7 +15,10 @@ import {
   isValidCampaignForSector,
   resolveFlowMode,
   resolveLabels,
-} from '@/lib/campaigns/config'
+} from '@/lib/sectors'
+import { event } from '@/lib/sectors/event'
+import { realEstate } from '@/lib/sectors/real_estate'
+import { tourism } from '@/lib/sectors/tourism'
 
 describe('registry integrity', () => {
   it('every campaign type references a valid sector and default flow mode', () => {
@@ -125,5 +128,22 @@ describe('string narrowing guards', () => {
     expect(isCampaignType('cruise')).toBe(false)
     expect(isFlowMode('feedback')).toBe(true)
     expect(isFlowMode('none')).toBe(false)
+  })
+})
+
+describe('per-sector modules aggregate into the registry', () => {
+  it('each module label appears in SECTORS', () => {
+    expect(SECTORS.tourism.label).toBe(tourism.label)
+    expect(SECTORS.real_estate.label).toBe(realEstate.label)
+    expect(SECTORS.event.label).toBe(event.label)
+  })
+
+  it('each module campaign type is registered under its own sector', () => {
+    for (const sectorModule of [tourism, realEstate, event]) {
+      for (const [type, config] of Object.entries(sectorModule.campaignTypes)) {
+        expect(config?.sector).toBe(sectorModule.id)
+        expect(CAMPAIGN_TYPES[type as keyof typeof CAMPAIGN_TYPES]).toStrictEqual(config)
+      }
+    }
   })
 })

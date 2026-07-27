@@ -1,4 +1,4 @@
-import type { FlowMode, GuestFlowLabels } from '@/lib/campaigns/config'
+import type { FlowMode, GuestFlowLabels } from '@/lib/sectors'
 
 import FeedbackFlow from './FeedbackFlow'
 import GalleryFlow from './GalleryFlow'

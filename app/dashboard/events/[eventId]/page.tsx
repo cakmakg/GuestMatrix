@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import QRCode from 'qrcode'
 
-import { getCampaignConfig, isCampaignType, isFlowMode } from '@/lib/campaigns/config'
+import { getCampaignConfig, isCampaignType, isFlowMode } from '@/lib/sectors'
 import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
