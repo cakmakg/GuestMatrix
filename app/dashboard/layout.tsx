@@ -30,7 +30,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
             className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700
                        rounded-lg hover:bg-gray-100 transition-colors"
           >
-            <span>➕</span> Event erstellen
+            <span>➕</span> Kampagne erstellen
+          </Link>
+          <Link
+            href="/dashboard/settings"
+            className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700
+                       rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <span>⚙️</span> Einstellungen
           </Link>
         </nav>
         <div className="px-3 py-4 border-t border-gray-100">

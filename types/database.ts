@@ -24,6 +24,7 @@ export type Database = {
           user_id: string
           name: string
           brand_name: string
+          sector: string
           created_at: string
           updated_at: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           user_id: string
           name: string
           brand_name: string
+          sector: string
           created_at?: string
           updated_at?: string
         }
@@ -40,6 +42,7 @@ export type Database = {
           user_id?: string
           name?: string
           brand_name?: string
+          sector?: string
           updated_at?: string
         }
         Relationships: []
@@ -51,6 +54,9 @@ export type Database = {
           name: string
           date: string
           description: string | null
+          campaign_type: string
+          flow_mode: string
+          archived_at: string | null
           created_at: string
           updated_at: string
         }
@@ -60,6 +66,9 @@ export type Database = {
           name: string
           date: string
           description?: string | null
+          campaign_type: string
+          flow_mode: string
+          archived_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -69,6 +78,9 @@ export type Database = {
           name?: string
           date?: string
           description?: string | null
+          campaign_type?: string
+          flow_mode?: string
+          archived_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -87,11 +99,12 @@ export type Database = {
           event_id: string
           guest_user_id: string
           media_url: string | null
-          file_type: 'image' | 'video'
+          file_type: 'image' | 'video' | null
           consent_at: string
           uploaded_at: string | null
           moderation_flag: boolean
           rating: number | null
+          comment: string | null
           deleted_at: string | null
           created_at: string
         }
@@ -101,20 +114,22 @@ export type Database = {
           event_id: string
           guest_user_id: string
           media_url?: string | null
-          file_type: 'image' | 'video'
+          file_type?: 'image' | 'video' | null
           consent_at: string
           uploaded_at?: string | null
           moderation_flag?: boolean
           rating?: number | null
+          comment?: string | null
           deleted_at?: string | null
           created_at?: string
         }
         Update: {
           media_url?: string | null
-          file_type?: 'image' | 'video'
+          file_type?: 'image' | 'video' | null
           uploaded_at?: string | null
           moderation_flag?: boolean
           rating?: number | null
+          comment?: string | null
           deleted_at?: string | null
         }
         Relationships: [

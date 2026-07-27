@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 
+import type { FlowMode, GuestFlowLabels } from '@/lib/campaigns/config'
+
 import GuestFlow from './GuestFlow'
 
 type PublicEvent = {
@@ -7,6 +9,9 @@ type PublicEvent = {
   name: string
   description: string | null
   brandName: string | null
+  campaignType: string
+  flowMode: FlowMode
+  labels: GuestFlowLabels
 }
 
 async function fetchPublicEvent(eventId: string): Promise<PublicEvent | null> {
@@ -34,6 +39,8 @@ export default async function GuestPage({ params }: { params: Promise<{ eventId:
       eventName={event.name}
       brandName={event.brandName}
       description={event.description}
+      flowMode={event.flowMode}
+      labels={event.labels}
     />
   )
 }

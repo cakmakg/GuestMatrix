@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 
+import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/campaigns/config'
 import { handleRouteError, ValidationError } from '@/lib/auth/errors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -10,6 +11,9 @@ type EventListRow = {
   name: string
   date: string
   description: string | null
+  campaign_type: string
+  flow_mode: string
+  archived_at: string | null
   created_at: string
 }
 
@@ -20,7 +24,7 @@ export async function GET(): Promise<Response> {
 
     const { data, error } = await supabase
       .from('events')
-      .select('id, name, date, description, created_at')
+      .select('id, name, date, description, campaign_type, flow_mode, archived_at, created_at')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
 
@@ -45,6 +49,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const supabase = await createSupabaseServerClient()
+
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('sector')
+      .eq('id', tenantId)
+      .single<{ sector: string }>()
+
+    const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
+    if (!sector || !isValidCampaignForSector(sector, parsed.data.campaignType)) {
+      throw new ValidationError('Campaign type does not match sector.')
+    }
+
+    const flowMode = resolveFlowMode(parsed.data.campaignType, parsed.data.flowMode ?? null)
+
     const { data, error } = await supabase
       .from('events')
       .insert({
@@ -52,9 +70,17 @@ export async function POST(request: NextRequest): Promise<Response> {
         name: parsed.data.name,
         date: parsed.data.date,
         description: parsed.data.description ?? null,
+        campaign_type: parsed.data.campaignType,
+        flow_mode: flowMode,
       })
-      .select('id, name, date')
-      .single<{ id: string; name: string; date: string }>()
+      .select('id, name, date, campaign_type, flow_mode')
+      .single<{
+        id: string
+        name: string
+        date: string
+        campaign_type: string
+        flow_mode: string
+      }>()
 
     if (error || !data) {
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })

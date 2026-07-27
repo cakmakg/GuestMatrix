@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createEventSchema,
+  feedbackSchema,
   loginSchema,
   moderationSchema,
   presignSchema,
   ratingSchema,
   resetPasswordSchema,
+  sectorSchema,
 } from '@/lib/validation/schemas'
 
 describe('loginSchema', () => {
@@ -35,29 +37,44 @@ describe('loginSchema', () => {
 })
 
 describe('createEventSchema', () => {
+  const validBase = {
+    name: 'Hochzeit Schmidt',
+    date: '2026-08-15',
+    campaignType: 'wedding' as const,
+  }
+
   it('accepts minimal valid event', () => {
-    expect(
-      createEventSchema.safeParse({ name: 'Hochzeit Schmidt', date: '2026-08-15' }).success,
-    ).toBe(true)
+    expect(createEventSchema.safeParse(validBase).success).toBe(true)
   })
 
   it('rejects empty name', () => {
-    expect(createEventSchema.safeParse({ name: '', date: '2026-08-15' }).success).toBe(false)
+    expect(createEventSchema.safeParse({ ...validBase, name: '' }).success).toBe(false)
   })
 
   it('rejects invalid date format', () => {
-    expect(createEventSchema.safeParse({ name: 'Test', date: '15.08.2026' }).success).toBe(false)
-    expect(createEventSchema.safeParse({ name: 'Test', date: '2026/08/15' }).success).toBe(false)
+    expect(createEventSchema.safeParse({ ...validBase, date: '15.08.2026' }).success).toBe(false)
+    expect(createEventSchema.safeParse({ ...validBase, date: '2026/08/15' }).success).toBe(false)
   })
 
   it('trims description whitespace', () => {
-    const result = createEventSchema.safeParse({
-      name: 'Test Event',
-      date: '2026-08-15',
-      description: '  Beschreibung  ',
-    })
+    const result = createEventSchema.safeParse({ ...validBase, description: '  Beschreibung  ' })
     expect(result.success).toBe(true)
     if (result.success) expect(result.data.description).toBe('Beschreibung')
+  })
+
+  it('requires a campaign type', () => {
+    expect(createEventSchema.safeParse({ name: 'Test', date: '2026-08-15' }).success).toBe(false)
+  })
+
+  it('rejects an unknown campaign type', () => {
+    expect(createEventSchema.safeParse({ ...validBase, campaignType: 'cruise' }).success).toBe(
+      false,
+    )
+  })
+
+  it('accepts an optional flow mode', () => {
+    expect(createEventSchema.safeParse({ ...validBase, flowMode: 'feedback' }).success).toBe(true)
+    expect(createEventSchema.safeParse({ ...validBase, flowMode: 'invalid' }).success).toBe(false)
   })
 })
 
@@ -155,5 +172,46 @@ describe('resetPasswordSchema', () => {
     expect(
       resetPasswordSchema.safeParse({ password: 'short', confirmPassword: 'short' }).success,
     ).toBe(false)
+  })
+})
+
+describe('feedbackSchema', () => {
+  it('accepts a rating only', () => {
+    expect(feedbackSchema.safeParse({ rating: 4 }).success).toBe(true)
+  })
+
+  it('accepts a comment only', () => {
+    expect(feedbackSchema.safeParse({ comment: 'Sehr schön!' }).success).toBe(true)
+  })
+
+  it('accepts a submissionId only (media already uploaded)', () => {
+    expect(
+      feedbackSchema.safeParse({ submissionId: '550e8400-e29b-41d4-a716-446655440000' }).success,
+    ).toBe(true)
+  })
+
+  it('rejects an empty submission', () => {
+    expect(feedbackSchema.safeParse({}).success).toBe(false)
+    expect(feedbackSchema.safeParse({ comment: '   ' }).success).toBe(false)
+  })
+
+  it('rejects a comment that is too long', () => {
+    expect(feedbackSchema.safeParse({ comment: 'x'.repeat(1001) }).success).toBe(false)
+  })
+
+  it('rejects an out-of-range rating', () => {
+    expect(feedbackSchema.safeParse({ rating: 6 }).success).toBe(false)
+  })
+})
+
+describe('sectorSchema', () => {
+  it('accepts known sectors', () => {
+    for (const sector of ['tourism', 'real_estate', 'event']) {
+      expect(sectorSchema.safeParse({ sector }).success).toBe(true)
+    }
+  })
+
+  it('rejects an unknown sector', () => {
+    expect(sectorSchema.safeParse({ sector: 'retail' }).success).toBe(false)
   })
 })
