@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createEventSchema,
   feedbackSchema,
+  guestbookMessageSchema,
   loginSchema,
   moderationSchema,
   presignSchema,
@@ -114,10 +115,34 @@ describe('presignSchema', () => {
     eventId: '550e8400-e29b-41d4-a716-446655440000',
     fileName: 'photo.jpg',
     mimeType: 'image/jpeg' as const,
+    consent: true as const,
   }
 
   it('accepts valid upload request', () => {
     expect(presignSchema.safeParse(validBase).success).toBe(true)
+  })
+
+  it('rejects a request without consent', () => {
+    const withoutConsent = {
+      eventId: validBase.eventId,
+      fileName: validBase.fileName,
+      mimeType: validBase.mimeType,
+    }
+    expect(presignSchema.safeParse(withoutConsent).success).toBe(false)
+    expect(presignSchema.safeParse({ ...validBase, consent: false }).success).toBe(false)
+  })
+
+  it('accepts an optional guest name and message (guestbook)', () => {
+    const result = presignSchema.safeParse({
+      ...validBase,
+      guestName: '  Familie Schmidt  ',
+      message: '  Alles Gute!  ',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.guestName).toBe('Familie Schmidt')
+      expect(result.data.message).toBe('Alles Gute!')
+    }
   })
 
   it('accepts all allowed MIME types', () => {
@@ -200,5 +225,47 @@ describe('feedbackSchema', () => {
 
   it('rejects an out-of-range rating', () => {
     expect(feedbackSchema.safeParse({ rating: 6 }).success).toBe(false)
+  })
+})
+
+describe('guestbookMessageSchema', () => {
+  const validBase = { guestName: 'Anna & Ben', message: 'Herzlichen Glückwunsch!', consent: true }
+
+  it('accepts a name + message with consent', () => {
+    expect(guestbookMessageSchema.safeParse(validBase).success).toBe(true)
+  })
+
+  it('trims name and message', () => {
+    const result = guestbookMessageSchema.safeParse({
+      guestName: '  Anna  ',
+      message: '  Alles Liebe  ',
+      consent: true,
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.guestName).toBe('Anna')
+      expect(result.data.message).toBe('Alles Liebe')
+    }
+  })
+
+  it('rejects a missing or empty name', () => {
+    expect(guestbookMessageSchema.safeParse({ message: 'Hi', consent: true }).success).toBe(false)
+    expect(
+      guestbookMessageSchema.safeParse({ guestName: '   ', message: 'Hi', consent: true }).success,
+    ).toBe(false)
+  })
+
+  it('rejects an empty message', () => {
+    expect(
+      guestbookMessageSchema.safeParse({ guestName: 'Anna', message: '   ', consent: true })
+        .success,
+    ).toBe(false)
+  })
+
+  it('rejects without consent', () => {
+    expect(
+      guestbookMessageSchema.safeParse({ guestName: 'Anna', message: 'Hi', consent: false })
+        .success,
+    ).toBe(false)
   })
 })

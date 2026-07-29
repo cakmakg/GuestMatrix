@@ -100,6 +100,7 @@ export type Database = {
           guest_user_id: string
           media_url: string | null
           file_type: 'image' | 'video' | null
+          guest_name: string | null
           consent_at: string
           uploaded_at: string | null
           moderation_flag: boolean
@@ -115,6 +116,7 @@ export type Database = {
           guest_user_id: string
           media_url?: string | null
           file_type?: 'image' | 'video' | null
+          guest_name?: string | null
           consent_at: string
           uploaded_at?: string | null
           moderation_flag?: boolean
@@ -126,6 +128,7 @@ export type Database = {
         Update: {
           media_url?: string | null
           file_type?: 'image' | 'video' | null
+          guest_name?: string | null
           uploaded_at?: string | null
           moderation_flag?: boolean
           rating?: number | null

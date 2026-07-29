@@ -6,6 +6,17 @@ import { CAMPAIGN_TYPE_TUPLE, FLOW_MODE_TUPLE } from '@/lib/sectors'
 
 const uuid = z.string().uuid()
 
+// Gastname für den Gästebuch-Gruß (Event/Hochzeit). Auf DB-Ebene optional; im
+// guestbook-Modus erzwingt die Validierung unten einen Namen.
+// trim() vor min(1), damit reine Leerzeichen als leer gelten.
+const guestName = z.string().trim().min(1, 'Name is required.').max(80)
+
+// Server-seitiges Consent-Gate: nur `true` ist gültig. Fehlt/ist false → kein
+// Submission-Datensatz, keine Upload-URL. (Gästemedien = personenbezogene Daten.)
+const consent = z.literal(true, {
+  errorMap: () => ({ message: 'Consent is required.' }),
+})
+
 // ─── MIME types (single source of truth for both validation and storage) ──────
 
 export const ALLOWED_MIME_TYPES = [
@@ -72,6 +83,18 @@ export const presignSchema = z.object({
   mimeType: z.enum(ALLOWED_MIME_TYPES, {
     errorMap: () => ({ message: 'File type not allowed.' }),
   }),
+  consent,
+  // Nur im guestbook-Modus mitgesendet: Name + Glückwunsch am Medienbeitrag.
+  guestName: guestName.optional(),
+  message: z.string().max(1000, 'Message is too long.').trim().optional(),
+})
+
+// Gästebuch-Modus (Event/Hochzeit) ohne Medien: reiner Glückwunsch mit Name.
+// Für Beiträge mit Medien wird stattdessen presignSchema (guestName + message) genutzt.
+export const guestbookMessageSchema = z.object({
+  guestName,
+  message: z.string().trim().min(1, 'Message is required.').max(1000),
+  consent,
 })
 
 export const moderationSchema = z.object({

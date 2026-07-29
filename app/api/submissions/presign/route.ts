@@ -22,7 +22,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       const message = parsed.error.issues[0]?.message ?? 'Invalid request.'
       throw new ValidationError(message)
     }
-    const { eventId, mimeType } = parsed.data
+    const { eventId, mimeType, guestName, message } = parsed.data
 
     const supabase = await createSupabaseServerClient()
 
@@ -45,6 +45,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         event_id: eventId,
         guest_user_id: userId,
         file_type: mimeType.startsWith('image/') ? 'image' : 'video',
+        // guestbook: Name + Glückwunsch am Medienbeitrag; sonst null.
+        guest_name: guestName ?? null,
+        comment: message ?? null,
         consent_at: new Date().toISOString(),
       })
       .select('id')

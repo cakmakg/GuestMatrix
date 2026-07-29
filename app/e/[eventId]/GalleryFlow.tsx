@@ -87,6 +87,7 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
           eventId,
           fileName: selectedFile.name,
           mimeType: selectedFile.type,
+          consent: true,
         }),
       })
       if (!presignRes.ok) {

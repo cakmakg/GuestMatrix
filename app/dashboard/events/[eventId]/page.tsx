@@ -14,6 +14,7 @@ type SubmissionRow = {
   id: string
   media_url: string | null
   file_type: 'image' | 'video' | null
+  guest_name: string | null
   uploaded_at: string | null
   moderation_flag: boolean
   rating: number | null
@@ -40,7 +41,7 @@ async function getEventData(tenantId: string, eventId: string) {
 
   const { data } = await supabaseAdmin
     .from('submissions')
-    .select('id, media_url, file_type, uploaded_at, moderation_flag, rating, comment')
+    .select('id, media_url, file_type, guest_name, uploaded_at, moderation_flag, rating, comment')
     .eq('event_id', eventId)
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
@@ -97,6 +98,26 @@ export default async function EventDetailPage({
 
   const flagged = submissions.filter((s) => s.moderation_flag).length
   const commentCount = submissions.filter((s) => s.comment && s.comment.trim() !== '').length
+  const mediaCount = submissions.filter((s) => s.media_url).length
+
+  const statCards: { label: string; value: string | number }[] =
+    flowMode === 'feedback'
+      ? [
+          { label: 'Feedback', value: submissions.length },
+          { label: 'Kommentare', value: commentCount },
+          { label: 'Ø Bewertung', value: avgRating !== null ? avgRating.toFixed(1) : '—' },
+        ]
+      : flowMode === 'guestbook'
+        ? [
+            { label: 'Beiträge', value: submissions.length },
+            { label: 'Mit Foto/Video', value: mediaCount },
+            { label: 'Sichtbar', value: submissions.length - flagged },
+          ]
+        : [
+            { label: 'Uploads', value: submissions.length },
+            { label: 'Sichtbar', value: submissions.length - flagged },
+            { label: 'Ø Bewertung', value: avgRating !== null ? avgRating.toFixed(1) : '—' },
+          ]
 
   return (
     <div className="p-8">
@@ -129,26 +150,12 @@ export default async function EventDetailPage({
       <div className="grid grid-cols-3 gap-6 mb-8">
         {/* Stats */}
         <div className="col-span-2 grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl p-5 border border-gray-200">
-            <p className="text-sm text-gray-500">
-              {flowMode === 'feedback' ? 'Feedback' : 'Uploads'}
-            </p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{submissions.length}</p>
-          </div>
-          <div className="bg-white rounded-xl p-5 border border-gray-200">
-            <p className="text-sm text-gray-500">
-              {flowMode === 'feedback' ? 'Kommentare' : 'Sichtbar'}
-            </p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
-              {flowMode === 'feedback' ? commentCount : submissions.length - flagged}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-5 border border-gray-200">
-            <p className="text-sm text-gray-500">Ø Bewertung</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
-              {avgRating !== null ? avgRating.toFixed(1) : '—'}
-            </p>
-          </div>
+          {statCards.map((card) => (
+            <div key={card.label} className="bg-white rounded-xl p-5 border border-gray-200">
+              <p className="text-sm text-gray-500">{card.label}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{card.value}</p>
+            </div>
+          ))}
         </div>
 
         {/* QR Code */}
@@ -238,6 +245,93 @@ export default async function EventDetailPage({
                       <button
                         type="submit"
                         className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                      >
+                        🗑
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      ) : flowMode === 'guestbook' ? (
+        /* ── Gästebuch (flow_mode = guestbook) — nur für das Brautpaar ──────── */
+        submissions.length === 0 ? (
+          <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
+            <p className="text-gray-400">Noch keine Einträge im Gästebuch.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <p className="font-medium text-gray-800">Gästebuch ({submissions.length})</p>
+              <p className="text-sm text-gray-400">{flagged} markiert</p>
+            </div>
+            <ul className="divide-y divide-gray-100">
+              {submissions.map((sub) => (
+                <li key={sub.id} className="px-5 py-4 flex items-start gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {sub.guest_name && sub.guest_name.trim() !== '' ? sub.guest_name : 'Anonym'}
+                    </p>
+                    {sub.comment && sub.comment.trim() !== '' ? (
+                      <p className="mt-1 text-sm whitespace-pre-wrap break-words text-gray-700">
+                        {sub.comment}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm italic text-gray-300">Kein Text</p>
+                    )}
+                    {sub.moderation_flag && (
+                      <span className="mt-1 inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                        Gesperrt
+                      </span>
+                    )}
+                  </div>
+
+                  {sub.signedUrl && (
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      {sub.file_type === 'video' ? (
+                        <video
+                          src={sub.signedUrl}
+                          className="h-full w-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={sub.signedUrl} alt="" className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <form
+                      action={async () => {
+                        'use server'
+                        await moderateAction(sub.id, !sub.moderation_flag)
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className={`rounded px-2 py-1 text-xs transition-colors ${
+                          sub.moderation_flag
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                        }`}
+                      >
+                        {sub.moderation_flag ? 'Freigeben' : 'Sperren'}
+                      </button>
+                    </form>
+                    <form
+                      action={async () => {
+                        'use server'
+                        await deleteFromDashboardAction(sub.id)
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className="rounded bg-red-100 px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-200"
                       >
                         🗑
                       </button>
