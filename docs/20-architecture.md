@@ -71,8 +71,8 @@ create table events (
   description   text,
   campaign_type text not null        -- 'tour' | 'stay' | 'property' | 'wedding'
                 check (campaign_type in ('tour', 'stay', 'property', 'wedding')),
-  flow_mode     text not null        -- 'gallery' | 'feedback' (aus dem Kampagnentyp abgeleitet)
-                check (flow_mode in ('gallery', 'feedback')),
+  flow_mode     text not null        -- 'gallery' | 'feedback' | 'guestbook' (aus dem Kampagnentyp abgeleitet)
+                check (flow_mode in ('gallery', 'feedback', 'guestbook')),
   archived_at   timestamptz,         -- aktive Kampagne = archived_at is null
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
@@ -82,8 +82,9 @@ create table events (
 **Kampagnentyp & Flow-Modus:** Jede Kampagne (`event`) hat einen `campaign_type`, der zum
 Sektor des Tenants passen muss, und einen daraus abgeleiteten `flow_mode`. Der Server setzt
 `flow_mode` über `resolveFlowMode()` aus der Registry; nur der Typ `property` (Immobilien)
-erlaubt dem Operator, zwischen `gallery` und `feedback` zu wählen. Bestandszeilen wurden auf
-`tour` / `gallery` backfillt.
+erlaubt dem Operator, zwischen `gallery` und `feedback` zu wählen. Der Typ `wedding` (Event)
+nutzt den privaten `guestbook`-Modus (Name + Glückwunsch + optionale Medien, nur für den
+Veranstalter/das Brautpaar sichtbar). Bestandszeilen wurden auf `tour` / `gallery` backfillt.
 
 **Indizes:**
 
@@ -248,18 +249,19 @@ weist der Betreiber zu (`tenants.sector`); Kunden können keinen Sektor anlegen.
 
 **Modell:** Tenant → Sektor (1); Sektor → Kampagnentypen (1:N); Kampagnentyp → Default-Flow-Modus.
 
-| Sektor | Kampagnentypen | Flow-Modus |
-| ------------- | -------------------- | ---------------------------------- |
-| `tourism`     | `tour`, `stay`       | `gallery` (tour) · `feedback` (stay) |
-| `real_estate` | `property`           | `gallery` **oder** `feedback` (wählbar) |
-| `event`       | `wedding`            | `gallery`                          |
+| Sektor        | Kampagnentypen | Flow-Modus                              |
+| ------------- | -------------- | --------------------------------------- |
+| `tourism`     | `tour`, `stay` | `gallery` (tour) · `feedback` (stay)    |
+| `real_estate` | `property`     | `gallery` **oder** `feedback` (wählbar) |
+| `event`       | `wedding`      | `guestbook`                             |
 
 **Flow-Modus-Fähigkeiten** (`FLOW_MODE_CAPABILITIES`):
 
-| Modus      | mediaRequired | gallery | reciprocity | rating | comment |
-| ---------- | ------------- | ------- | ----------- | ------ | ------- |
-| `gallery`  | ✅            | ✅      | ✅          | ✅     | ❌      |
-| `feedback` | ❌            | ❌      | ❌          | ✅     | ✅      |
+| Modus       | mediaRequired | gallery | reciprocity | rating | comment | guestName |
+| ----------- | ------------- | ------- | ----------- | ------ | ------- | --------- |
+| `gallery`   | ✅            | ✅      | ✅          | ✅     | ❌      | ❌        |
+| `feedback`  | ❌            | ❌      | ❌          | ✅     | ✅      | ❌        |
+| `guestbook` | ❌            | ❌      | ❌          | ❌     | ✅      | ✅        |
 
 Registry-Helfer (Auszug): `campaignTypesForSector`, `isValidCampaignForSector`,
 `resolveFlowMode`, `getCapabilities`, `resolveLabels` sowie die Narrowing-Guards
@@ -377,6 +379,31 @@ Medium. Endpunkt: `POST /api/events/[eventId]/feedback` (Gast-Session via `requi
 
 Keine Galerie, keine Reziprozitätssperre. Das Dashboard zeigt für diese Kampagnen eine
 Feedback-Liste (Bewertung + Kommentar) statt eines Medienrasters.
+
+### Gästebuch-Ablauf (`guestbook`-Modus)
+
+Kampagnen im `guestbook`-Modus (Hochzeit, Marke **Momento**) sammeln **Name + Glückwunsch +
+optionale Medien**, sichtbar **nur für den Veranstalter (Brautpaar)** — keine geteilte Galerie,
+keine Reziprozität, kein Rating. Ein `submission`-Datensatz trägt zusätzlich `guest_name`.
+
+- **Mit Medien:** normaler Presigned-Upload (`presign` → PUT → `confirm`); `guestName` +
+  `message` werden bereits beim `presign` an den Medienbeitrag geschrieben (je Datei ein Datensatz).
+- **Reiner Glückwunsch (ohne Medien):** `POST /api/events/[eventId]/guestbook`
+  (`guestbookMessageSchema`: `guestName` + `message` + `consent`), legt einen abgeschlossenen,
+  medienlosen Beitrag an.
+
+Consent wird serverseitig erzwungen (`consent: z.literal(true)` in `presignSchema` /
+`guestbookMessageSchema`). Das Dashboard zeigt eine private Gästebuch-Liste (Name + Text +
+optionales Medium) mit Sperren/Löschen. Geteilte Galerie / Live-Fotowand folgt später als
+`gallery`-Modus.
+
+### Tarife (Basis, ohne Zahlung)
+
+Tarife sind als Code-Registry gepflegt (`lib/plans/`, analog zu `lib/sectors/`): `free` / `pro`
+mit Kontingenten (aktive Kampagnen, Uploads je Kampagne). Der Tarif steht in `tenants.plan`
+(Default `free`, CHECK `free|pro`). Durchsetzung bei der Kampagnenerstellung (aktive Kampagnen)
+und im `presign` (abgeschlossene Uploads je Event → 403 bei Überschreitung). Tatsächliche
+Bezahlung (Stripe) ist bewusst ausgelagert.
 
 ---
 
