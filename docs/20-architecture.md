@@ -14,6 +14,14 @@ Tenant-Isolierung wird nicht auf Anwendungsebene, sondern auf Postgres-Ebene üb
 ohne Policy sind nicht erreichbar. Der `supabase-js`-Client arbeitet stets mit dem JWT
 des angemeldeten Benutzers; dadurch greifen die Policies automatisch.
 
+**Zwei-Schichten-Zugriffsmodell (GRANT + RLS):** Zugriff auf eine Tabelle erfordert
+**beides** — eine Tabellen-Berechtigung (`GRANT`) für die API-Rolle (`anon`, `authenticated`,
+`service_role`) **und** eine erfüllte RLS-Policy für die Zeile. Die GRANTs erteilt
+**Migration `0007_grants.sql`** (inkl. `alter default privileges`, damit künftige Migrations-
+Tabellen automatisch berechtigt sind). Fehlen die GRANTs, scheitert bereits der PostgREST-
+Rollenwechsel mit `42501 permission denied` — noch bevor RLS greift. `service_role` (Admin-
+Client) besitzt zusätzlich `BYPASSRLS`; das umgeht die **Policies**, nicht aber die **GRANTs**.
+
 ---
 
 ### Tabelle: `tenants`
@@ -85,6 +93,14 @@ Sektor des Tenants passen muss, und einen daraus abgeleiteten `flow_mode`. Der S
 erlaubt dem Operator, zwischen `gallery` und `feedback` zu wählen. Der Typ `wedding` (Event)
 nutzt den privaten `guestbook`-Modus (Name + Glückwunsch + optionale Medien, nur für den
 Veranstalter/das Brautpaar sichtbar). Bestandszeilen wurden auf `tour` / `gallery` backfillt.
+
+> **Status (Retrenchment, Migration 0006):** Die oben gezeigten CHECK-Listen sind der
+> **designed-for**-Zielzustand. **Aktiv** ist ausschließlich `tourism / tour / gallery`:
+> `0006_lockdown_tourism_gallery.sql` verengt die drei CHECKs auf je einen Wert
+> (`sector = 'tourism'`, `campaign_type = 'tour'`, `flow_mode = 'gallery'`), sodass die DB
+> keine `stay`/`property`/`wedding`- bzw. `feedback`/`guestbook`-Zeile halten kann. Die Modi
+> `feedback`/`guestbook` und die Sektoren `real_estate`/`event` bleiben als Code erhalten,
+> sind aber deaktiviert. Wiederaktivierung: **`docs/extension-points.md`**.
 
 **Indizes:**
 
@@ -208,10 +224,16 @@ create policy "guest_delete_own_submission"
   on submissions for delete
   using (guest_user_id = auth.uid());
 
--- Galerie: nicht geflaggte und nicht gelöschte Submissions sind öffentlich lesbar
+-- Galerie: sichtbar erst nach eigenem Upload (Reziprozitätssperre in RLS, Migration 0002).
+-- has_completed_upload() ist security definer und bricht die RLS-Rekursion.
 create policy "public_gallery_select"
   on submissions for select
-  using (moderation_flag = false and deleted_at is null);
+  using (
+    moderation_flag = false
+    and deleted_at is null
+    and uploaded_at is not null
+    and public.has_completed_upload(event_id)
+  );
 ```
 
 ---
@@ -306,6 +328,9 @@ const { data, error } = await supabase.auth.signInAnonymously()
 // data.user.id → wird als guest_user_id in die submissions-Tabelle geschrieben
 ```
 
+- **Voraussetzung:** Anonyme Anmeldungen müssen aktiviert sein — lokal via `supabase/config.toml`
+  (`enable_anonymous_sign_ins = true`), in der Cloud via Dashboard (Authentication → Sign In /
+  Providers → Anonymous). Ohne diese Einstellung schlägt der gesamte Gäste-Flow fehl.
 - `signInAnonymously()` erstellt in Supabase Auth einen echten Benutzereintrag und gibt
   ein anonymes JWT zurück.
 - Mit diesem JWT lösen RLS-Policies die Bedingung `auth.uid() = guest_user_id` automatisch auf.

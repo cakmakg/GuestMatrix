@@ -48,7 +48,7 @@ export default async function NewEventPage({
   const singleType = types.length === 1 ? types[0] : null
   // Flow-Modus-Wahl nur, wenn der (einzige) Typ sie erlaubt (aktuell: Immobilie).
   const flowChoiceType =
-    singleType && getCampaignConfig(singleType).allowFlowModeChoice ? singleType : null
+    singleType && getCampaignConfig(singleType)?.allowFlowModeChoice ? singleType : null
 
   return (
     <div className="p-8 max-w-xl">
@@ -57,7 +57,7 @@ export default async function NewEventPage({
           ← Zurück
         </Link>
         <h1 className="text-2xl font-bold text-gray-900 mt-2">Neue Kampagne erstellen</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Branche: {SECTORS[sector].label}</p>
+        <p className="text-sm text-gray-500 mt-0.5">Branche: {SECTORS[sector]?.label}</p>
       </div>
 
       {error && (
@@ -93,7 +93,7 @@ export default async function NewEventPage({
                     required
                     className="w-4 h-4 accent-indigo-600"
                   />
-                  <span className="text-sm text-gray-800">{CAMPAIGN_TYPES[type].label}</span>
+                  <span className="text-sm text-gray-800">{CAMPAIGN_TYPES[type]?.label}</span>
                 </label>
               ))}
             </div>

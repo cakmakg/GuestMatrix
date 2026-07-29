@@ -45,7 +45,7 @@ export default async function SettingsPage() {
 
           {sector ? (
             <div className="space-y-3">
-              <p className="text-lg font-semibold text-gray-900">{SECTORS[sector].label}</p>
+              <p className="text-lg font-semibold text-gray-900">{SECTORS[sector]?.label}</p>
               <div>
                 <p className="text-xs text-gray-500 mb-1.5">Verfügbare Kampagnentypen</p>
                 <div className="flex flex-wrap gap-2">
@@ -54,7 +54,7 @@ export default async function SettingsPage() {
                       key={type}
                       className="inline-block px-2.5 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700"
                     >
-                      {getCampaignConfig(type).label}
+                      {getCampaignConfig(type)?.label}
                     </span>
                   ))}
                 </div>

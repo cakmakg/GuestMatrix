@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CAMPAIGN_TYPES,
-  CAMPAIGN_TYPE_TUPLE,
-  FLOW_MODE_TUPLE,
   SECTORS,
-  SECTOR_TUPLE,
   campaignTypesForSector,
+  getCampaignConfig,
   getCapabilities,
   isCampaignType,
   isFlowMode,
@@ -16,164 +14,112 @@ import {
   resolveFlowMode,
   resolveLabels,
 } from '@/lib/sectors'
-import { event } from '@/lib/sectors/event'
-import { realEstate } from '@/lib/sectors/real_estate'
 import { tourism } from '@/lib/sectors/tourism'
 
-describe('registry integrity', () => {
-  it('every campaign type references a valid sector and default flow mode', () => {
-    for (const type of CAMPAIGN_TYPE_TUPLE) {
-      const config = CAMPAIGN_TYPES[type]
-      expect(SECTOR_TUPLE).toContain(config.sector)
-      expect(FLOW_MODE_TUPLE).toContain(config.defaultFlowMode)
-    }
+// Retrenchment (Migration 0006): Aktiv registriert ist NUR tourism / tour / gallery — die
+// einzige MVP-Validierungsbahn. Die übrigen Sektoren/Kampagnentypen/Modi bleiben als Code
+// vorhanden (types.ts hält die Tupel bewusst breit), sind aber nicht registriert und per
+// DB-CHECK nicht speicherbar. Diese Tests beweisen die aktive Sperre. Siehe
+// docs/extension-points.md für die Wiederaktivierung.
+
+describe('active registry is locked to tourism / tour / gallery', () => {
+  it('registers exactly the tourism sector', () => {
+    expect(Object.keys(SECTORS)).toEqual(['tourism'])
+    expect(SECTORS.tourism?.label).toBe(tourism.label)
+    expect(SECTORS.tourism?.campaignTypes).toEqual(['tour'])
   })
 
-  it('every campaign type is listed under exactly its own sector', () => {
-    for (const type of CAMPAIGN_TYPE_TUPLE) {
-      const sector = CAMPAIGN_TYPES[type].sector
-      expect(SECTORS[sector].campaignTypes).toContain(type)
-    }
+  it('registers exactly the tour campaign type', () => {
+    expect(Object.keys(CAMPAIGN_TYPES)).toEqual(['tour'])
+    expect(campaignTypesForSector('tourism')).toEqual(['tour'])
   })
 
-  it('every sector lists only campaign types that point back to it', () => {
-    for (const sector of SECTOR_TUPLE) {
-      for (const type of SECTORS[sector].campaignTypes) {
-        expect(CAMPAIGN_TYPES[type].sector).toBe(sector)
-      }
-    }
-  })
-})
-
-describe('campaignTypesForSector', () => {
-  it('maps tourism to tour and stay', () => {
-    expect(campaignTypesForSector('tourism')).toEqual(['tour', 'stay'])
-  })
-
-  it('maps real_estate to property and event to wedding', () => {
-    expect(campaignTypesForSector('real_estate')).toEqual(['property'])
-    expect(campaignTypesForSector('event')).toEqual(['wedding'])
+  it('tour is a gallery campaign with no operator flow-mode choice', () => {
+    const config = getCampaignConfig('tour')
+    expect(config?.sector).toBe('tourism')
+    expect(config?.defaultFlowMode).toBe('gallery')
+    expect(config?.allowFlowModeChoice).toBe(false)
   })
 })
 
-describe('isValidCampaignForSector', () => {
-  it('accepts a matching pair', () => {
-    expect(isValidCampaignForSector('tourism', 'stay')).toBe(true)
-  })
-
-  it('rejects a mismatched pair', () => {
-    expect(isValidCampaignForSector('event', 'stay')).toBe(false)
-    expect(isValidCampaignForSector('tourism', 'wedding')).toBe(false)
-  })
-})
-
-describe('flow mode resolution', () => {
-  it('only property allows the operator to choose the flow mode', () => {
-    expect(CAMPAIGN_TYPES.property.allowFlowModeChoice).toBe(true)
-    for (const type of ['tour', 'stay', 'wedding'] as const) {
-      expect(CAMPAIGN_TYPES[type].allowFlowModeChoice).toBe(false)
+describe('deactivated sectors / campaign types are rejected by the registry', () => {
+  it('only tourism is a recognised sector', () => {
+    expect(isSector('tourism')).toBe(true)
+    for (const s of ['real_estate', 'event', 'retail']) {
+      expect(isSector(s)).toBe(false)
     }
   })
 
-  it('honours the chosen mode only when the type allows a choice', () => {
-    expect(resolveFlowMode('property', 'gallery')).toBe('gallery')
-    expect(resolveFlowMode('property', 'feedback')).toBe('feedback')
-    // tour ignores the choice and falls back to its default
+  it('only tour is a recognised campaign type', () => {
+    expect(isCampaignType('tour')).toBe(true)
+    for (const t of ['stay', 'property', 'wedding', 'cruise']) {
+      expect(isCampaignType(t)).toBe(false)
+    }
+  })
+
+  it('campaignTypesForSector returns empty for unregistered sectors', () => {
+    expect(campaignTypesForSector('real_estate')).toEqual([])
+    expect(campaignTypesForSector('event')).toEqual([])
+  })
+
+  it('getCampaignConfig returns undefined for deactivated types', () => {
+    expect(getCampaignConfig('stay')).toBeUndefined()
+    expect(getCampaignConfig('wedding')).toBeUndefined()
+  })
+
+  it('isValidCampaignForSector only accepts tourism/tour', () => {
+    expect(isValidCampaignForSector('tourism', 'tour')).toBe(true)
+    expect(isValidCampaignForSector('tourism', 'stay')).toBe(false)
+    expect(isValidCampaignForSector('event', 'wedding')).toBe(false)
+  })
+})
+
+describe('flow-mode resolution collapses to the single active gallery path', () => {
+  it('tour always resolves to gallery, ignoring any chosen mode', () => {
+    expect(resolveFlowMode('tour')).toBe('gallery')
     expect(resolveFlowMode('tour', 'feedback')).toBe('gallery')
-    expect(resolveFlowMode('stay', null)).toBe('feedback')
+    expect(resolveFlowMode('tour', 'guestbook')).toBe('gallery')
   })
 
-  it('isFlowModeAllowed matches the choice policy', () => {
-    expect(isFlowModeAllowed('property', 'gallery')).toBe(true)
-    expect(isFlowModeAllowed('property', 'feedback')).toBe(true)
-    expect(isFlowModeAllowed('tour', 'feedback')).toBe(false)
+  it('deactivated campaign types fall back to gallery', () => {
+    expect(resolveFlowMode('wedding')).toBe('gallery')
+    expect(resolveFlowMode('stay', 'feedback')).toBe('gallery')
+  })
+
+  it('isFlowModeAllowed permits only gallery for tour and false for unknown types', () => {
     expect(isFlowModeAllowed('tour', 'gallery')).toBe(true)
+    expect(isFlowModeAllowed('tour', 'feedback')).toBe(false)
+    expect(isFlowModeAllowed('wedding', 'guestbook')).toBe(false)
   })
 })
 
-describe('capabilities', () => {
-  it('gallery requires media and enables the gallery/reciprocity', () => {
+describe('active gallery flow labels + capabilities', () => {
+  it('gallery requires media and enables gallery + reciprocity', () => {
     const caps = getCapabilities('gallery')
     expect(caps.mediaRequired).toBe(true)
     expect(caps.galleryEnabled).toBe(true)
     expect(caps.reciprocityEnabled).toBe(true)
   })
 
-  it('feedback makes media optional and disables the gallery', () => {
-    const caps = getCapabilities('feedback')
-    expect(caps.mediaRequired).toBe(false)
-    expect(caps.galleryEnabled).toBe(false)
-    expect(caps.reciprocityEnabled).toBe(false)
-    expect(caps.commentEnabled).toBe(true)
-  })
-
-  it('guestbook is private (no shared gallery/reciprocity/rating) with name + comment', () => {
-    const caps = getCapabilities('guestbook')
-    expect(caps.galleryEnabled).toBe(false)
-    expect(caps.reciprocityEnabled).toBe(false)
-    expect(caps.ratingEnabled).toBe(false)
-    expect(caps.commentEnabled).toBe(true)
-    expect(caps.guestNameEnabled).toBe(true)
-  })
-
-  it('only guestbook enables the guest name field', () => {
-    expect(getCapabilities('gallery').guestNameEnabled).toBe(false)
-    expect(getCapabilities('feedback').guestNameEnabled).toBe(false)
+  it('resolveLabels combines the tour headline with gallery consent/success text', () => {
+    const labels = resolveLabels('tour', 'gallery')
+    expect(labels.landingHeadline).toBe(getCampaignConfig('tour')?.labels.landingHeadline)
+    expect(labels.consentText).toContain('sichtbar')
+    expect(labels.successText).toBeTruthy()
   })
 })
 
-describe('event / wedding uses the guestbook flow', () => {
-  it('wedding resolves to guestbook and locks the choice', () => {
-    expect(CAMPAIGN_TYPES.wedding.defaultFlowMode).toBe('guestbook')
-    expect(resolveFlowMode('wedding')).toBe('guestbook')
-    // choice is ignored because wedding does not allow a flow-mode choice
-    expect(resolveFlowMode('wedding', 'gallery')).toBe('guestbook')
-  })
-
-  it('exposes name prompts and is a known flow mode', () => {
-    const labels = resolveLabels('wedding', 'guestbook')
-    expect(labels.namePrompt).toBeTruthy()
-    expect(labels.namePlaceholder).toBeTruthy()
-    expect(isFlowMode('guestbook')).toBe(true)
-  })
-})
-
-describe('resolveLabels', () => {
-  it('combines type headline with mode-specific consent/success text', () => {
-    const gallery = resolveLabels('wedding', 'gallery')
-    expect(gallery.landingHeadline).toBe(CAMPAIGN_TYPES.wedding.labels.landingHeadline)
-    expect(gallery.consentText).toContain('sichtbar')
-
-    const feedback = resolveLabels('property', 'feedback')
-    expect(feedback.ratingPrompt).toBe(CAMPAIGN_TYPES.property.labels.ratingPrompt)
-    expect(feedback.consentText).toContain('Veranstalter')
-  })
-})
-
-describe('string narrowing guards', () => {
-  it('accepts known values and rejects unknown ones', () => {
-    expect(isSector('tourism')).toBe(true)
-    expect(isSector('retail')).toBe(false)
-    expect(isCampaignType('property')).toBe(true)
-    expect(isCampaignType('cruise')).toBe(false)
-    expect(isFlowMode('feedback')).toBe(true)
+describe('flow-mode type guard stays forward-compatible for re-enablement', () => {
+  it('gallery is a known flow-mode type; unknown strings are rejected', () => {
+    expect(isFlowMode('gallery')).toBe(true)
     expect(isFlowMode('none')).toBe(false)
   })
-})
 
-describe('per-sector modules aggregate into the registry', () => {
-  it('each module label appears in SECTORS', () => {
-    expect(SECTORS.tourism.label).toBe(tourism.label)
-    expect(SECTORS.real_estate.label).toBe(realEstate.label)
-    expect(SECTORS.event.label).toBe(event.label)
-  })
-
-  it('each module campaign type is registered under its own sector', () => {
-    for (const sectorModule of [tourism, realEstate, event]) {
-      for (const [type, config] of Object.entries(sectorModule.campaignTypes)) {
-        expect(config?.sector).toBe(sectorModule.id)
-        expect(CAMPAIGN_TYPES[type as keyof typeof CAMPAIGN_TYPES]).toStrictEqual(config)
-      }
-    }
+  it('feedback/guestbook remain valid flow-mode *types* though no campaign can use them', () => {
+    // Der Typ bleibt (types.ts unverändert); die Sperre ist Registry + DB-CHECK, nicht das
+    // Typsystem. Die Capabilities-Vorlagen bleiben für die Wiederaktivierung erhalten.
+    expect(isFlowMode('feedback')).toBe(true)
+    expect(isFlowMode('guestbook')).toBe(true)
+    expect(getCapabilities('guestbook').guestNameEnabled).toBe(true)
   })
 })

@@ -1,8 +1,6 @@
 import type { FlowMode, GuestFlowLabels } from '@/lib/sectors'
 
-import FeedbackFlow from './FeedbackFlow'
 import GalleryFlow from './GalleryFlow'
-import GuestbookFlow from './GuestbookFlow'
 
 type Props = {
   eventId: string
@@ -13,9 +11,18 @@ type Props = {
   labels: GuestFlowLabels
 }
 
-/** Wählt den Gäste-Flow anhand des Flow-Modus der Kampagne. */
+/**
+ * Verteiler für den Gäste-Flow anhand des Flow-Modus.
+ *
+ * Retrenchment (Migration 0006): Aktiv ist ausschließlich der `gallery`-Flow. Die Modi
+ * `feedback` und `guestbook` sind deaktiviert — der DB-CHECK verhindert, dass eine solche
+ * Kampagne überhaupt existiert. `FeedbackFlow`/`GuestbookFlow` bleiben als Code erhalten
+ * (dormant). Zum Reaktivieren hier den jeweiligen Zweig wieder ergänzen — siehe
+ * docs/extension-points.md.
+ */
 export default function GuestFlow({ flowMode, ...rest }: Props) {
-  if (flowMode === 'feedback') return <FeedbackFlow {...rest} />
-  if (flowMode === 'guestbook') return <GuestbookFlow {...rest} />
+  if (flowMode !== 'gallery') {
+    throw new Error(`Flow-Modus '${flowMode}' ist deaktiviert; nur 'gallery' ist aktiv.`)
+  }
   return <GalleryFlow {...rest} />
 }

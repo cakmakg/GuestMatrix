@@ -32,6 +32,13 @@ Self-serve-Registrierung, Abrechnung/Abonnements/Pakete, hotel-/resort-spezifisc
 Loyalty/Belohnungen, erweitertes Analytics-Dashboard, NPS, native App, Mehrsprachigkeit,
 Rollen/Mehrbenutzer pro Tenant, KI-Funktionen außer Moderation.
 
+**Deaktivierte, aber vorbereitete Bahnen (designed-for, not built):** Die Sektoren
+`real_estate` und `event` (Hochzeit/Momento) sowie die Flow-Modi `feedback` und `guestbook`
+existieren als Code, sind aber per Migration `0006` + Registry deaktiviert — die aktive Bahn
+ist allein `tourism / tour / gallery`. Die oben exkludierte **Self-serve-Registrierung** wurde
+konsistent dazu deaktiviert (die Route `/signup` ist ausgeschaltet); Tenants weist der
+Betreiber zu. Anleitung zur Wiederaktivierung: **`docs/extension-points.md`**.
+
 ## Risikoreichste Annahme
 
 „Laden Gäste wirklich Inhalte hoch?" (nicht technisch, sondern verhaltensbasiert)

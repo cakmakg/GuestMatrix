@@ -90,7 +90,7 @@ export default async function EventDetailPage({
 
   const flowMode = isFlowMode(event.flow_mode) ? event.flow_mode : 'gallery'
   const typeLabel = isCampaignType(event.campaign_type)
-    ? getCampaignConfig(event.campaign_type).label
+    ? (getCampaignConfig(event.campaign_type)?.label ?? event.campaign_type)
     : event.campaign_type
 
   const guestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${eventId}`

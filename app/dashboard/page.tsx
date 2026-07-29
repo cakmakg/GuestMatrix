@@ -24,7 +24,9 @@ type SubmissionStats = {
 }
 
 function campaignLabel(campaignType: string): string {
-  return isCampaignType(campaignType) ? getCampaignConfig(campaignType).label : campaignType
+  return isCampaignType(campaignType)
+    ? (getCampaignConfig(campaignType)?.label ?? campaignType)
+    : campaignType
 }
 
 async function getStats(tenantId: string) {

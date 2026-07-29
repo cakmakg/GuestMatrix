@@ -20,9 +20,7 @@ export default async function LoginPage({ searchParams }: Props) {
   const successMessage =
     message === 'password-reset-success'
       ? 'Passwort erfolgreich geändert. Bitte melden Sie sich an.'
-      : message === 'signup-success'
-        ? 'Konto erstellt. Bitte melden Sie sich an.'
-        : null
+      : null
 
   return (
     <main style={styles.main}>
@@ -68,9 +66,6 @@ export default async function LoginPage({ searchParams }: Props) {
 
         <a href="/forgot-password" style={styles.link}>
           Passwort vergessen?
-        </a>
-        <a href="/signup" style={styles.link}>
-          Neu hier? Konto erstellen
         </a>
       </div>
     </main>

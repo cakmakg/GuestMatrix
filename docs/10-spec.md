@@ -1,39 +1,68 @@
 # GuestMatrix — Spezifikation
 
-> **Multi-Sektor:** Das Produkt bedient mehrere Branchen. Ein **Tenant** = eine
-> Kundenorganisation mit genau einem **Sektor** (`tourism`, `real_estate`, `event`). Jeder
-> Sektor enthält einen oder mehrere **Kampagnentypen**, die den **Flow-Modus** des
-> Gäste-Ablaufs bestimmen (`gallery` oder `feedback`). Kein Sektor ist Standard. Details in
-> Abschnitt 0. Sektoren gehören dem Betreiber und liegen je Sektor in einem eigenen Ordner
-> unter `lib/sectors/<id>/`; der Kunde bekommt einen Sektor zugewiesen und kann keinen anlegen.
+> **Multi-Sektor (designed-for):** Das Produkt ist für mehrere Branchen entworfen. Ein
+> **Tenant** = eine Kundenorganisation mit genau einem **Sektor** (`tourism`, `real_estate`,
+> `event`). Jeder Sektor enthält einen oder mehrere **Kampagnentypen**, die den **Flow-Modus**
+> des Gäste-Ablaufs bestimmen (`gallery`, `feedback` oder `guestbook`). Kein Sektor ist
+> Standard. Details in Abschnitt 0. Sektoren gehören dem Betreiber und liegen je Sektor in
+> einem eigenen Ordner unter `lib/sectors/<id>/`; der Kunde bekommt einen Sektor zugewiesen
+> und kann keinen anlegen.
+>
+> **Aktiver MVP-Umfang (Retrenchment):** Gebaut **und aktiv** ist ausschließlich
+> `tourism / tour / gallery` — die einzige Validierungsbahn der Phase 0 (siehe `phase0.md`).
+> Alle übrigen Zeilen in Abschnitt 0 sind **designed-for, nicht aktiv**: als Code vorhanden,
+> aber per Migration `0006` + Registry deaktiviert. Reifegrad-Details: Abschnitt **0.1**;
+> Wiederaktivierung: **`docs/extension-points.md`**.
 
 ## 0. Sektoren, Kampagnentypen & Flow-Modi
 
-| Sektor | Kampagnentyp | Flow-Modus | Gäste-Ablauf |
-| ------------- | ------------------------ | ---------- | ------------------------------------------------ |
-| `tourism`     | Tour (`tour`)            | `gallery`  | Foto/Video-Upload + Galerie + Reziprozität + Bewertung |
-| `tourism`     | Hotel/Aufenthalt (`stay`)| `feedback` | Bewertung + Kommentar (Medien optional)          |
-| `real_estate` | Immobilie (`property`)   | `gallery` **oder** `feedback` | vom Operator je Kampagne wählbar |
-| `event`       | Hochzeit/Event (`wedding`)| `gallery` | wie Tour                                         |
+| Sektor        | Kampagnentyp               | Flow-Modus                    | Gäste-Ablauf                                           |
+| ------------- | -------------------------- | ----------------------------- | ------------------------------------------------------ |
+| `tourism`     | Tour (`tour`)              | `gallery`                     | Foto/Video-Upload + Galerie + Reziprozität + Bewertung |
+| `tourism`     | Hotel/Aufenthalt (`stay`)  | `feedback`                    | Bewertung + Kommentar (Medien optional)                |
+| `real_estate` | Immobilie (`property`)     | `gallery` **oder** `feedback` | vom Operator je Kampagne wählbar                       |
+| `event`       | Hochzeit/Event (`wedding`) | `gallery`                     | wie Tour                                               |
 
 - **`gallery`:** Medium Pflicht · öffentliche Galerie · Reziprozitätssperre · optionale Bewertung.
 - **`feedback`:** Medium optional · keine Galerie/Reziprozität · Bewertung + Kommentar, privat an den Tenant.
+- **`guestbook`:** privates Gästebuch (Name + Glückwunsch + optionale Medien), nur für den Veranstalter sichtbar — keine Galerie/Reziprozität/Bewertung.
 - Neuer Sektor = neuer Ordner unter `lib/sectors/<id>/` + Registry-Eintrag + Wert in der CHECK-Liste der Migration.
+
+> **Hinweis zur Tabelle:** Die Zeile `event` / `wedding` läuft im Modus **`guestbook`**
+> (privates Gästebuch, gemäß Architektur `20-architecture.md`) — nicht `gallery`. Eine
+> geteilte Galerie / Live-Fotowand ist als späterer `gallery`-Modus vorgesehen.
+
+### 0.1 Umfang & Reifegrad — Built vs. Designed-for
+
+Phasen-Label wie in `30-requirements.md`: **MVP** = Phase 0 · **Deaktiviert** = als Code
+vorhanden, per Migration `0006` + Registry ausgeschaltet (designed-for).
+
+| Sektor / Kampagnentyp / Modus     | Reifegrad       | Status                                             |
+| --------------------------------- | --------------- | -------------------------------------------------- |
+| `tourism` / `tour` / `gallery`    | **MVP — aktiv** | Einzige aktive Validierungsbahn der Phase 0.       |
+| `tourism` / `stay` / `feedback`   | **Deaktiviert** | Hotel/Feedback; in `phase0.md` bewusst exkludiert. |
+| `real_estate` / `property`        | **Deaktiviert** | `gallery`/`feedback`; Code vorhanden, nicht aktiv. |
+| `event` / `wedding` / `guestbook` | **Deaktiviert** | Momento-Gästebuch; Code vorhanden, nicht aktiv.    |
+
+Die DB kann deaktivierte Werte nicht speichern (CHECK aus `0006`). Die einzige Bahn, die die
+User Stories und der Core-Ablauf (Abschnitte 1–2) **aktiv** abdecken, ist `tour`/`gallery`;
+`feedback`/`guestbook`-Stories (z. B. B-7) beschreiben deaktivierte Funktionen. Schritt-für-
+Schritt zur Wiederaktivierung: **`docs/extension-points.md`**.
 
 ## 1. User Stories
 
 ### Persona A: Tenant (Kundenorganisation — z. B. Reiseleiter, Makler, Event-Veranstalter)
 
-| #   | Story                                                                                                           | Akzeptanzkriterium                                                                                                                                              |
-| --- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A-1 | Ich möchte mich im System anmelden, um meine Veranstaltungen verwalten zu können.                               | Gültige Anmeldedaten → Dashboard. Falsche Anmeldedaten → Fehlermeldung, kein Stack-Trace.                                                                       |
-| A-0 | Ich möchte meine zugewiesene Branche (Sektor) einsehen, damit ich weiß, welche Kampagnentypen ich anlegen kann. | Einstellungen zeigt die vom Betreiber zugewiesene Branche **schreibgeschützt** (aus `tenants.sector`) samt verfügbarer Kampagnentypen. Kunden können keinen Sektor anlegen oder ändern.        |
-| A-2 | Ich möchte eine neue Kampagne erstellen, um QR-Codes an Gäste verteilen zu können.                             | Formular: Kampagnentyp (nach Sektor) + Name + Datum (Pflicht); bei Immobilien zusätzlich Galerie/Feedback. POST → DB-Eintrag mit tenantId, campaign_type, flow_mode. Antwort: eventId + QR-URL. |
-| A-3 | Ich möchte den QR-Code einer Kampagne herunterladen, um ihn vor Ort einsetzen zu können.                        | QR als PNG herunterladbar. Kodierte URL: `/e/[eventId]`.                                                                                                        |
-| A-4 | Ich möchte hochgeladene Inhalte bzw. Feedback einer Kampagne einsehen können.                                   | `gallery`-Modus: Thumbnail-Raster mit Moderationsstatus. `feedback`-Modus: Liste aus Bewertung + Kommentar. Nur eigene tenantId-Inhalte sichtbar.               |
-| A-5 | Ich möchte eine Zusammenfassung des Gäste-Feedbacks einsehen können.                                            | Kampagnendetailseite: Durchschnittsbewertung, Anzahl Beiträge/Feedback, Anzahl Kommentare.                                                                       |
-| A-6 | Ich möchte Inhalte mit einem Moderations-Flag markieren können, um unangemessene Inhalte auszublenden.          | „Flag"-Button → `moderationFlag: true`. Geflaggte Inhalte sind in der Gästegalerie unsichtbar. Flag kann aufgehoben werden.                                      |
-| A-7 | Ich möchte Kampagnen archivieren / reaktivieren, um die Anzahl aktiver Kampagnen zu steuern.                    | Toggle setzt/entfernt `archived_at`. Übersicht zeigt „Aktive Kampagnen" (= `archived_at is null`).                                                              |
+| #   | Story                                                                                                           | Akzeptanzkriterium                                                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A-1 | Ich möchte mich im System anmelden, um meine Veranstaltungen verwalten zu können.                               | Gültige Anmeldedaten → Dashboard. Falsche Anmeldedaten → Fehlermeldung, kein Stack-Trace.                                                                                                       |
+| A-0 | Ich möchte meine zugewiesene Branche (Sektor) einsehen, damit ich weiß, welche Kampagnentypen ich anlegen kann. | Einstellungen zeigt die vom Betreiber zugewiesene Branche **schreibgeschützt** (aus `tenants.sector`) samt verfügbarer Kampagnentypen. Kunden können keinen Sektor anlegen oder ändern.         |
+| A-2 | Ich möchte eine neue Kampagne erstellen, um QR-Codes an Gäste verteilen zu können.                              | Formular: Kampagnentyp (nach Sektor) + Name + Datum (Pflicht); bei Immobilien zusätzlich Galerie/Feedback. POST → DB-Eintrag mit tenantId, campaign_type, flow_mode. Antwort: eventId + QR-URL. |
+| A-3 | Ich möchte den QR-Code einer Kampagne herunterladen, um ihn vor Ort einsetzen zu können.                        | QR als PNG herunterladbar. Kodierte URL: `/e/[eventId]`.                                                                                                                                        |
+| A-4 | Ich möchte hochgeladene Inhalte bzw. Feedback einer Kampagne einsehen können.                                   | `gallery`-Modus: Thumbnail-Raster mit Moderationsstatus. `feedback`-Modus: Liste aus Bewertung + Kommentar. Nur eigene tenantId-Inhalte sichtbar.                                               |
+| A-5 | Ich möchte eine Zusammenfassung des Gäste-Feedbacks einsehen können.                                            | Kampagnendetailseite: Durchschnittsbewertung, Anzahl Beiträge/Feedback, Anzahl Kommentare.                                                                                                      |
+| A-6 | Ich möchte Inhalte mit einem Moderations-Flag markieren können, um unangemessene Inhalte auszublenden.          | „Flag"-Button → `moderationFlag: true`. Geflaggte Inhalte sind in der Gästegalerie unsichtbar. Flag kann aufgehoben werden.                                                                     |
+| A-7 | Ich möchte Kampagnen archivieren / reaktivieren, um die Anzahl aktiver Kampagnen zu steuern.                    | Toggle setzt/entfernt `archived_at`. Übersicht zeigt „Aktive Kampagnen" (= `archived_at is null`).                                                                                              |
 
 ### Persona B: Gast (Endnutzer, anonym)
 
@@ -41,24 +70,24 @@
 > `gallery`-Modus (Tour, Hochzeit); **B-7** ist der `feedback`-Modus (Hotel-Aufenthalt,
 > Immobilien-Besichtigung). B-1, B-2 und B-6 gelten in beiden Modi.
 
-| #   | Story                                                                                                                   | Akzeptanzkriterium                                                                                                                            |
-| --- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| B-1 | Nach dem Scannen des QR-Codes möchte ich zu einer Startseite weitergeleitet werden, um zu verstehen, was zu tun ist.   | `/e/[eventId]` → Kampagnenname + Kurzbeschreibung + CTA (Text je nach Kampagnentyp). Ungültige eventId → 404.                                 |
-| B-2 | Vor dem Beitrag möchte ich nach meiner Einwilligung gefragt werden.                                                    | Consent-Checkbox (Pflicht, kein Voranklicken). Ohne Bestätigung bleibt der Weiter-Button inaktiv. Zeitstempel der Einwilligung wird in DB gespeichert. |
-| B-3 | (`gallery`) Ich möchte Fotos oder Videos hochladen können.                                                             | Akzeptierte Formate: jpg, png, mp4, mov. Max. Größe: 50 MB. Upload-Fortschrittsanzeige vorhanden. Nach Erfolg wird Galerie angezeigt.         |
-| B-4 | (`gallery`) Nach dem Hochladen von mindestens 1 Inhalt möchte ich die Galerie einsehen können (Reziprozitätssperre).   | Ohne abgeschlossenen Upload kein Galerie-Zugriff. Nach Upload wird Galerie geöffnet; alle genehmigten Inhalte außer geflaggten sichtbar.      |
-| B-5 | (`gallery`) Optional kann ich meine Erfahrung mit 1–5 Sternen bewerten.                                                | Bewertungsbildschirm nach dem Upload-Ablauf. Überspringbar. Bewertung als Integer 1–5; wird in `submissions.rating` gespeichert.              |
-| B-6 | Ich möchte die Löschung meiner Inhalte beantragen können.                                                               | Bei jedem Beitrag ist eine „Löschen"-Option sichtbar. Löschanfrage → `deletedAt`-Zeitstempel + ggf. Mediendatei löschen. (DSGVO-Löschpfad.)   |
-| B-7 | (`feedback`) Ich möchte eine Bewertung und/oder einen Kommentar abgeben, optional mit Foto/Video.                      | Mindestens Bewertung **oder** Kommentar erforderlich. Medium optional. Keine Galerie. `consent_at` serverseitig; `rating`/`comment` gespeichert. |
+| #   | Story                                                                                                                | Akzeptanzkriterium                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| B-1 | Nach dem Scannen des QR-Codes möchte ich zu einer Startseite weitergeleitet werden, um zu verstehen, was zu tun ist. | `/e/[eventId]` → Kampagnenname + Kurzbeschreibung + CTA (Text je nach Kampagnentyp). Ungültige eventId → 404.                                          |
+| B-2 | Vor dem Beitrag möchte ich nach meiner Einwilligung gefragt werden.                                                  | Consent-Checkbox (Pflicht, kein Voranklicken). Ohne Bestätigung bleibt der Weiter-Button inaktiv. Zeitstempel der Einwilligung wird in DB gespeichert. |
+| B-3 | (`gallery`) Ich möchte Fotos oder Videos hochladen können.                                                           | Akzeptierte Formate: jpg, png, mp4, mov. Max. Größe: 50 MB. Upload-Fortschrittsanzeige vorhanden. Nach Erfolg wird Galerie angezeigt.                  |
+| B-4 | (`gallery`) Nach dem Hochladen von mindestens 1 Inhalt möchte ich die Galerie einsehen können (Reziprozitätssperre). | Ohne abgeschlossenen Upload kein Galerie-Zugriff. Nach Upload wird Galerie geöffnet; alle genehmigten Inhalte außer geflaggten sichtbar.               |
+| B-5 | (`gallery`) Optional kann ich meine Erfahrung mit 1–5 Sternen bewerten.                                              | Bewertungsbildschirm nach dem Upload-Ablauf. Überspringbar. Bewertung als Integer 1–5; wird in `submissions.rating` gespeichert.                       |
+| B-6 | Ich möchte die Löschung meiner Inhalte beantragen können.                                                            | Bei jedem Beitrag ist eine „Löschen"-Option sichtbar. Löschanfrage → `deletedAt`-Zeitstempel + ggf. Mediendatei löschen. (DSGVO-Löschpfad.)            |
+| B-7 | (`feedback`) Ich möchte eine Bewertung und/oder einen Kommentar abgeben, optional mit Foto/Video.                    | Mindestens Bewertung **oder** Kommentar erforderlich. Medium optional. Keine Galerie. `consent_at` serverseitig; `rating`/`comment` gespeichert.       |
 
 ### Persona C: System (implizit)
 
-| #   | Verhalten                                                                                                                                                  |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C-1 | Bei jeder neuen Einreichung wird ein `consentAt`-Zeitstempel gespeichert. Ohne Einwilligung wird kein Eintrag erstellt.                                    |
-| C-2 | Moderations-Stub: Nach Abschluss des Uploads wird `moderationFlag: false` gesetzt; KI-Integration in Phase 2.                                             |
-| C-3 | Alle Datenbankabfragen sind nach `tenantId` und der jeweiligen ID eingegrenzt; tenant-übergreifende Datenlecks sind ausgeschlossen.                         |
-| C-4 | Gelöschte Medien: `deletedAt` wird in der DB gesetzt, die Datei wird aus dem Storage entfernt, sie erscheint weder in der Galerie noch im Dashboard.       |
+| #   | Verhalten                                                                                                                                            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C-1 | Bei jeder neuen Einreichung wird ein `consentAt`-Zeitstempel gespeichert. Ohne Einwilligung wird kein Eintrag erstellt.                              |
+| C-2 | Moderations-Stub: Nach Abschluss des Uploads wird `moderationFlag: false` gesetzt; KI-Integration in Phase 2.                                        |
+| C-3 | Alle Datenbankabfragen sind nach `tenantId` und der jeweiligen ID eingegrenzt; tenant-übergreifende Datenlecks sind ausgeschlossen.                  |
+| C-4 | Gelöschte Medien: `deletedAt` wird in der DB gesetzt, die Datei wird aus dem Storage entfernt, sie erscheint weder in der Galerie noch im Dashboard. |
 
 ---
 
@@ -158,12 +187,12 @@ Ziel: Durchschnittlich ≥ 5 Uploads pro Veranstaltung in Pilottouren.
 
 ### Conversion-Trichter (Validierungsmetriken)
 
-| Schritt                            | Metrik                       | Phase-0-Schwellenwert         |
-| ---------------------------------- | ---------------------------- | ----------------------------- |
-| QR-Scan → Seitenaufruf             | Technische Erreichbarkeit    | 99 % Uptime                   |
-| Seitenaufruf → Consent-Bestätigung | Consent-Conversion           | gemessen, kein Schwellenwert  |
-| Consent → abgeschlossener Upload   | **Hauptverhaltenshypothese** | **≥ 40 %**                    |
-| Upload → Bewertung abgegeben       | Optionale Teilnahme          | gemessen, kein Schwellenwert  |
+| Schritt                            | Metrik                       | Phase-0-Schwellenwert        |
+| ---------------------------------- | ---------------------------- | ---------------------------- |
+| QR-Scan → Seitenaufruf             | Technische Erreichbarkeit    | 99 % Uptime                  |
+| Seitenaufruf → Consent-Bestätigung | Consent-Conversion           | gemessen, kein Schwellenwert |
+| Consent → abgeschlossener Upload   | **Hauptverhaltenshypothese** | **≥ 40 %**                   |
+| Upload → Bewertung abgegeben       | Optionale Teilnahme          | gemessen, kein Schwellenwert |
 
 ### Definition of Done (pro Feature)
 

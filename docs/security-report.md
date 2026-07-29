@@ -89,6 +89,15 @@ GuestMatrix ist ein QR-basiertes Gast-UGC- und Feedback-Tool für kleine Tourope
 - `current_tenant_id()` PostgreSQL-Funktion liest Tenant-ID aus dem JWT
 - Daten eines Tenants sind für andere Tenants **auf Datenbankebene** nicht sichtbar
 - RLS ist die letzte Verteidigungslinie — ein Bug in der App-Schicht kann nicht zu Datenlecks führen
+- **Zugriff = GRANT + RLS:** Die Tabellen-GRANTs für `anon`/`authenticated`/`service_role`
+  liefert Migration `0007_grants.sql`; ohne sie ist die Tabelle für die API-Rolle gar nicht
+  erreichbar (`42501`, fail-closed). RLS filtert danach die Zeilen.
+- **Flow-Modus-Lock (Migration `0006`):** `events.flow_mode` ist per CHECK auf `gallery`
+  verengt. Da RLS **nicht** flow-mode-aware ist (`public_gallery_select` filtert nicht nach
+  `flow_mode`), verhindert dieser CHECK, dass überhaupt eine `feedback`/`guestbook`-Zeile mit
+  privatem `comment` entsteht — die potenzielle Leak-Fläche ist damit physisch geschlossen.
+  Beim Reaktivieren eines guest-sichtbaren Modus ist diese Policy neu zu auditieren
+  (siehe `docs/extension-points.md`).
 
 #### Berechtigungshierarchie in Route-Handlern
 ```
@@ -285,6 +294,8 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 
 ### Autorisierung
 - [x] RLS auf allen Tabellen aktiv
+- [x] Tabellen-GRANTs für API-Rollen gesetzt (`0007_grants.sql`; Zugriff = GRANT + RLS)
+- [x] Flow-Modus per CHECK auf `gallery` verengt (`0006`) — feedback/guestbook-Leak-Fläche geschlossen
 - [x] Tenant-Isolierung auf DB-Ebene
 - [x] `requireTenantAuth()` / `requireAnyAuth()` in allen geschützten Routen
 - [x] Galerie-Reziprozitätssperre server-seitig erzwungen
