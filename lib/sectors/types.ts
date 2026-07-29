@@ -11,7 +11,7 @@
 
 export const SECTOR_TUPLE = ['tourism', 'real_estate', 'event'] as const
 export const CAMPAIGN_TYPE_TUPLE = ['tour', 'stay', 'property', 'wedding'] as const
-export const FLOW_MODE_TUPLE = ['gallery', 'feedback'] as const
+export const FLOW_MODE_TUPLE = ['gallery', 'feedback', 'guestbook'] as const
 
 export type Sector = (typeof SECTOR_TUPLE)[number]
 export type CampaignType = (typeof CAMPAIGN_TYPE_TUPLE)[number]
@@ -25,6 +25,8 @@ export type CampaignCapabilities = {
   reciprocityEnabled: boolean
   ratingEnabled: boolean
   commentEnabled: boolean
+  // Erfasst zusätzlich den Gastnamen (z. B. Gästebuch-Gruß). Nur im guestbook-Modus.
+  guestNameEnabled: boolean
 }
 
 export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
@@ -34,6 +36,7 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     reciprocityEnabled: true,
     ratingEnabled: true,
     commentEnabled: false,
+    guestNameEnabled: false,
   },
   feedback: {
     mediaRequired: false,
@@ -41,6 +44,17 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     reciprocityEnabled: false,
     ratingEnabled: true,
     commentEnabled: true,
+    guestNameEnabled: false,
+  },
+  // Privates Gästebuch: Name + Gruß + optionale Medien, nur für den Veranstalter
+  // sichtbar (keine geteilte Galerie, keine Reciprocity, kein Rating).
+  guestbook: {
+    mediaRequired: false,
+    galleryEnabled: false,
+    reciprocityEnabled: false,
+    ratingEnabled: false,
+    commentEnabled: true,
+    guestNameEnabled: true,
   },
 }
 
@@ -60,16 +74,26 @@ export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successTe
       'meine Daten löschen lassen.',
     successText: 'Danke für dein Feedback!',
   },
+  guestbook: {
+    consentText:
+      'Ich stimme zu, dass mein Name, meine Nachricht und meine Fotos/Videos gespeichert und ' +
+      'dem Veranstalter (Brautpaar) gezeigt werden. Ich kann meine Einwilligung jederzeit ' +
+      'widerrufen und meine Daten löschen lassen.',
+    successText: 'Danke für eure lieben Worte!',
+  },
 }
 
 // ─── Kampagnentyp + Sektor-Modul ──────────────────────────────────────────────
 
 // Kampagnentyp-spezifische Texte (der Flow-Modus wählt aus, welche gerendert werden).
+// namePrompt/namePlaceholder nur relevant, wenn der Modus guestNameEnabled ist (guestbook).
 export type CampaignTypeLabels = {
   landingHeadline: string
   ratingPrompt: string
   commentPrompt: string
   commentPlaceholder: string
+  namePrompt?: string
+  namePlaceholder?: string
 }
 
 // Aufgelöste, flache Beschriftungen, die der Gäste-Flow konsumiert.
@@ -79,6 +103,8 @@ export type GuestFlowLabels = {
   ratingPrompt: string
   commentPrompt: string
   commentPlaceholder: string
+  namePrompt?: string
+  namePlaceholder?: string
   successText: string
 }
 

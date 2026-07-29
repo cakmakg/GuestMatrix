@@ -106,6 +106,36 @@ describe('capabilities', () => {
     expect(caps.reciprocityEnabled).toBe(false)
     expect(caps.commentEnabled).toBe(true)
   })
+
+  it('guestbook is private (no shared gallery/reciprocity/rating) with name + comment', () => {
+    const caps = getCapabilities('guestbook')
+    expect(caps.galleryEnabled).toBe(false)
+    expect(caps.reciprocityEnabled).toBe(false)
+    expect(caps.ratingEnabled).toBe(false)
+    expect(caps.commentEnabled).toBe(true)
+    expect(caps.guestNameEnabled).toBe(true)
+  })
+
+  it('only guestbook enables the guest name field', () => {
+    expect(getCapabilities('gallery').guestNameEnabled).toBe(false)
+    expect(getCapabilities('feedback').guestNameEnabled).toBe(false)
+  })
+})
+
+describe('event / wedding uses the guestbook flow', () => {
+  it('wedding resolves to guestbook and locks the choice', () => {
+    expect(CAMPAIGN_TYPES.wedding.defaultFlowMode).toBe('guestbook')
+    expect(resolveFlowMode('wedding')).toBe('guestbook')
+    // choice is ignored because wedding does not allow a flow-mode choice
+    expect(resolveFlowMode('wedding', 'gallery')).toBe('guestbook')
+  })
+
+  it('exposes name prompts and is a known flow mode', () => {
+    const labels = resolveLabels('wedding', 'guestbook')
+    expect(labels.namePrompt).toBeTruthy()
+    expect(labels.namePlaceholder).toBeTruthy()
+    expect(isFlowMode('guestbook')).toBe(true)
+  })
 })
 
 describe('resolveLabels', () => {

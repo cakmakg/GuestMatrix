@@ -2,7 +2,9 @@ import type { SectorModule } from '../types'
 
 /**
  * Sektor: Hochzeit / Event.
- * Kampagnentyp: Hochzeit/Event (Galerie).
+ * Kampagnentyp: Hochzeit/Event (privates Gästebuch — guestbook).
+ * Gäste hinterlassen Name + Glückwunsch + Fotos/Videos; sichtbar nur für das Brautpaar.
+ * Geteilte Galerie / Live-Fotowand folgt später (dann als gallery-Modus).
  */
 export const event = {
   id: 'event',
@@ -11,13 +13,15 @@ export const event = {
     wedding: {
       sector: 'event',
       label: 'Hochzeit / Event',
-      defaultFlowMode: 'gallery',
+      defaultFlowMode: 'guestbook',
       allowFlowModeChoice: false,
       labels: {
-        landingHeadline: 'Teilt eure schönsten Momente mit allen Gästen!',
+        landingHeadline: 'Hinterlasst dem Brautpaar eure Glückwünsche und schönsten Fotos!',
         ratingPrompt: 'Wie war die Feier für dich?',
-        commentPrompt: 'Dein Kommentar (optional)',
-        commentPlaceholder: 'Was war dein schönster Moment?',
+        commentPrompt: 'Eure Glückwünsche',
+        commentPlaceholder: 'Schreibt dem Brautpaar ein paar liebe Worte …',
+        namePrompt: 'Euer Name',
+        namePlaceholder: 'Von wem ist der Gruß?',
       },
     },
   },

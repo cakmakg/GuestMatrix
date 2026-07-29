@@ -22,7 +22,7 @@ import type {
   Sector,
   SectorConfig,
 } from './types'
-import { FLOW_MODE_CAPABILITIES, FLOW_MODE_LABELS } from './types'
+import { FLOW_MODE_CAPABILITIES, FLOW_MODE_LABELS, FLOW_MODE_TUPLE } from './types'
 import { event } from './event'
 import { realEstate } from './real_estate'
 import { tourism } from './tourism'
@@ -84,6 +84,8 @@ export function resolveLabels(type: CampaignType, mode: FlowMode): GuestFlowLabe
     ratingPrompt: typeLabels.ratingPrompt,
     commentPrompt: typeLabels.commentPrompt,
     commentPlaceholder: typeLabels.commentPlaceholder,
+    namePrompt: typeLabels.namePrompt,
+    namePlaceholder: typeLabels.namePlaceholder,
     successText: modeLabels.successText,
   }
 }
@@ -99,5 +101,5 @@ export function isCampaignType(value: string): value is CampaignType {
 }
 
 export function isFlowMode(value: string): value is FlowMode {
-  return value === 'gallery' || value === 'feedback'
+  return (FLOW_MODE_TUPLE as readonly string[]).includes(value)
 }
