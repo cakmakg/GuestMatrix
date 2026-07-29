@@ -2,7 +2,7 @@
 
 QR-basiertes Gast-UGC- und Feedback-Tool für mehrere Branchen: Tourismus, Immobilien und Hochzeit/Event.
 
-Gäste scannen einen QR-Code, teilen Fotos/Videos oder geben Feedback (Bewertung + Kommentar) — ohne App-Installation und ohne eigenen Account. Der Ablauf richtet sich nach dem Kampagnentyp: eine Galerie mit Reziprozitätssperre (Tour, Hochzeit) oder ein privates Feedback (Hotel-Aufenthalt, Immobilien-Besichtigung). Tenants verwalten Kampagnen, moderieren Inhalte und laden QR-Codes herunter.
+Gäste scannen einen QR-Code, teilen Fotos/Videos oder geben Feedback (Bewertung + Kommentar) — ohne App-Installation und ohne eigenen Account. Der Ablauf richtet sich nach dem Kampagnentyp: eine Galerie mit Reziprozitätssperre (Tour), ein privates Gästebuch (Hochzeit/Event, Marke Momento) oder ein privates Feedback (Hotel-Aufenthalt, Immobilien-Besichtigung). Tenants verwalten Kampagnen, moderieren Inhalte und laden QR-Codes herunter.
 
 Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerbüro, ein Event-Veranstalter) mit genau einem **Sektor**. Kein Sektor ist Standard; neue Sektoren lassen sich über eine zentrale Registry ergänzen.
 
@@ -14,7 +14,7 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 - [Funktionsübersicht](#funktionsübersicht)
 - [Architektur](#architektur)
 - [Verzeichnisstruktur](#verzeichnisstruktur)
-- [Lokale Einrichtung](#lokale-einrichtung)
+- [Einrichtung](#einrichtung)
 - [Befehle](#befehle)
 - [API-Routen](#api-routen)
 - [Sicherheit](#sicherheit)
@@ -25,18 +25,18 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 
 ## Tech-Stack
 
-| Schicht | Technologie |
-|---------|-------------|
-| Framework | Next.js 15 (App Router) |
-| Sprache | TypeScript (strict) |
-| Datenbank | Supabase Postgres + Row Level Security |
+| Schicht           | Technologie                                                   |
+| ----------------- | ------------------------------------------------------------- |
+| Framework         | Next.js 15 (App Router)                                       |
+| Sprache           | TypeScript (strict)                                           |
+| Datenbank         | Supabase Postgres + Row Level Security                        |
 | Authentifizierung | Supabase Auth (E-Mail/Passwort für Tenants, anonym für Gäste) |
-| Datei-Storage | Supabase Storage (privater Bucket, Presigned URLs) |
-| Rate Limiting | Upstash Redis + `@upstash/ratelimit` |
-| Validierung | Zod |
-| QR-Code | `qrcode` |
-| Tests | Vitest |
-| Deployment | Vercel |
+| Datei-Storage     | Supabase Storage (privater Bucket, Presigned URLs)            |
+| Rate Limiting     | Upstash Redis + `@upstash/ratelimit`                          |
+| Validierung       | Zod                                                           |
+| QR-Code           | `qrcode`                                                      |
+| Tests             | Vitest                                                        |
+| Deployment        | Vercel                                                        |
 
 ---
 
@@ -50,6 +50,7 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 - QR-Code pro Kampagne als PNG herunterladen
 - Galerie-Kampagnen: Thumbnail-Raster mit Moderationsstatus
 - Feedback-Kampagnen: Liste aus Bewertung + Kommentar
+- Gästebuch-Kampagnen: private Liste aus Name + Glückwunsch (+ optionalem Medium)
 - Inhalte sperren / freigeben (Moderations-Flag)
 - Inhalte löschen (DSGVO-konform: Soft Delete + Storage-Löschung)
 - Kampagnen archivieren / reaktivieren
@@ -59,7 +60,8 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 
 - QR-Code scannen → Kampagnenseite
 - DSGVO-Einwilligung bestätigen (Consent-Checkbox)
-- **Galerie-Ablauf** (Tour, Hochzeit): Foto/Video hochladen (JPEG, PNG, MP4, MOV · max. 50 MB) mit Fortschrittsanzeige, Galerie erst nach eigenem Upload (Reziprozitätssperre), 1–5-Sterne-Bewertung
+- **Galerie-Ablauf** (Tour): Foto/Video hochladen (JPEG, PNG, MP4, MOV · max. 50 MB) mit Fortschrittsanzeige, Galerie erst nach eigenem Upload (Reziprozitätssperre), 1–5-Sterne-Bewertung
+- **Gästebuch-Ablauf** (Hochzeit/Event, Marke Momento): Name + Glückwunsch (+ optionale Medien) hinterlassen — privat für den Veranstalter, keine öffentliche Galerie
 - **Feedback-Ablauf** (Hotel-Aufenthalt, Immobilien-Besichtigung): Bewertung (1–5) und/oder Kommentar, Medien optional, keine öffentliche Galerie
 - Eigene Beiträge jederzeit löschen (DSGVO-Recht auf Vergessenwerden)
 
@@ -69,17 +71,18 @@ Ein **Tenant** ist eine Kundenorganisation (z. B. eine Reiseagentur, ein Maklerb
 
 Ein Tenant gehört zu genau einem Sektor. Jeder Sektor enthält einen oder mehrere Kampagnentypen; der Kampagnentyp legt den **Flow-Modus** des Gäste-Ablaufs fest. Sektoren gehören dem **Betreiber** und werden als Code entwickelt: je Sektor ein Ordner unter [`lib/sectors/`](lib/sectors), aggregiert von `lib/sectors/index.ts` (einzige Quelle der Wahrheit). Ein neuer Sektor = ein Ordner dort plus Registry-Eintrag und ein Wert in der CHECK-Liste der Migration. Den Sektor eines Kunden **weist der Betreiber zu** (`tenants.sector`); der Kunde sieht ihn nur schreibgeschützt und kann keinen Sektor anlegen.
 
-| Sektor | Kampagnentyp | Flow-Modus |
-|--------|--------------|------------|
-| Tourismus (`tourism`) | Tour (`tour`) | `gallery` |
-| Tourismus (`tourism`) | Hotel / Aufenthalt (`stay`) | `feedback` |
-| Immobilien (`real_estate`) | Immobilie (`property`) | `gallery` **oder** `feedback` (wählbar) |
-| Hochzeit / Event (`event`) | Hochzeit / Event (`wedding`) | `gallery` |
+| Sektor                     | Kampagnentyp                 | Flow-Modus                              |
+| -------------------------- | ---------------------------- | --------------------------------------- |
+| Tourismus (`tourism`)      | Tour (`tour`)                | `gallery`                               |
+| Tourismus (`tourism`)      | Hotel / Aufenthalt (`stay`)  | `feedback`                              |
+| Immobilien (`real_estate`) | Immobilie (`property`)       | `gallery` **oder** `feedback` (wählbar) |
+| Hochzeit / Event (`event`) | Hochzeit / Event (`wedding`) | `guestbook`                             |
 
-| Flow-Modus | Verhalten |
-|------------|-----------|
-| `gallery` | Medien-Pflicht · öffentliche Galerie · Reziprozitätssperre · Bewertung |
-| `feedback` | Medien optional · keine Galerie/Reziprozität · Bewertung + Kommentar (privat) |
+| Flow-Modus  | Verhalten                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| `gallery`   | Medien-Pflicht · öffentliche Galerie · Reziprozitätssperre · Bewertung                                    |
+| `feedback`  | Medien optional · keine Galerie/Reziprozität · Bewertung + Kommentar (privat)                             |
+| `guestbook` | Name + Glückwunsch · Medien optional · keine Galerie/Reziprozität/Bewertung · privat für den Veranstalter |
 
 ---
 
@@ -93,7 +96,7 @@ Next.js 15 (Vercel)
   ├── App Router — Server Components (Standard)
   ├── Route Handler — API-Endpunkte (app/api/)
   ├── Server Actions — Formulare (Login, Kampagne erstellen, Sektor, Moderation, Archivieren)
-  └── Client Components — Interaktive UI (GalleryFlow, FeedbackFlow, QrSection)
+  └── Client Components — Interaktive UI (GalleryFlow, FeedbackFlow, GuestbookFlow, QrSection)
       │
       ├── Supabase Postgres (RLS auf jeder Tabelle)
       ├── Supabase Auth (Tenant: Email/PW · Gast: anonym)
@@ -106,7 +109,7 @@ Next.js 15 (Vercel)
 auth.users (Supabase Auth)
     │ 1:1
     ▼
-tenants  (id, user_id, name, brand_name, sector)
+tenants  (id, user_id, name, brand_name, sector, plan)
     │ 1:N
     ▼
 events   (id, tenant_id, name, date, description,
@@ -114,14 +117,15 @@ events   (id, tenant_id, name, date, description,
     │ 1:N
     ▼
 submissions  (id, tenant_id, event_id, guest_user_id,
-              media_url, file_type, consent_at, uploaded_at,
+              media_url, file_type, guest_name, consent_at, uploaded_at,
               moderation_flag, rating, comment, deleted_at)
 ```
 
 - `tenants.sector` — Sektor der Kundenorganisation (`tourism` · `real_estate` · `event`); ohne Default, beim Onboarding gesetzt.
 - `events.campaign_type` / `flow_mode` — Kampagnentyp und daraus abgeleiteter Gäste-Ablauf.
 - `events.archived_at` — aktive Kampagne = `archived_at is null`.
-- `submissions.comment` — Freitext-Feedback; `file_type` ist optional (Feedback ohne Medien).
+- `submissions.comment` / `guest_name` — Freitext (Feedback bzw. Gästebuch-Gruß); `file_type` ist optional (Feedback/Gästebuch ohne Medien).
+- `tenants.plan` — Tarif (`free` · `pro`), Default `free`; steuert Kontingente (aktive Kampagnen, Uploads je Kampagne). Keine Zahlung.
 
 ### Upload-Ablauf (3 Schritte)
 
@@ -143,11 +147,11 @@ Client              Next.js API           Supabase Storage
 
 ### Supabase-Clients
 
-| Client | Datei | Schlüssel | RLS | Verwendung |
-|--------|-------|-----------|-----|------------|
-| Browser | `lib/supabase/browser.ts` | anon | ✅ aktiv | Client Components |
-| Server | `lib/supabase/server.ts` | anon | ✅ aktiv | Server Components, Actions, Route Handler |
-| Admin | `lib/supabase/admin.ts` | service_role | ❌ umgangen | Privilegierte Operationen (nur server-seitig) |
+| Client  | Datei                     | Schlüssel    | RLS         | Verwendung                                    |
+| ------- | ------------------------- | ------------ | ----------- | --------------------------------------------- |
+| Browser | `lib/supabase/browser.ts` | anon         | ✅ aktiv    | Client Components                             |
+| Server  | `lib/supabase/server.ts`  | anon         | ✅ aktiv    | Server Components, Actions, Route Handler     |
+| Admin   | `lib/supabase/admin.ts`   | service_role | ❌ umgangen | Privilegierte Operationen (nur server-seitig) |
 
 ---
 
@@ -163,6 +167,7 @@ app/
 │   │       ├── public/route.ts       # Öffentliche Kampagnen-Info + Flow-Modus + Labels
 │   │       ├── gallery/route.ts      # Galerie (Reziprozitätssperre)
 │   │       ├── feedback/route.ts     # Feedback (Bewertung + Kommentar, Medien optional)
+│   │       ├── guestbook/route.ts    # Gästebuch-Gruß (Name + Glückwunsch, ohne Medien)
 │   │       └── submissions/route.ts  # Dashboard-Submissions mit signierten URLs
 │   ├── sessions/route.ts             # Anonyme Gast-Session erstellen
 │   ├── submissions/
@@ -182,7 +187,7 @@ app/
 │       ├── new/                      # Kampagne erstellen (Typ + ggf. Flow-Modus)
 │       └── [eventId]/                # Kampagnen-Detail: Mediengrid oder Feedback-Liste + QR
 ├── e/[eventId]/                      # Gäste-Flow — GuestFlow (Dispatcher),
-│                                     #   GalleryFlow, FeedbackFlow, GuestShell
+│                                     #   GalleryFlow, FeedbackFlow, GuestbookFlow, GuestShell
 ├── login/                            # Tenant-Anmeldung
 ├── forgot-password/                  # Passwort zurücksetzen (E-Mail)
 └── reset-password/                   # Neues Passwort setzen (PKCE)
@@ -210,7 +215,8 @@ lib/
 └── logger.ts           # Strukturiertes Logging (JSON in Prod)
 
 supabase/
-├── migrations/         # SQL-Migrationen (Tabellen + RLS + Indizes)
+├── migrations/         # 0001 Basis-Schema + RLS · 0002 Reziprozität + Storage-Bucket · 0003–0005 Multi-Sektor/Gästebuch/Tarife
+├── config.toml         # u. a. enable_anonymous_sign_ins = true (Gäste-Flow)
 └── seed.sql
 
 types/
@@ -224,38 +230,58 @@ tests/
 
 ---
 
-## Lokale Einrichtung
+## Einrichtung
 
-**Voraussetzungen:** Node.js ≥ 20, Docker (für lokalen Supabase-Stack)
+**Voraussetzungen:** Node.js ≥ 20. Für die lokale Variante zusätzlich Docker.
+
+Die Datenbank lässt sich auf zwei Wegen anbinden — **lokal** (Docker) oder **Cloud** (supabase.com). Beide verwenden dieselben Migrationen unter `supabase/migrations/` (`0001`–`0005`).
 
 ```bash
-# 1. Repository klonen
+# Gemeinsam
 git clone <repo-url>
 cd guestmatrix
-
-# 2. Umgebungsvariablen einrichten
-cp .env.example .env.local
-# .env.local mit den Supabase-Projektwerten befüllen
-
-# 3. Abhängigkeiten installieren
 npm install
+cp .env.example .env.local   # danach mit den Supabase-Werten befüllen (siehe unten)
+```
 
-# 4. Lokalen Supabase-Stack starten
-npx supabase start
+### Variante A — Lokaler Stack (Docker)
 
-# 5. Migrationen anwenden + Seed-Daten laden
-npx supabase db reset
-
-# 6. TypeScript-Typen aus dem Datenbankschema generieren
+```bash
+npx supabase start        # Postgres/Auth/Storage/Studio als Container
+# → API URL + anon key + service_role key aus der Ausgabe in .env.local eintragen
+npx supabase db reset     # wendet Migrationen 0001–0005 + seed an
 npx supabase gen types typescript --local > types/database.ts
-
-# 7. Entwicklungsserver starten
 npm run dev
 ```
 
-Die App ist anschließend unter `http://localhost:3000` erreichbar.
+`enable_anonymous_sign_ins = true` ist in `supabase/config.toml` bereits gesetzt — der Gäste-Flow benötigt anonyme Anmeldungen.
 
-Supabase Studio (lokales Dashboard): `http://localhost:54323`
+### Variante B — Cloud-Projekt (supabase.com)
+
+```bash
+# 1. Projekt auf supabase.com anlegen.
+#    Project Settings → API: Project URL + anon + service_role → in .env.local eintragen.
+npx supabase login
+npx supabase link --project-ref <ref>   # <ref> = Reference ID (Project Settings → General)
+npx supabase db push      # wendet Migrationen 0001–0005 auf die Cloud-DB an
+npx supabase gen types typescript --linked > types/database.ts
+npm run dev
+```
+
+#### ⚠️ Pflicht-Einstellungen im Supabase-Dashboard (Cloud)
+
+Drei Auth-Einstellungen liegen **nur im Dashboard**, nicht im Repo. Fehlen sie, brechen die Kern-Flows mit genau diesen Fehlern:
+
+| Ort — Authentication → Sign In / Providers | Einstellung           | Wert                 | sonst                              |
+| ------------------------------------------ | --------------------- | -------------------- | ---------------------------------- |
+| Anonymous                                  | Anonymous sign-ins    | **AN**               | Gäste-/Gästebuch-Flow schlägt fehl |
+| Email                                      | Enable Email provider | **AN**               | Signup → `email_provider_disabled` |
+| Email                                      | Confirm email         | **AUS** (zum Testen) | Login → `email_not_confirmed`      |
+
+Der Storage-Bucket `ugc-media` wird von Migration `0002` angelegt (kein manuelles Anlegen nötig).
+Bei `PGRST205` (Tabelle nicht gefunden) zeigt `.env.local` auf ein anderes Projekt als das, auf das `db push` lief.
+
+Die App ist anschließend unter `http://localhost:3000` erreichbar. Supabase Studio: lokal `http://localhost:54323`, in der Cloud über das Dashboard.
 
 ---
 
@@ -281,32 +307,33 @@ Alle Routen geben `{ error: string }` mit dem passenden HTTP-Statuscode zurück.
 
 ### Öffentlich
 
-| Methode | Route | Beschreibung |
-|---------|-------|--------------|
-| `GET` | `/api/events/[eventId]/public` | Name, Beschreibung, Markenname, Kampagnentyp, Flow-Modus, Labels |
-| `POST` | `/api/sessions` | Anonyme Gast-Session erstellen |
-| `GET` | `/api/events/[eventId]/gallery` | Galerie (nur nach eigenem Upload) |
-| `GET` | `/api/health` | Liveness-Check |
+| Methode | Route                           | Beschreibung                                                     |
+| ------- | ------------------------------- | ---------------------------------------------------------------- |
+| `GET`   | `/api/events/[eventId]/public`  | Name, Beschreibung, Markenname, Kampagnentyp, Flow-Modus, Labels |
+| `POST`  | `/api/sessions`                 | Anonyme Gast-Session erstellen                                   |
+| `GET`   | `/api/events/[eventId]/gallery` | Galerie (nur nach eigenem Upload)                                |
+| `GET`   | `/api/health`                   | Liveness-Check                                                   |
 
 ### Authentifiziert (Gast oder Tenant)
 
-| Methode | Route | Beschreibung |
-|---------|-------|--------------|
-| `POST` | `/api/submissions/presign` | Presigned Upload-URL anfordern |
-| `PATCH` | `/api/submissions/[id]/confirm` | Upload bestätigen + MIME prüfen |
-| `PATCH` | `/api/submissions/[id]/rate` | Bewertung speichern (eigene Submission) |
-| `POST` | `/api/events/[eventId]/feedback` | Feedback abgeben (Bewertung + Kommentar, Medien optional) |
-| `DELETE` | `/api/submissions/[id]` | Submission löschen (DSGVO) |
+| Methode  | Route                             | Beschreibung                                              |
+| -------- | --------------------------------- | --------------------------------------------------------- |
+| `POST`   | `/api/submissions/presign`        | Presigned Upload-URL anfordern                            |
+| `PATCH`  | `/api/submissions/[id]/confirm`   | Upload bestätigen + MIME prüfen                           |
+| `PATCH`  | `/api/submissions/[id]/rate`      | Bewertung speichern (eigene Submission)                   |
+| `POST`   | `/api/events/[eventId]/feedback`  | Feedback abgeben (Bewertung + Kommentar, Medien optional) |
+| `POST`   | `/api/events/[eventId]/guestbook` | Gästebuch-Gruß abgeben (Name + Glückwunsch, ohne Medien)  |
+| `DELETE` | `/api/submissions/[id]`           | Submission löschen (DSGVO)                                |
 
 ### Nur Tenant (Dashboard)
 
-| Methode | Route | Beschreibung |
-|---------|-------|--------------|
-| `GET` | `/api/events` | Alle eigenen Kampagnen auflisten |
-| `POST` | `/api/events` | Neue Kampagne erstellen (Kampagnentyp + Flow-Modus) |
-| `GET` | `/api/events/[eventId]/submissions` | Submissions mit signierten URLs |
-| `PATCH` | `/api/submissions/[id]/moderate` | Moderations-Flag setzen / aufheben |
-| `POST` | `/api/auth/logout` | Abmelden |
+| Methode | Route                               | Beschreibung                                        |
+| ------- | ----------------------------------- | --------------------------------------------------- |
+| `GET`   | `/api/events`                       | Alle eigenen Kampagnen auflisten                    |
+| `POST`  | `/api/events`                       | Neue Kampagne erstellen (Kampagnentyp + Flow-Modus) |
+| `GET`   | `/api/events/[eventId]/submissions` | Submissions mit signierten URLs                     |
+| `PATCH` | `/api/submissions/[id]/moderate`    | Moderations-Flag setzen / aufheben                  |
+| `POST`  | `/api/auth/logout`                  | Abmelden                                            |
 
 ---
 
@@ -316,21 +343,21 @@ Eine vollständige Analyse aller 18 STRIDE-Bedrohungen und der implementierten G
 
 ### Überblick
 
-| Bereich | Maßnahme |
-|---------|----------|
-| Session-Token | Ausschließlich `httpOnly`-Cookies — kein `localStorage` |
-| Passwort-Hashing | Argon2 (Supabase Auth intern) |
-| Idle-Timeout | 30 Minuten für Tenant-Sessions |
-| Tenant-Isolierung | Row Level Security auf allen Tabellen (Datenbankebene) |
-| Input-Validierung | Zod auf jedem API-Endpunkt |
-| Rate Limiting | Upstash Redis (Login, Reset, Upload, Galerie, allgemein) |
-| MIME-Validierung | Magic Bytes (erste 12 Bytes) — nicht Content-Type-Header |
-| Storage-Pfade | Vollständig server-seitig generiert — kein Client-Input im Pfad |
-| Download-URLs | Signierte URLs mit Ablaufzeit — keine rohen Storage-Pfade |
-| Security Headers | CSP, HSTS, X-Frame-Options, COEP/COOP/CORP, Permissions-Policy |
-| Fehlerantworten | Generische Meldungen — kein Stack-Trace, keine Server-Details |
-| Secrets | Ausschließlich Umgebungsvariablen — kein Secret im Repository |
-| DSGVO | Consent-Timestamp server-seitig, Soft Delete + Storage-Löschung |
+| Bereich           | Maßnahme                                                        |
+| ----------------- | --------------------------------------------------------------- |
+| Session-Token     | Ausschließlich `httpOnly`-Cookies — kein `localStorage`         |
+| Passwort-Hashing  | Argon2 (Supabase Auth intern)                                   |
+| Idle-Timeout      | 30 Minuten für Tenant-Sessions                                  |
+| Tenant-Isolierung | Row Level Security auf allen Tabellen (Datenbankebene)          |
+| Input-Validierung | Zod auf jedem API-Endpunkt                                      |
+| Rate Limiting     | Upstash Redis (Login, Reset, Upload, Galerie, allgemein)        |
+| MIME-Validierung  | Magic Bytes (erste 12 Bytes) — nicht Content-Type-Header        |
+| Storage-Pfade     | Vollständig server-seitig generiert — kein Client-Input im Pfad |
+| Download-URLs     | Signierte URLs mit Ablaufzeit — keine rohen Storage-Pfade       |
+| Security Headers  | CSP, HSTS, X-Frame-Options, COEP/COOP/CORP, Permissions-Policy  |
+| Fehlerantworten   | Generische Meldungen — kein Stack-Trace, keine Server-Details   |
+| Secrets           | Ausschließlich Umgebungsvariablen — kein Secret im Repository   |
+| DSGVO             | Consent-Timestamp server-seitig, Soft Delete + Storage-Löschung |
 
 ---
 
@@ -367,12 +394,14 @@ vercel deploy
 
 **Checkliste vor dem ersten Deployment:**
 
-- [ ] Supabase-Projekt erstellt, alle Migrationen angewendet
+- [ ] Supabase-Projekt erstellt, alle Migrationen angewendet (`npx supabase db push`)
+- [ ] Supabase Auth: **Anonymous sign-ins aktiviert** (Gäste-/Gästebuch-Flow)
+- [ ] Supabase Auth: **E-Mail-Provider aktiviert**; `Confirm email` in Prod an + SMTP hinterlegt
 - [ ] Alle Umgebungsvariablen in Vercel eingetragen
-- [ ] Upstash Redis-Instanz erstellt und Credentials hinterlegt
+- [ ] Upstash Redis-Instanz erstellt und Credentials hinterlegt (in Prod Pflicht)
 - [ ] `NEXT_PUBLIC_APP_URL` auf die Produktions-Domain gesetzt
 - [ ] Supabase Auth: E-Mail-Vorlagen angepasst (Passwort-Reset-Link)
-- [ ] Supabase Storage: Bucket `ugc-media` als privat konfiguriert
+- [ ] Supabase Storage: Bucket `ugc-media` vorhanden (aus Migration `0002`) und privat
 
 Nach jeder Datenbankänderung:
 
