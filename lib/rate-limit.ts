@@ -10,8 +10,13 @@ const redis =
     ? Redis.fromEnv()
     : null
 
+// Rate Limiting ist in Phase 0 bewusst V2 (docs/phase0.md). Fehlt Upstash in Produktion,
+// wird NICHT hart abgebrochen (das machte die App nicht deploybar) — stattdessen einmalige
+// Warnung + fail-open (kein Limit). checkRateLimit() unten failt ohnehin offen.
 if (!redis && process.env.NODE_ENV === 'production') {
-  throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.')
+  console.warn(
+    '[rate_limit] UPSTASH_REDIS_REST_URL/TOKEN nicht gesetzt — Rate Limiting ist deaktiviert (no-op). Für die Produktionshärtung (V2) konfigurieren.',
+  )
 }
 
 // When Redis is absent (development), all requests pass through — rate limiting is a no-op.
