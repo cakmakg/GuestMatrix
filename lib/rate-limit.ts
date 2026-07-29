@@ -31,6 +31,9 @@ export const rateLimiters = {
   /** 5 attempts per 15 minutes per IP — tenant login brute-force protection */
   login: makeLimiter(Ratelimit.fixedWindow(5, '15m'), 'rl:login'),
 
+  /** 5 sign-ups per hour per IP — self-service registration abuse prevention */
+  signup: makeLimiter(Ratelimit.fixedWindow(5, '1h'), 'rl:signup'),
+
   /** 3 requests per hour per IP — password reset enumeration prevention */
   forgotPassword: makeLimiter(Ratelimit.fixedWindow(3, '1h'), 'rl:forgot-password'),
 

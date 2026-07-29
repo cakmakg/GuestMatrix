@@ -46,6 +46,14 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address.').max(254).toLowerCase().trim(),
 })
 
+// Self-Service-Registrierung (Event/Hochzeit → Momento). Der Sektor wird NICHT vom
+// Kunden gewählt, sondern im Handler fest auf 'event' gesetzt.
+export const signupSchema = z.object({
+  email: z.string().email('Invalid email address.').max(254).toLowerCase().trim(),
+  password: z.string().min(8, 'Password must be at least 8 characters.').max(128),
+  brandName: z.string().trim().min(1, 'Name is required.').max(100),
+})
+
 export const resetPasswordSchema = z
   .object({
     password: z.string().min(8, 'Password must be at least 8 characters.').max(128),

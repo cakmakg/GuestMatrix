@@ -9,6 +9,7 @@ import {
   presignSchema,
   ratingSchema,
   resetPasswordSchema,
+  signupSchema,
 } from '@/lib/validation/schemas'
 
 describe('loginSchema', () => {
@@ -33,6 +34,32 @@ describe('loginSchema', () => {
     expect(loginSchema.safeParse({ email: 'test@example.com', password: 'short' }).success).toBe(
       false,
     )
+  })
+})
+
+describe('signupSchema', () => {
+  const validBase = {
+    email: 'couple@example.com',
+    password: 'password123',
+    brandName: 'Anna & Ben',
+  }
+
+  it('accepts a valid signup', () => {
+    expect(signupSchema.safeParse(validBase).success).toBe(true)
+  })
+
+  it('lowercases the email', () => {
+    const result = signupSchema.safeParse({ ...validBase, email: 'Couple@Example.COM' })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.email).toBe('couple@example.com')
+  })
+
+  it('rejects a short password', () => {
+    expect(signupSchema.safeParse({ ...validBase, password: 'short' }).success).toBe(false)
+  })
+
+  it('rejects a blank brand name', () => {
+    expect(signupSchema.safeParse({ ...validBase, brandName: '   ' }).success).toBe(false)
   })
 })
 

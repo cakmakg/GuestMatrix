@@ -1,48 +1,49 @@
 import type { Metadata } from 'next'
 
-import { loginAction } from './actions'
+import { BRAND } from '@/lib/brand'
 
-export const metadata: Metadata = { title: 'Anmelden – GuestMatrix' }
+import { signupAction } from './actions'
+
+export const metadata: Metadata = { title: `Konto erstellen – ${BRAND.name}` }
 
 const ERROR_MESSAGES: Record<string, string> = {
-  invalid_credentials: 'E-Mail-Adresse oder Passwort ist falsch.',
-  rate_limited: 'Zu viele Anmeldeversuche. Bitte warten Sie 15 Minuten.',
-  idle_timeout: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+  invalid: 'Bitte überprüfe deine Eingaben.',
+  rate_limited: 'Zu viele Registrierungen. Bitte warte eine Stunde.',
+  server: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
 }
 
 type Props = {
-  searchParams: Promise<{ error?: string; next?: string; message?: string }>
+  searchParams: Promise<{ error?: string }>
 }
 
-export default async function LoginPage({ searchParams }: Props) {
-  const { error, next, message } = await searchParams
+export default async function SignupPage({ searchParams }: Props) {
+  const { error } = await searchParams
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? 'Ein Fehler ist aufgetreten.') : null
-  const successMessage =
-    message === 'password-reset-success'
-      ? 'Passwort erfolgreich geändert. Bitte melden Sie sich an.'
-      : message === 'signup-success'
-        ? 'Konto erstellt. Bitte melden Sie sich an.'
-        : null
 
   return (
     <main style={styles.main}>
       <div style={styles.card}>
-        <h1 style={styles.heading}>GuestMatrix</h1>
-        <p style={styles.subtitle}>Tenant-Anmeldung</p>
+        <h1 style={styles.heading}>{BRAND.name}</h1>
+        <p style={styles.subtitle}>{BRAND.slogan}</p>
 
-        {successMessage && (
-          <p role="status" style={styles.success}>
-            {successMessage}
-          </p>
-        )}
         {errorMessage && (
           <p role="alert" style={styles.error}>
             {errorMessage}
           </p>
         )}
 
-        <form action={loginAction} style={styles.form}>
-          <input type="hidden" name="next" value={next ?? '/dashboard'} />
+        <form action={signupAction} style={styles.form}>
+          <label style={styles.label}>
+            Name des Brautpaars
+            <input
+              type="text"
+              name="brandName"
+              required
+              maxLength={100}
+              placeholder="z. B. Anna & Ben"
+              style={styles.input}
+            />
+          </label>
 
           <label style={styles.label}>
             E-Mail-Adresse
@@ -55,22 +56,19 @@ export default async function LoginPage({ searchParams }: Props) {
               type="password"
               name="password"
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
               minLength={8}
               style={styles.input}
             />
           </label>
 
           <button type="submit" style={styles.button}>
-            Anmelden
+            Konto erstellen
           </button>
         </form>
 
-        <a href="/forgot-password" style={styles.link}>
-          Passwort vergessen?
-        </a>
-        <a href="/signup" style={styles.link}>
-          Neu hier? Konto erstellen
+        <a href="/login" style={styles.link}>
+          Schon ein Konto? Anmelden
         </a>
       </div>
     </main>
@@ -109,15 +107,6 @@ const styles = {
     border: '1px solid #fecaca',
     borderRadius: '6px',
     color: '#991b1b',
-    fontSize: '0.875rem',
-    marginBottom: '1rem',
-    padding: '0.75rem',
-  } as React.CSSProperties,
-  success: {
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    borderRadius: '6px',
-    color: '#166534',
     fontSize: '0.875rem',
     marginBottom: '1rem',
     padding: '0.75rem',

@@ -7,7 +7,7 @@ const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 const LAST_ACTIVE_COOKIE = 'gm_last_active'
 
 const PROTECTED_PREFIXES = ['/dashboard']
-const AUTH_PREFIXES = ['/login', '/forgot-password', '/reset-password']
+const AUTH_PREFIXES = ['/login', '/signup', '/forgot-password', '/reset-password']
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
