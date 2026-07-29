@@ -1,7 +1,13 @@
 import type { NextRequest } from 'next/server'
 
-import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
+import {
+  AuthorizationError,
+  handleRouteError,
+  NotFoundError,
+  ValidationError,
+} from '@/lib/auth/errors'
 import { requireAnyAuth } from '@/lib/auth/session'
+import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -35,6 +41,25 @@ export async function POST(request: NextRequest): Promise<Response> {
       .single<{ id: string; tenant_id: string }>()
 
     if (!event) throw new NotFoundError('Event')
+
+    // ── Tarif-Kontingent: abgeschlossene Uploads je Event begrenzen ────────────
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('plan')
+      .eq('id', event.tenant_id)
+      .single<{ plan: string }>()
+
+    const planConfig = getPlanConfig(resolvePlan(tenant?.plan))
+    const { count: uploadedCount } = await supabaseAdmin
+      .from('submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .not('uploaded_at', 'is', null)
+      .is('deleted_at', null)
+
+    if ((uploadedCount ?? 0) >= planConfig.maxUploadsPerEvent) {
+      throw new AuthorizationError('Upload-Limit für dieses Event erreicht.')
+    }
 
     // ── Create submission in pending state ─────────────────────────────────────
     // consent_at is set server-side — the client cannot falsify the timestamp.

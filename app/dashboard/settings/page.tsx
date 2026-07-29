@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { SECTORS, campaignTypesForSector, getCampaignConfig, isSector } from '@/lib/sectors'
+import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -17,11 +18,13 @@ export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('sector')
+    .select('sector, plan')
     .eq('id', tenantId)
-    .single<{ sector: string }>()
+    .single<{ sector: string; plan: string }>()
 
   const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
+  const plan = resolvePlan(tenant?.plan)
+  const planConfig = getPlanConfig(plan)
 
   return (
     <div className="p-8 max-w-xl">
@@ -62,6 +65,27 @@ export default async function SettingsPage() {
               Keine Branche zugewiesen. Bitte kontaktiere den Support.
             </p>
           )}
+        </div>
+      </div>
+
+      <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Tarif</p>
+            <p className="mt-1 text-lg font-semibold text-gray-900">{planConfig.label}</p>
+            <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
+              <li>Bis zu {planConfig.maxActiveEvents} aktive Kampagne(n)</li>
+              <li>Bis zu {planConfig.maxUploadsPerEvent} Uploads je Kampagne</li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            disabled
+            title="Bald verfügbar"
+            className="shrink-0 cursor-not-allowed rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-400"
+          >
+            Upgrade (bald)
+          </button>
         </div>
       </div>
     </div>

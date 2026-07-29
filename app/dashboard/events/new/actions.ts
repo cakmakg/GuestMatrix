@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 
 import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/sectors'
+import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createEventSchema } from '@/lib/validation/schemas'
@@ -27,14 +28,32 @@ export async function createEventAction(formData: FormData): Promise<void> {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('sector')
+    .select('sector, plan')
     .eq('id', tenantId)
-    .single<{ sector: string }>()
+    .single<{ sector: string; plan: string }>()
 
   const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
   if (!sector || !isValidCampaignForSector(sector, parsed.data.campaignType)) {
     redirect(
       '/dashboard/events/new?error=' + encodeURIComponent('Kampagnentyp passt nicht zur Branche.'),
+    )
+  }
+
+  // Tarif-Kontingent: aktive (nicht archivierte) Kampagnen begrenzen.
+  const planConfig = getPlanConfig(resolvePlan(tenant?.plan))
+  const { count: activeEvents } = await supabase
+    .from('events')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .is('archived_at', null)
+
+  if ((activeEvents ?? 0) >= planConfig.maxActiveEvents) {
+    redirect(
+      '/dashboard/events/new?error=' +
+        encodeURIComponent(
+          `Tarif-Limit erreicht (${planConfig.maxActiveEvents} aktive Kampagne(n)). ` +
+            'Bitte archiviere eine Kampagne oder wechsle den Tarif.',
+        ),
     )
   }
 

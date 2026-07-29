@@ -25,6 +25,7 @@ export type Database = {
           name: string
           brand_name: string
           sector: string
+          plan: string
           created_at: string
           updated_at: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           name: string
           brand_name: string
           sector: string
+          plan?: string
           created_at?: string
           updated_at?: string
         }
@@ -43,6 +45,7 @@ export type Database = {
           name?: string
           brand_name?: string
           sector?: string
+          plan?: string
           updated_at?: string
         }
         Relationships: []
