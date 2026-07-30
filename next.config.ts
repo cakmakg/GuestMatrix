@@ -4,11 +4,17 @@ const SUPABASE_HOSTNAME = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
   : '*.supabase.co'
 
+// Dev-Modus: Next.js Fast Refresh / webpack-HMR wertet Code via eval() aus und benötigt daher
+// 'unsafe-eval'. In Produktion (Vercel, NODE_ENV=production) wird es NICHT gesetzt — script-src
+// bleibt dort strikt ('self' 'unsafe-inline').
+const isDev = process.env.NODE_ENV !== 'production'
+
 const CSP = [
   "default-src 'self'",
   // 'unsafe-inline' ist für Next.js 15 (Hydration-Inline-Skripte) erforderlich.
+  // 'unsafe-eval' nur im Dev-Modus (HMR/Fast Refresh); in Produktion strikt.
   // In Phase 2 durch CSP-Nonce-Infrastruktur ersetzen.
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: https://${SUPABASE_HOSTNAME}`,
   "font-src 'self'",
