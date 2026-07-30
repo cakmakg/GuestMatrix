@@ -6,13 +6,17 @@ import { NotFoundError } from '@/lib/auth/errors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { logger } from '@/lib/logger'
 import { deleteSubmission } from '@/lib/submissions/delete-submission'
-import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export async function moderateAction(submissionId: string, flag: boolean): Promise<void> {
   const { tenantId } = await requireTenantAuth()
 
-  const { data: sub } = await supabaseAdmin
+  // Moderation läuft RLS-aktiv: Sichtbarkeit + Berechtigung erzwingen tenant_select_submissions
+  // (Lesen) und tenant_update_submissions (Flag-Update) über tenant_id = current_tenant_id().
+  // Kein service_role für die Flag-Mutation; die .eq('tenant_id')-Filter bleiben als Defense-in-Depth.
+  const supabase = await createSupabaseServerClient()
+
+  const { data: sub } = await supabase
     .from('submissions')
     .select('id, event_id, tenant_id')
     .eq('id', submissionId)
@@ -22,7 +26,13 @@ export async function moderateAction(submissionId: string, flag: boolean): Promi
 
   if (!sub) throw new NotFoundError('Submission')
 
-  await supabaseAdmin.from('submissions').update({ moderation_flag: flag }).eq('id', submissionId)
+  const { error } = await supabase
+    .from('submissions')
+    .update({ moderation_flag: flag })
+    .eq('id', submissionId)
+    .eq('tenant_id', tenantId)
+
+  if (error) throw error
 
   logger.info('[dashboard] moderation_flag set', { submissionId, flag, tenantId })
   revalidatePath(`/dashboard/events/${sub.event_id}`)

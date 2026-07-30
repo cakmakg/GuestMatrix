@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
 import { requireTenantAuth } from '@/lib/auth/session'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { moderationSchema, submissionIdParam } from '@/lib/validation/schemas'
 
 export async function PATCH(
@@ -23,8 +23,12 @@ export async function PATCH(
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid request.')
     }
 
-    // Verify the submission belongs to this tenant
-    const { data: existing } = await supabaseAdmin
+    // RLS-aktiv: Sichtbarkeit + Flag-Update laufen über tenant_select_submissions /
+    // tenant_update_submissions (tenant_id = current_tenant_id()); kein service_role.
+    const supabase = await createSupabaseServerClient()
+
+    // Verify the submission belongs to this tenant (RLS-scoped read).
+    const { data: existing } = await supabase
       .from('submissions')
       .select('id')
       .eq('id', submissionId)
@@ -34,10 +38,11 @@ export async function PATCH(
 
     if (!existing) throw new NotFoundError('Submission')
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('submissions')
       .update({ moderation_flag: parsed.data.moderationFlag })
       .eq('id', submissionId)
+      .eq('tenant_id', tenantId)
 
     if (error) {
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })
