@@ -185,6 +185,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attach_feedback: {
+        Args: { p_comment?: string; p_rating?: number; p_submission_id: string }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       has_completed_upload: { Args: { p_event_id: string }; Returns: boolean }
       is_gallery_event: { Args: { p_event_id: string }; Returns: boolean }

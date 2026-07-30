@@ -27,26 +27,19 @@ export async function POST(
     // Server client so RLS enforces guest_user_id = auth.uid()
     const supabase = await createSupabaseServerClient()
 
-    // ── Media already uploaded: attach rating/comment to the existing submission ──
+    // ── Media already uploaded: attach rating/comment via ownership-checked RPC ──
+    // Gäste haben keine UPDATE-RLS-Policy auf submissions; ein direktes update() träfe still
+    // 0 Zeilen (rating/comment gingen verloren). attach_feedback (SECURITY DEFINER) prüft
+    // guest_user_id = auth.uid() und aktualisiert NUR rating/comment. Kein Treffer =
+    // fremde/fehlende Einreichung → NotFoundError.
     if (submissionId) {
-      const { data: existing } = await supabase
-        .from('submissions')
-        .select('id, guest_user_id')
-        .eq('id', submissionId)
-        .is('deleted_at', null)
-        .single<{ id: string; guest_user_id: string }>()
-
-      if (!existing || existing.guest_user_id !== userId) throw new NotFoundError('Submission')
-
-      const { error } = await supabase
-        .from('submissions')
-        .update({ rating: rating ?? null, comment: comment ?? null })
-        .eq('id', submissionId)
-        .eq('guest_user_id', userId)
-
-      if (error) {
-        return Response.json({ error: 'Something went wrong.' }, { status: 500 })
-      }
+      const { data: attachedId, error } = await supabase.rpc('attach_feedback', {
+        p_submission_id: submissionId,
+        p_rating: rating,
+        p_comment: comment,
+      })
+      if (error) throw error
+      if (!attachedId) throw new NotFoundError('Submission')
       return Response.json({ ok: true, submissionId })
     }
 

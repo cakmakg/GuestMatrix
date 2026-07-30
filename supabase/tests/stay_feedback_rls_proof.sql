@@ -105,4 +105,32 @@ do $$ begin
 exception when check_violation then raise notice 'PASS (lock): wedding abgelehnt — %', sqlerrm;
   when others then raise notice 'ERR (lock-wd): %', sqlerrm; end $$;
 
+-- ═══ attach_feedback (0010): Gast hängt rating/comment an EIGENEN Medien-Beitrag ═══
+-- Medien-Beitrag von guest1 auf dem stay-Event; rating/comment zunächst NULL (wie nach presign).
+insert into public.submissions (id, tenant_id, event_id, guest_user_id, file_type, media_url, consent_at, uploaded_at, moderation_flag)
+values ('c1c1c1c1-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111111','55555555-5555-4555-8555-555555555555','99999999-9999-4999-8999-999999999999','image','11111111-1111-4111-8111-111111111111/55555555-5555-4555-8555-555555555555/c1c1c1c1-1111-4111-8111-111111111111/x.jpg',now(),now(),false);
+
+-- Fremd-Gast (guest2) kann NICHT anhängen: RPC gibt NULL, Werte bleiben NULL.
+do $$ declare v uuid; r int; begin
+  perform set_config('request.jwt.claims','{"sub":"88888888-8888-4888-8888-888888888888","role":"authenticated"}', true);
+  set local role authenticated;
+  select public.attach_feedback('c1c1c1c1-1111-4111-8111-111111111111'::uuid, 4::smallint, 'HACK') into v;
+  reset role; perform set_config('request.jwt.claims','', true);
+  select rating into r from public.submissions where id='c1c1c1c1-1111-4111-8111-111111111111';
+  if v is null and r is null then raise notice 'PASS (attach-foreign): Fremd-Gast kann rating/comment NICHT anhängen';
+  else raise notice 'FAIL (attach-foreign): rpc=%, rating=%', v, r; end if;
+exception when others then reset role; raise notice 'ERR (attach-foreign): %', sqlerrm; end $$;
+
+-- Eigentümer-Gast (guest1) hängt an: rating/comment werden gesetzt.
+do $$ declare v uuid; r int; c text; begin
+  perform set_config('request.jwt.claims','{"sub":"99999999-9999-4999-8999-999999999999","role":"authenticated"}', true);
+  set local role authenticated;
+  select public.attach_feedback('c1c1c1c1-1111-4111-8111-111111111111'::uuid, 4::smallint, 'Sehr gut') into v;
+  reset role; perform set_config('request.jwt.claims','', true);
+  select rating, comment into r, c from public.submissions where id='c1c1c1c1-1111-4111-8111-111111111111';
+  if v = 'c1c1c1c1-1111-4111-8111-111111111111' and r = 4 and c = 'Sehr gut'
+    then raise notice 'PASS (attach-own): Eigentümer-Gast hängt rating/comment an seinen Beitrag';
+  else raise notice 'FAIL (attach-own): rpc=%, rating=%, comment=%', v, r, c; end if;
+exception when others then reset role; raise notice 'ERR (attach-own): %', sqlerrm; end $$;
+
 rollback;
