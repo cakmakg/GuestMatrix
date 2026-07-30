@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { getCampaignConfig, isCampaignType } from '@/lib/sectors'
 import { requireTenantAuth } from '@/lib/auth/session'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { setEventArchivedAction } from './actions'
 
@@ -30,7 +30,13 @@ function campaignLabel(campaignType: string): string {
 }
 
 async function getStats(tenantId: string) {
-  const { data: events } = await supabaseAdmin
+  // RLS-aktiver Server-Client: Tenant-Isolierung wird in der DB durchgesetzt
+  // (tenant_select_own_events / tenant_select_submissions). Der service_role-Admin-Client
+  // wird für Frontend-Datenlesungen bewusst NICHT verwendet. Die .eq('tenant_id')-Filter
+  // bleiben als Defense-in-Depth über RLS.
+  const supabase = await createSupabaseServerClient()
+
+  const { data: events } = await supabase
     .from('events')
     .select('id, name, date, description, campaign_type, flow_mode, archived_at, created_at')
     .eq('tenant_id', tenantId)
@@ -38,7 +44,7 @@ async function getStats(tenantId: string) {
 
   const eventList = (events as EventRow[]) ?? []
 
-  const { data: subs } = await supabaseAdmin
+  const { data: subs } = await supabase
     .from('submissions')
     .select('event_id, rating')
     .eq('tenant_id', tenantId)

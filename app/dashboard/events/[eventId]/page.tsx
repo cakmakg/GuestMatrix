@@ -4,7 +4,7 @@ import QRCode from 'qrcode'
 
 import { getCampaignConfig, isCampaignType, isFlowMode } from '@/lib/sectors'
 import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
-import { supabaseAdmin } from '@/lib/supabase/admin'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
 
 import { deleteFromDashboardAction, moderateAction } from './actions'
@@ -22,7 +22,12 @@ type SubmissionRow = {
 }
 
 async function getEventData(tenantId: string, eventId: string) {
-  const { data: event } = await supabaseAdmin
+  // RLS-aktiver Server-Client: Event- und Submission-Lesungen laufen über die Tenant-Policies
+  // (tenant_select_own_events / tenant_select_submissions). Kein service_role für Frontend-
+  // Datenlesungen. Signierte Storage-URLs werden weiterhin in createSignedUrls gekapselt.
+  const supabase = await createSupabaseServerClient()
+
+  const { data: event } = await supabase
     .from('events')
     .select('id, name, date, description, campaign_type, flow_mode, tenant_id')
     .eq('id', eventId)
@@ -39,7 +44,7 @@ async function getEventData(tenantId: string, eventId: string) {
 
   if (!event) return null
 
-  const { data } = await supabaseAdmin
+  const { data } = await supabase
     .from('submissions')
     .select('id, media_url, file_type, guest_name, uploaded_at, moderation_flag, rating, comment')
     .eq('event_id', eventId)
