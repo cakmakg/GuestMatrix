@@ -187,6 +187,7 @@ export type Database = {
     Functions: {
       current_tenant_id: { Args: never; Returns: string }
       has_completed_upload: { Args: { p_event_id: string }; Returns: boolean }
+      is_gallery_event: { Args: { p_event_id: string }; Returns: boolean }
       owned_submission_media: {
         Args: { p_submission_id: string }
         Returns: {

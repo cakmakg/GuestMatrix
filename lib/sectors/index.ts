@@ -5,12 +5,14 @@
  * Die Sektoren selbst werden vom Betreiber entwickelt und liegen je Sektor in einem
  * eigenen Ordner (`lib/sectors/<id>/`). Kein Sektor ist Standard.
  *
- * ── RETRENCHMENT (Migration 0006) ──────────────────────────────────────────────
- * Aktiv registriert ist NUR tourism / tour / gallery (die einzige MVP-Validierungsbahn).
- * Die Module `lib/sectors/event/` und `lib/sectors/real_estate/` sowie die Modi feedback/
- * guestbook bleiben als Code vorhanden und kompilieren weiter (types.ts hält die Tupel
- * bewusst breit), sind aber hier NICHT importiert/registriert — daher deaktiviert. Der
- * DB-CHECK aus 0006 ist die harte Garantie, dass deaktivierte Werte keine Zeile halten.
+ * ── AKTIVER UMFANG (Retrenchment 0006 + Öffnung 0009) ──────────────────────────
+ * Aktiv registriert ist der Sektor tourism mit tour (gallery) UND stay (feedback).
+ * Migration 0009 hat den CHECK auf campaign_type in (tour, stay) / flow_mode in
+ * (gallery, feedback) erweitert und dabei ATOMAR public_gallery_select um is_gallery_event
+ * ergänzt (B1: Feedback-Kommentare gelangen nie in die Gäste-Galerie).
+ * Weiterhin GESPERRT: die Sektoren `lib/sectors/event/` und `lib/sectors/real_estate/`
+ * sowie der Modus guestbook — als Code vorhanden (types.ts hält die Tupel bewusst breit),
+ * aber hier NICHT importiert/registriert und per DB-CHECK nicht speicherbar.
  *
  * ── Einen deaktivierten Sektor/Modus (wieder) aktivieren ────────────────────────
  * Vollständige Anleitung: docs/extension-points.md. Kurz:
@@ -39,11 +41,12 @@ export * from './types'
 // ─── Aggregierte Registries (nur aktive Einträge; Partial wegen Retrenchment) ──
 
 export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
-  tourism: { label: tourism.label, campaignTypes: ['tour'] },
+  tourism: { label: tourism.label, campaignTypes: ['tour', 'stay'] },
 }
 
 export const CAMPAIGN_TYPES: Partial<Record<CampaignType, CampaignTypeConfig>> = {
   tour: tourism.campaignTypes.tour,
+  stay: tourism.campaignTypes.stay,
 }
 
 // ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
