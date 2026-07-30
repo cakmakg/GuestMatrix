@@ -8,8 +8,10 @@ const __dirname = dirname(__filename)
 const compat = new FlatCompat({ baseDirectory: __dirname })
 
 const eslintConfig = [
-  // Von Next.js automatisch generierte Dateien — vom Linting ausschließen
-  { ignores: ['next-env.d.ts', '.next/**', 'node_modules/**'] },
+  // Generierte / Artefakt-Dateien — vom Linting ausschließen. supabase/.temp entsteht lokal
+  // beim `supabase start` (gebündelte Edge-Runtime) und ist git-ignoriert; flat config liest
+  // .gitignore nicht automatisch, daher hier explizit.
+  { ignores: ['next-env.d.ts', '.next/**', 'node_modules/**', 'supabase/.temp/**'] },
 
   ...compat.extends(
     'next/core-web-vitals',

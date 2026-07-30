@@ -51,6 +51,12 @@ export class UploadError extends AppError {
   }
 }
 
+export class StorageDeletionError extends AppError {
+  constructor() {
+    super('STORAGE_DELETE_ERROR', 'Löschung fehlgeschlagen, bitte erneut versuchen.', 500)
+  }
+}
+
 /**
  * Maps any thrown error to a consistent JSON Response.
  * Unknown errors are logged server-side; the client receives a generic message.
