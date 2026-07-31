@@ -94,16 +94,17 @@ do $$ declare v uuid; d timestamptz; begin
   else raise notice 'FAIL (5): Fremd-Gast konnte löschen (rpc=%, deleted_at=%)', v, d; end if;
 exception when others then reset role; raise notice 'ERR (5): %', sqlerrm; end $$;
 
--- (6) Eigentümer-Gast (guest1) löscht: RPC gibt die id zurück, deleted_at ist gesetzt.
-do $$ declare v uuid; d timestamptz; begin
+-- (6) Eigentümer-Gast (guest1) löscht: RPC gibt die id zurück, deleted_at ist gesetzt und
+--     media_url ist genullt (0011 — kein toter Storage-Pfad in der gelöschten Zeile).
+do $$ declare v uuid; d timestamptz; m text; begin
   perform set_config('request.jwt.claims','{"sub":"99999999-9999-4999-8999-999999999999","role":"authenticated"}', true);
   set local role authenticated;
   select public.soft_delete_submission('44444444-4444-4444-8444-444444444444'::uuid) into v;
   reset role; perform set_config('request.jwt.claims','', true);
-  select deleted_at into d from public.submissions where id='44444444-4444-4444-8444-444444444444';
-  if v = '44444444-4444-4444-8444-444444444444' and d is not null
-    then raise notice 'PASS (6): Eigentümer-Gast löscht (RPC gibt id, deleted_at gesetzt)';
-  else raise notice 'FAIL (6): Löschung nicht committet (rpc=%, deleted_at=%)', v, d; end if;
+  select deleted_at, media_url into d, m from public.submissions where id='44444444-4444-4444-8444-444444444444';
+  if v = '44444444-4444-4444-8444-444444444444' and d is not null and m is null
+    then raise notice 'PASS (6): Eigentümer-Gast löscht (RPC gibt id, deleted_at gesetzt, media_url genullt)';
+  else raise notice 'FAIL (6): Löschung nicht committet/genullt (rpc=%, deleted_at=%, media_url=%)', v, d, m; end if;
 exception when others then reset role; raise notice 'ERR (6): %', sqlerrm; end $$;
 
 -- (7) Nach der Löschung: owned_submission_media liefert 0 (deleted_at-Filter) — die Datei ist
