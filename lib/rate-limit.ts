@@ -13,7 +13,16 @@ const redis =
 // Rate Limiting ist in Phase 0 bewusst V2 (docs/phase0.md). Fehlt Upstash in Produktion,
 // wird NICHT hart abgebrochen (das machte die App nicht deploybar) — stattdessen einmalige
 // Warnung + fail-open (kein Limit). checkRateLimit() unten failt ohnehin offen.
-if (!redis && process.env.NODE_ENV === 'production') {
+//
+// NEXT_PHASE-Guard: `next build` läuft mit NODE_ENV=production, aber Upstash-Secrets sind
+// Runtime-Werte (auf Vercel erst zur Laufzeit gesetzt). Ohne den Guard würde diese Warnung bei
+// jedem Build mehrfach erscheinen und fälschlich „Rate Limiting deaktiviert" melden. Nur zur
+// echten Laufzeit warnen (Cold Start des Prod-Servers), nicht in der Build-Phase.
+if (
+  !redis &&
+  process.env.NODE_ENV === 'production' &&
+  process.env.NEXT_PHASE !== 'phase-production-build'
+) {
   console.warn(
     '[rate_limit] UPSTASH_REDIS_REST_URL/TOKEN nicht gesetzt — Rate Limiting ist deaktiviert (no-op). Für die Produktionshärtung (V2) konfigurieren.',
   )
