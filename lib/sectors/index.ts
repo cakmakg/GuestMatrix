@@ -28,6 +28,7 @@ import type {
   CampaignCapabilities,
   CampaignType,
   CampaignTypeConfig,
+  FeedbackQuestion,
   FlowMode,
   GuestFlowLabels,
   Sector,
@@ -104,7 +105,27 @@ export function resolveLabels(type: CampaignType, mode: FlowMode): GuestFlowLabe
     namePrompt: typeLabels?.namePrompt,
     namePlaceholder: typeLabels?.namePlaceholder,
     successText: modeLabels.successText,
+    questions: getFeedbackQuestions(type),
   }
+}
+
+/**
+ * Strukturierter Feedback-Katalog eines Kampagnentyps (leer, wenn keiner definiert ist — z. B.
+ * tour). Server-seitige Quelle der Wahrheit für die Antwort-Validierung; dem Client wird nicht
+ * vertraut.
+ */
+export function getFeedbackQuestions(type: CampaignType): readonly FeedbackQuestion[] {
+  return CAMPAIGN_TYPES[type]?.questions ?? []
+}
+
+/**
+ * Liefert die Antwort-Schlüssel, die NICHT im Katalog des Kampagnentyps stehen. Leeres Array =
+ * alle Schlüssel gültig; der Handler wirft bei nicht-leerem Ergebnis ValidationError. Die
+ * Wertebereiche (1–5) prüft bereits das Zod-Schema — hier geht es allein um die Zugehörigkeit.
+ */
+export function unknownAnswerKeys(type: CampaignType, answers: Record<string, number>): string[] {
+  const allowed = new Set(getFeedbackQuestions(type).map((q) => q.id))
+  return Object.keys(answers).filter((key) => !allowed.has(key))
 }
 
 // ─── Narrowing für DB-Strings (text-Spalten kommen als string zurück) ─────────

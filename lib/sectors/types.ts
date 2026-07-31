@@ -83,6 +83,24 @@ export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successTe
   },
 }
 
+// ─── Strukturiertes Feedback (Feedback-Anreicherung) ──────────────────────────
+
+/**
+ * Eine strukturierte Feedback-Frage (v1: nur Sterne-Bewertung 1–5; weitere Typen wie 'text'
+ * später). Der Katalog je Kampagnentyp liegt im Sektor-Modul; die Antworten landen generisch
+ * in `submissions.feedback_answers` unter `id`. `id` ist deshalb ein STABILER Schlüssel und
+ * darf nie geändert werden (sonst verwaisen alte Antworten).
+ *
+ * Compliance: Alle Fragen sind OPTIONAL („anbieten, nicht erzwingen"). Es gibt KEIN
+ * Rating-Gating — nirgends wird nach der Bewertung verzweigt, um zufriedene Gäste zu
+ * externen Reviews zu leiten oder unzufriedene auszublenden.
+ */
+export type FeedbackQuestion = {
+  id: string
+  prompt: string
+  type: 'rating'
+}
+
 // ─── Kampagnentyp + Sektor-Modul ──────────────────────────────────────────────
 
 // Kampagnentyp-spezifische Texte (der Flow-Modus wählt aus, welche gerendert werden).
@@ -106,6 +124,8 @@ export type GuestFlowLabels = {
   namePrompt?: string
   namePlaceholder?: string
   successText: string
+  // Strukturierte Zusatzfragen (leer, wenn der Kampagnentyp keine definiert — z. B. tour).
+  questions: readonly FeedbackQuestion[]
 }
 
 export type CampaignTypeConfig = {
@@ -114,6 +134,9 @@ export type CampaignTypeConfig = {
   defaultFlowMode: FlowMode
   allowFlowModeChoice: boolean
   labels: CampaignTypeLabels
+  // Optionaler Katalog strukturierter Feedback-Fragen. Fehlt → nur Gesamt-Rating/Kommentar
+  // (leichter tour-Flow). Der DB-Speicher (feedback_answers) ist generisch; kein Sonderfall-Code.
+  questions?: readonly FeedbackQuestion[]
 }
 
 /** Eine vom Betreiber entwickelte Sektor-Einheit (ein Ordner unter `lib/sectors/<id>/`). */

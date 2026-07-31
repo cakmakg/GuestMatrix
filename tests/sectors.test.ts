@@ -6,6 +6,7 @@ import {
   campaignTypesForSector,
   getCampaignConfig,
   getCapabilities,
+  getFeedbackQuestions,
   isCampaignType,
   isFlowMode,
   isFlowModeAllowed,
@@ -13,6 +14,7 @@ import {
   isValidCampaignForSector,
   resolveFlowMode,
   resolveLabels,
+  unknownAnswerKeys,
 } from '@/lib/sectors'
 import { tourism } from '@/lib/sectors/tourism'
 
@@ -137,6 +139,35 @@ describe('active flow labels + capabilities (gallery + feedback)', () => {
     expect(labels.landingHeadline).toBe(getCampaignConfig('stay')?.labels.landingHeadline)
     expect(labels.consentText).toContain('Feedback')
     expect(labels.successText).toContain('Feedback')
+  })
+})
+
+describe('structured feedback catalog (stay full, tour light)', () => {
+  it('stay exposes a non-empty rating catalog with unique, stable ids', () => {
+    const questions = getFeedbackQuestions('stay')
+    expect(questions.length).toBeGreaterThan(0)
+    expect(questions.every((q) => q.type === 'rating')).toBe(true)
+    const ids = questions.map((q) => q.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids).toEqual(['cleanliness', 'service', 'location', 'value'])
+  })
+
+  it('tour stays light: no structured questions', () => {
+    expect(getFeedbackQuestions('tour')).toEqual([])
+    expect(getCampaignConfig('tour')?.questions).toBeUndefined()
+  })
+
+  it('resolveLabels carries the stay catalog and an empty list for tour', () => {
+    expect(resolveLabels('stay', 'feedback').questions).toEqual(getFeedbackQuestions('stay'))
+    expect(resolveLabels('tour', 'gallery').questions).toEqual([])
+  })
+
+  it('unknownAnswerKeys accepts catalog keys and rejects everything else', () => {
+    expect(unknownAnswerKeys('stay', { cleanliness: 5, value: 3 })).toEqual([])
+    expect(unknownAnswerKeys('stay', { cleanliness: 5, bogus: 3 })).toEqual(['bogus'])
+    // tour has no catalog → any key is unknown (structured answers do not belong on tour)
+    expect(unknownAnswerKeys('tour', { cleanliness: 5 })).toEqual(['cleanliness'])
+    expect(unknownAnswerKeys('stay', {})).toEqual([])
   })
 })
 

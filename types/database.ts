@@ -88,6 +88,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           event_id: string
+          feedback_answers: Json | null
           file_type: string | null
           guest_name: string | null
           guest_user_id: string
@@ -104,6 +105,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           event_id: string
+          feedback_answers?: Json | null
           file_type?: string | null
           guest_name?: string | null
           guest_user_id: string
@@ -120,6 +122,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           event_id?: string
+          feedback_answers?: Json | null
           file_type?: string | null
           guest_name?: string | null
           guest_user_id?: string
@@ -186,7 +189,12 @@ export type Database = {
     }
     Functions: {
       attach_feedback: {
-        Args: { p_comment?: string; p_rating?: number; p_submission_id: string }
+        Args: {
+          p_answers?: Json
+          p_comment?: string
+          p_rating?: number
+          p_submission_id: string
+        }
         Returns: string
       }
       current_tenant_id: { Args: never; Returns: string }
@@ -201,6 +209,10 @@ export type Database = {
       soft_delete_submission: {
         Args: { p_submission_id: string }
         Returns: string
+      }
+      validate_feedback_answers: {
+        Args: { p_answers: Json; p_campaign_type: string }
+        Returns: undefined
       }
     }
     Enums: {

@@ -15,7 +15,7 @@ export async function PATCH(
     if (!parsedParams.success) throw new ValidationError('Invalid submission ID.')
 
     const { submissionId } = parsedParams.data
-    const { userId } = await requireAnyAuth()
+    await requireAnyAuth()
 
     const body: unknown = await request.json().catch(() => null)
     const parsed = ratingSchema.safeParse(body)
@@ -23,32 +23,20 @@ export async function PATCH(
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid request.')
     }
 
-    // Use server client so RLS enforces guest_user_id = auth.uid()
+    // Server client so RLS enforces guest_user_id = auth.uid().
     const supabase = await createSupabaseServerClient()
 
-    const { data: existing } = await supabase
-      .from('submissions')
-      .select('id, guest_user_id')
-      .eq('id', submissionId)
-      .is('deleted_at', null)
-      .single<{ id: string; guest_user_id: string }>()
-
-    if (!existing) throw new NotFoundError('Submission')
-
-    // Guests can only rate submissions they uploaded
-    if (existing.guest_user_id !== userId) {
-      throw new NotFoundError('Submission')
-    }
-
-    const { error } = await supabase
-      .from('submissions')
-      .update({ rating: parsed.data.rating })
-      .eq('id', submissionId)
-      .eq('guest_user_id', userId)
-
-    if (error) {
-      return Response.json({ error: 'Something went wrong.' }, { status: 500 })
-    }
+    // Bewertung ownership-geprüft über die RPC anhängen. WICHTIG (Bugfix): ein direktes update()
+    // als Gast trifft 0 Zeilen, weil Gäste keine UPDATE-RLS-Policy auf submissions haben (nur
+    // tenant_update_submissions) — die Tour-Bewertung ging still verloren. attach_feedback
+    // (SECURITY DEFINER) prüft guest_user_id = auth.uid() und setzt NUR rating/comment/answers.
+    // Dieser Pfad ist tour-only (gallery); tour hat weder Kommentar noch strukturierte Antworten.
+    const { data: attachedId, error } = await supabase.rpc('attach_feedback', {
+      p_submission_id: submissionId,
+      p_rating: parsed.data.rating,
+    })
+    if (error) throw error
+    if (!attachedId) throw new NotFoundError('Submission')
 
     return Response.json({ ok: true })
   } catch (error) {

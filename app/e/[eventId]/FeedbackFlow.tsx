@@ -47,6 +47,7 @@ export default function FeedbackFlow({
   const [step, setStep] = useState<Step>('landing')
   const [consentChecked, setConsentChecked] = useState(false)
   const [rating, setRating] = useState<number>(0)
+  const [answers, setAnswers] = useState<Record<string, number>>({})
   const [comment, setComment] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [progress, setProgress] = useState(0)
@@ -94,7 +95,8 @@ export default function FeedbackFlow({
 
   const handleSubmit = useCallback(async () => {
     const trimmed = comment.trim()
-    if (rating === 0 && trimmed === '' && !selectedFile) {
+    const hasAnswers = Object.keys(answers).length > 0
+    if (rating === 0 && trimmed === '' && !selectedFile && !hasAnswers) {
       setError('Bitte gib eine Bewertung oder einen Kommentar ab.')
       return
     }
@@ -114,6 +116,7 @@ export default function FeedbackFlow({
         body: JSON.stringify({
           rating: rating > 0 ? rating : undefined,
           comment: trimmed !== '' ? trimmed : undefined,
+          answers: hasAnswers ? answers : undefined,
           submissionId: sid,
         }),
       })
@@ -128,7 +131,7 @@ export default function FeedbackFlow({
       setError(err instanceof Error ? err.message : 'Feedback fehlgeschlagen.')
       setStep('feedback')
     }
-  }, [comment, rating, selectedFile, eventId, uploadMedia])
+  }, [comment, answers, rating, selectedFile, eventId, uploadMedia])
 
   const handleDelete = useCallback(async () => {
     if (!submissionId) return
@@ -196,6 +199,30 @@ export default function FeedbackFlow({
               ))}
             </div>
           </div>
+
+          {/* Strukturierte Zusatzfragen (aus dem Kampagnen-Katalog) — alle optional. */}
+          {labels.questions.length > 0 && (
+            <div className="space-y-3">
+              {labels.questions.map((q) => (
+                <div key={q.id} className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-gray-600">{q.prompt}</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: star }))}
+                        className="text-2xl leading-none hover:scale-110 transition-transform"
+                        aria-label={`${q.prompt}: ${star} Sterne`}
+                      >
+                        {star <= (answers[q.id] ?? 0) ? '★' : '☆'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div>
             <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1.5">

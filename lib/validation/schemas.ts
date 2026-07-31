@@ -113,10 +113,19 @@ export const ratingSchema = z.object({
   rating: z.number({ invalid_type_error: 'Rating must be a number.' }).int().min(1).max(5),
 })
 
+// Strukturierte Zusatzantworten: { fragenId: 1..5 }. Das Zod-Schema prüft NUR Form + Wertebereich
+// (UX / schnelle Ablehnung). Die Schlüssel-Zugehörigkeit zum Kampagnentyp-Katalog prüft der
+// Handler (unknownAnswerKeys); als letzte Verteidigungslinie validiert zusätzlich die DB
+// (attach_feedback-Körper + Trigger), da jsonb schemalos ist.
+export const feedbackAnswersSchema = z.record(
+  z.string(),
+  z.number({ invalid_type_error: 'Answer must be a number.' }).int().min(1).max(5),
+)
+
 // Feedback-Modus (z. B. Hotel-Aufenthalt, Immobilien-Besichtigung): Bewertung und/oder
 // Kommentar ohne zwingenden Medien-Upload. Wenn eine submissionId vorliegt, wurde bereits
 // ein Medium hochgeladen — dann sind rating/comment optional. Sonst muss mindestens eines
-// von rating/comment ausgefüllt sein.
+// von rating/comment/answers ausgefüllt sein.
 export const feedbackSchema = z
   .object({
     rating: z
@@ -126,12 +135,20 @@ export const feedbackSchema = z
       .max(5)
       .optional(),
     comment: z.string().max(1000, 'Comment is too long.').trim().optional(),
+    answers: feedbackAnswersSchema.optional(),
     submissionId: uuid.optional(),
   })
-  .refine((data) => data.rating !== undefined || !!data.comment || !!data.submissionId, {
-    message: 'Please provide a rating or a comment.',
-    path: ['comment'],
-  })
+  .refine(
+    (data) =>
+      data.rating !== undefined ||
+      !!data.comment ||
+      !!data.submissionId ||
+      (data.answers !== undefined && Object.keys(data.answers).length > 0),
+    {
+      message: 'Please provide a rating or a comment.',
+      path: ['comment'],
+    },
+  )
 
 // ─── URL params ───────────────────────────────────────────────────────────────
 

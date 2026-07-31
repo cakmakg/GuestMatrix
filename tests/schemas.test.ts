@@ -253,6 +253,20 @@ describe('feedbackSchema', () => {
   it('rejects an out-of-range rating', () => {
     expect(feedbackSchema.safeParse({ rating: 6 }).success).toBe(false)
   })
+
+  it('accepts structured answers only (no overall rating/comment)', () => {
+    expect(feedbackSchema.safeParse({ answers: { cleanliness: 5, service: 4 } }).success).toBe(true)
+  })
+
+  it('rejects an answer value out of the 1–5 range', () => {
+    expect(feedbackSchema.safeParse({ answers: { cleanliness: 0 } }).success).toBe(false)
+    expect(feedbackSchema.safeParse({ answers: { cleanliness: 6 } }).success).toBe(false)
+    expect(feedbackSchema.safeParse({ answers: { cleanliness: 3.5 } }).success).toBe(false)
+  })
+
+  it('rejects an empty submission even with an empty answers object', () => {
+    expect(feedbackSchema.safeParse({ answers: {} }).success).toBe(false)
+  })
 })
 
 describe('guestbookMessageSchema', () => {

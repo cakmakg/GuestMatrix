@@ -31,6 +31,14 @@ export const tourism = {
         commentPrompt: 'Dein Kommentar (optional)',
         commentPlaceholder: 'Was hat dir gefallen? Was können wir verbessern?',
       },
+      // Strukturierte Zusatzfragen für Aufenthalte — alle optional. Die id ist ein stabiler
+      // Speicherschlüssel (feedback_answers) und darf nicht geändert werden.
+      questions: [
+        { id: 'cleanliness', prompt: 'Sauberkeit', type: 'rating' },
+        { id: 'service', prompt: 'Personal & Service', type: 'rating' },
+        { id: 'location', prompt: 'Lage', type: 'rating' },
+        { id: 'value', prompt: 'Preis-Leistung', type: 'rating' },
+      ],
     },
   },
 } satisfies SectorModule

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import QRCode from 'qrcode'
 
-import { getCampaignConfig, isCampaignType, isFlowMode } from '@/lib/sectors'
+import { getCampaignConfig, getFeedbackQuestions, isCampaignType, isFlowMode } from '@/lib/sectors'
 import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
@@ -19,6 +19,7 @@ type SubmissionRow = {
   moderation_flag: boolean
   rating: number | null
   comment: string | null
+  feedback_answers: Record<string, number> | null
 }
 
 async function getEventData(tenantId: string, eventId: string) {
@@ -46,7 +47,9 @@ async function getEventData(tenantId: string, eventId: string) {
 
   const { data } = await supabase
     .from('submissions')
-    .select('id, media_url, file_type, guest_name, uploaded_at, moderation_flag, rating, comment')
+    .select(
+      'id, media_url, file_type, guest_name, uploaded_at, moderation_flag, rating, comment, feedback_answers',
+    )
     .eq('event_id', eventId)
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
@@ -97,6 +100,11 @@ export default async function EventDetailPage({
   const typeLabel = isCampaignType(event.campaign_type)
     ? (getCampaignConfig(event.campaign_type)?.label ?? event.campaign_type)
     : event.campaign_type
+
+  // Fragen-Katalog des Kampagnentyps → id-zu-Prompt-Reihenfolge für die Feedback-Anzeige (leer bei tour).
+  const feedbackQuestions = isCampaignType(event.campaign_type)
+    ? getFeedbackQuestions(event.campaign_type)
+    : []
 
   const guestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${eventId}`
   const qrDataUrl = await QRCode.toDataURL(guestUrl, { width: 300, margin: 2 })
@@ -198,6 +206,23 @@ export default async function EventDetailPage({
                       </p>
                     ) : (
                       <p className="mt-1 text-sm text-gray-300 italic">Kein Kommentar</p>
+                    )}
+                    {feedbackQuestions.length > 0 && sub.feedback_answers && (
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                        {feedbackQuestions.map((q) => {
+                          const value = sub.feedback_answers?.[q.id]
+                          if (typeof value !== 'number') return null
+                          return (
+                            <span key={q.id} className="text-xs text-gray-500">
+                              {q.prompt}:{' '}
+                              <span className="text-amber-500">
+                                {'★'.repeat(value)}
+                                {'☆'.repeat(5 - value)}
+                              </span>
+                            </span>
+                          )
+                        })}
+                      </div>
                     )}
                     {sub.moderation_flag && (
                       <span className="mt-1 inline-block text-xs font-bold bg-red-500 text-white px-2 py-0.5 rounded">
