@@ -94,13 +94,16 @@ erlaubt dem Operator, zwischen `gallery` und `feedback` zu wählen. Der Typ `wed
 nutzt den privaten `guestbook`-Modus (Name + Glückwunsch + optionale Medien, nur für den
 Veranstalter/das Brautpaar sichtbar). Bestandszeilen wurden auf `tour` / `gallery` backfillt.
 
-> **Status (Retrenchment, Migration 0006):** Die oben gezeigten CHECK-Listen sind der
-> **designed-for**-Zielzustand. **Aktiv** ist ausschließlich `tourism / tour / gallery`:
-> `0006_lockdown_tourism_gallery.sql` verengt die drei CHECKs auf je einen Wert
-> (`sector = 'tourism'`, `campaign_type = 'tour'`, `flow_mode = 'gallery'`), sodass die DB
-> keine `stay`/`property`/`wedding`- bzw. `feedback`/`guestbook`-Zeile halten kann. Die Modi
-> `feedback`/`guestbook` und die Sektoren `real_estate`/`event` bleiben als Code erhalten,
-> sind aber deaktiviert. Wiederaktivierung: **`docs/extension-points.md`**.
+> **Status (Retrenchment 0006 + Öffnung 0009):** Die oben gezeigten CHECK-Listen sind der
+> **designed-for**-Zielzustand. **Aktiv** sind `tourism / tour / gallery` UND `tourism / stay /
+feedback`: `0006_lockdown_tourism_gallery.sql` verengte die drei CHECKs zunächst auf je einen
+> Wert; `0009_reopen_tourism_stay_feedback.sql` erweiterte `campaign_type` auf `('tour', 'stay')`
+> und `flow_mode` auf `('gallery', 'feedback')` (Sektor bleibt `tourism`) und ergänzte ATOMAR das
+> B1-Gallery-Audit — `public_gallery_select` bekommt `is_gallery_event`, damit private
+> Feedback-Kommentare nie an andere Gäste gelangen. `0010` fügte die ownership-geprüfte RPC
+> `attach_feedback` hinzu (rating/comment an einen Medien-Beitrag). Weiterhin gesperrt: der Modus
+> `guestbook` sowie die Sektoren `real_estate`/`event`. (Wieder-)Aktivierung:
+> **`docs/extension-points.md`**.
 
 **Indizes:**
 

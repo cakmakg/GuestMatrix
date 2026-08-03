@@ -3,7 +3,8 @@
 ## Für wen, welcher Schmerzpunkt?
 
 Primär (Beachhead): Kleine Reiseoperatoren / unabhängige Reiseleiter.
-Fast-Follow (designtechnisch vorbereitet, jetzt KEIN Build): Hotels & Resorts.
+Fast-Follow (mit T2 / Migration `0009` GEBAUT & aktiv): Hotels & Resorts — Kampagnentyp `stay`,
+Flow-Modus `feedback`.
 Endnutzer: Gäste des jeweiligen Unternehmens.
 
 Schmerzpunkt: Unternehmen können Gästeerfahrungs-Inhalte (Foto/Video) und Feedback
@@ -32,12 +33,14 @@ Self-serve-Registrierung, Abrechnung/Abonnements/Pakete, hotel-/resort-spezifisc
 Loyalty/Belohnungen, erweitertes Analytics-Dashboard, NPS, native App, Mehrsprachigkeit,
 Rollen/Mehrbenutzer pro Tenant, KI-Funktionen außer Moderation.
 
-**Deaktivierte, aber vorbereitete Bahnen (designed-for, not built):** Die Sektoren
-`real_estate` und `event` (Hochzeit/Momento) sowie die Flow-Modi `feedback` und `guestbook`
-existieren als Code, sind aber per Migration `0006` + Registry deaktiviert — die aktive Bahn
-ist allein `tourism / tour / gallery`. Die oben exkludierte **Self-serve-Registrierung** wurde
-konsistent dazu deaktiviert (die Route `/signup` ist ausgeschaltet); Tenants weist der
-Betreiber zu. Anleitung zur Wiederaktivierung: **`docs/extension-points.md`**.
+**Aktive Bahnen (Stand T2):** `tourism / tour / gallery` (MVP) UND `tourism / stay / feedback`
+(Hotel-Feedback; Migration `0009` erweiterte die CHECKs und ergänzte atomar das B1-Gallery-Audit
+`is_gallery_event`, `0010` fügte die ownership-geprüfte RPC `attach_feedback` hinzu).
+**Weiterhin deaktiviert (designed-for, not built):** die Sektoren `real_estate` und `event`
+(Hochzeit/Momento) sowie der Flow-Modus `guestbook` — als Code vorhanden, per Migration `0006` +
+Registry gesperrt. Die oben exkludierte **Self-serve-Registrierung** bleibt konsistent deaktiviert
+(die Route `/signup` ist ausgeschaltet); Tenants weist der Betreiber zu. Anleitung zur
+(Wieder-)Aktivierung: **`docs/extension-points.md`**.
 
 ## Risikoreichste Annahme
 

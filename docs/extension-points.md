@@ -6,19 +6,23 @@
 
 ## Invariante (aktueller Zustand)
 
-**Aktiv ist ausschließlich `tourism / tour / gallery`.** Die Garantie besteht aus zwei Schichten:
+**Aktiv sind `tourism / tour / gallery` UND `tourism / stay / feedback`** (Hotel-Feedback; seit
+Migration `0009`). Die Garantie besteht aus zwei Schichten:
 
-1. **DB-CHECK** (`supabase/migrations/0006_lockdown_tourism_gallery.sql`): `tenants.sector = 'tourism'`,
-   `events.campaign_type = 'tour'`, `events.flow_mode = 'gallery'`. Deaktivierte Werte sind
-   **nicht speicherbar** — eine `feedback`/`guestbook`- oder Nicht-Tourism-Zeile kann physisch
-   nicht existieren.
-2. **Registry** (`lib/sectors/index.ts`): nur `tourism`/`tour` sind in `SECTORS` + `CAMPAIGN_TYPES`
-   eingetragen. UI, Validierung und Gäste-Flow leiten sich vollständig hieraus ab.
+1. **DB-CHECK**: `tenants.sector = 'tourism'` (0006). `events.campaign_type in ('tour', 'stay')`
+   und `events.flow_mode in ('gallery', 'feedback')` — `0006_lockdown_tourism_gallery.sql` verengte
+   auf je einen Wert, `0009_reopen_tourism_stay_feedback.sql` erweiterte um stay/feedback. Weiterhin
+   **nicht speicherbar**: `flow_mode = 'guestbook'` sowie die Sektoren `real_estate`/`event` — eine
+   solche Zeile kann physisch nicht existieren.
+2. **Registry** (`lib/sectors/index.ts`): `tourism` mit `tour` + `stay` sind in `SECTORS` +
+   `CAMPAIGN_TYPES` eingetragen. UI, Validierung und Gäste-Flow leiten sich vollständig hieraus ab.
 
-**Wichtig — RLS ist NICHT flow-mode-aware.** Die Policies `public_gallery_select` und
-`public_select_events` filtern **nicht** nach `flow_mode`. Deshalb ist der DB-CHECK (nicht eine
-RLS-Policy) die Garantie, dass ein deaktivierter Modus keine Zeile hält. Wer einen guest-sichtbaren
-Modus reaktiviert, **muss** diese beiden Policies erneut prüfen (siehe Schritt 4).
+**RLS-Update (0009): `public_gallery_select` IST jetzt flow-mode-aware.** Die Policy filtert über
+den SECURITY-DEFINER-Helfer `is_gallery_event(event_id)` — nur `gallery`-Events erreichen die
+Gäste-Galerie, sodass private Feedback-Kommentare NIE an andere Gäste gelangen (B1-Audit, atomar in
+derselben Migration wie die CHECK-Öffnung). `public_select_events` (Event-Stammdaten) bleibt
+öffentlich lesbar; sensible Felder filtert der API-Handler. **Wer künftig einen weiteren
+guest-sichtbaren Modus reaktiviert, muss `public_gallery_select` erneut prüfen** (siehe Schritt 4).
 
 ## Vorhandener Code als Vorlage (dormant, nicht gelöscht)
 
@@ -27,11 +31,13 @@ Modus reaktiviert, **muss** diese beiden Policies erneut prüfen (siehe Schritt 
 | Sektor-Modul `event` (Momento) | `lib/sectors/event/index.ts`                                          |
 | Sektor-Modul `real_estate`     | `lib/sectors/real_estate/index.ts`                                    |
 | Flow-Modus-Capabilities/Labels | `lib/sectors/types.ts` (`FLOW_MODE_CAPABILITIES`, `FLOW_MODE_LABELS`) |
-| Gäste-Flow `feedback`          | `app/e/[eventId]/FeedbackFlow.tsx`                                    |
 | Gäste-Flow `guestbook`         | `app/e/[eventId]/GuestbookFlow.tsx`                                   |
 | Route Gästebuch-Gruß           | `app/api/events/[eventId]/_guestbook/route.ts`                        |
-| Route Feedback                 | `app/api/events/[eventId]/_feedback/route.ts`                         |
 | Self-Service-Signup (Momento)  | `app/_signup/` (Route via `_`-Präfix deaktiviert)                     |
+
+> `feedback` ist NICHT mehr dormant: `FeedbackFlow.tsx` + `app/api/events/[eventId]/feedback/route.ts`
+> (ohne `_`) sind seit `0009` aktiv (Hotel/`stay`). Ergänzend liefert `0010` die RPC `attach_feedback`
+> (rating/comment an einen Medien-Beitrag anhängen, ownership-geprüft).
 
 Die Tupel in `lib/sectors/types.ts` (`SECTOR_TUPLE`, `CAMPAIGN_TYPE_TUPLE`, `FLOW_MODE_TUPLE`)
 sind bewusst **breit** geblieben, damit dieser Code weiter kompiliert. Reaktivieren heißt daher:
@@ -39,7 +45,9 @@ Registry-Eintrag + CHECK erweitern (+ ggf. RLS-Audit) — keine Typänderungen n
 
 ## Rezept — einen deaktivierten Sektor/Modus aktivieren
 
-Beispiel: `event` / `wedding` / `guestbook` wieder aktivieren.
+Beispiel: `event` / `wedding` / `guestbook` wieder aktivieren. (Ein bereits durchgeführtes, echtes
+Beispiel dieses Rezepts ist `tourism / stay / feedback` in Migration `0009` — inklusive Schritt 4,
+dem B1-Gallery-Audit via `is_gallery_event`.)
 
 1. **Migration — CHECK erweitern** (neue Datei `supabase/migrations/00NN_*.sql`, drop + recreate):
 

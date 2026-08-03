@@ -8,11 +8,11 @@
 > einem eigenen Ordner unter `lib/sectors/<id>/`; der Kunde bekommt einen Sektor zugewiesen
 > und kann keinen anlegen.
 >
-> **Aktiver MVP-Umfang (Retrenchment):** Gebaut **und aktiv** ist ausschließlich
-> `tourism / tour / gallery` — die einzige Validierungsbahn der Phase 0 (siehe `phase0.md`).
-> Alle übrigen Zeilen in Abschnitt 0 sind **designed-for, nicht aktiv**: als Code vorhanden,
-> aber per Migration `0006` + Registry deaktiviert. Reifegrad-Details: Abschnitt **0.1**;
-> Wiederaktivierung: **`docs/extension-points.md`**.
+> **Aktiver Umfang (Stand T2):** Gebaut **und aktiv** sind `tourism / tour / gallery` (MVP) UND
+> `tourism / stay / feedback` (Hotel-Feedback; seit Migration `0009`). Die übrigen Zeilen in
+> Abschnitt 0 sind **designed-for, nicht aktiv**: als Code vorhanden, aber per Migration `0006` +
+> Registry deaktiviert (Sektoren `real_estate`/`event`, Flow-Modus `guestbook`). Reifegrad-Details:
+> Abschnitt **0.1**; (Wieder-)Aktivierung: **`docs/extension-points.md`**.
 
 ## 0. Sektoren, Kampagnentypen & Flow-Modi
 
@@ -37,17 +37,17 @@
 Phasen-Label wie in `30-requirements.md`: **MVP** = Phase 0 · **Deaktiviert** = als Code
 vorhanden, per Migration `0006` + Registry ausgeschaltet (designed-for).
 
-| Sektor / Kampagnentyp / Modus     | Reifegrad       | Status                                             |
-| --------------------------------- | --------------- | -------------------------------------------------- |
-| `tourism` / `tour` / `gallery`    | **MVP — aktiv** | Einzige aktive Validierungsbahn der Phase 0.       |
-| `tourism` / `stay` / `feedback`   | **Deaktiviert** | Hotel/Feedback; in `phase0.md` bewusst exkludiert. |
-| `real_estate` / `property`        | **Deaktiviert** | `gallery`/`feedback`; Code vorhanden, nicht aktiv. |
-| `event` / `wedding` / `guestbook` | **Deaktiviert** | Momento-Gästebuch; Code vorhanden, nicht aktiv.    |
+| Sektor / Kampagnentyp / Modus     | Reifegrad       | Status                                                                                          |
+| --------------------------------- | --------------- | ----------------------------------------------------------------------------------------------- |
+| `tourism` / `tour` / `gallery`    | **MVP — aktiv** | Einzige aktive Validierungsbahn der Phase 0.                                                    |
+| `tourism` / `stay` / `feedback`   | **Aktiv (T2)**  | Hotel-Feedback; via `0009` geöffnet (B1-Audit `is_gallery_event`) + `0010` (`attach_feedback`). |
+| `real_estate` / `property`        | **Deaktiviert** | `gallery`/`feedback`; Code vorhanden, nicht aktiv.                                              |
+| `event` / `wedding` / `guestbook` | **Deaktiviert** | Momento-Gästebuch; Code vorhanden, nicht aktiv.                                                 |
 
-Die DB kann deaktivierte Werte nicht speichern (CHECK aus `0006`). Die einzige Bahn, die die
-User Stories und der Core-Ablauf (Abschnitte 1–2) **aktiv** abdecken, ist `tour`/`gallery`;
-`feedback`/`guestbook`-Stories (z. B. B-7) beschreiben deaktivierte Funktionen. Schritt-für-
-Schritt zur Wiederaktivierung: **`docs/extension-points.md`**.
+Die DB kann deaktivierte Werte nicht speichern (CHECK aus `0006`, um stay/feedback erweitert in
+`0009`). **Aktiv** abgedeckt sind `tour`/`gallery` (Stories B-3…B-5) UND `stay`/`feedback` (Hotel;
+Story B-7); nur `guestbook`-Stories beschreiben noch deaktivierte Funktionen. Schritt-für-Schritt
+zur (Wieder-)Aktivierung: **`docs/extension-points.md`**.
 
 ## 1. User Stories
 
