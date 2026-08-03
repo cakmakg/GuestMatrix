@@ -2,3 +2,7 @@
 node_modules/
 supabase/.temp/
 *.lock
+
+# Von `supabase gen types` erzeugt — nicht handbearbeitet (CLAUDE.md); Prettier würde bei
+# jeder Neugenerierung erneut abweichen.
+types/database.ts

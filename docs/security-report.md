@@ -12,34 +12,34 @@
 
 GuestMatrix ist ein QR-basiertes Gast-UGC- und Feedback-Tool für kleine Touroperatoren. Drei Akteure interagieren mit dem System:
 
-| Akteur | Vertrauen | Zugriff |
-|--------|-----------|---------|
-| Tenant (Betreiber) | Authentifiziert (E-Mail + Passwort) | Dashboard, Events, Moderationsfunktionen |
-| Gast | Anonym authentifiziert (Supabase `signInAnonymously`) | Upload, Galerie-Ansicht (nach Upload) |
-| Angreifer | Kein Vertrauen | Öffentlich zugängliche Endpunkte |
+| Akteur             | Vertrauen                                             | Zugriff                                  |
+| ------------------ | ----------------------------------------------------- | ---------------------------------------- |
+| Tenant (Betreiber) | Authentifiziert (E-Mail + Passwort)                   | Dashboard, Events, Moderationsfunktionen |
+| Gast               | Anonym authentifiziert (Supabase `signInAnonymously`) | Upload, Galerie-Ansicht (nach Upload)    |
+| Angreifer          | Kein Vertrauen                                        | Öffentlich zugängliche Endpunkte         |
 
 ### 1.2 Identifizierte Bedrohungen (T1–T18)
 
-| ID | STRIDE-Kategorie | Beschreibung | Priorität | Status |
-|----|-----------------|--------------|-----------|--------|
-| T1 | Spoofing | Brute-Force auf Tenant-Login | Kritisch | ✅ Behoben |
-| T2 | Tampering | MIME-Typ-Manipulation beim Upload | Kritisch | ✅ Behoben |
-| T3 | Information Disclosure | Gast sieht Galerie ohne Upload | Kritisch | ✅ Behoben |
-| T4 | Elevation of Privilege | Gast greift auf Tenant-Funktionen zu | Kritisch | ✅ Behoben |
-| T5 | Tampering | Path-Injection in Storage-Pfad | Hoch | ✅ Behoben |
-| T6 | Tampering | Consent-Zeitstempel vom Client fälschbar | Hoch | ✅ Behoben |
-| T7 | Denial of Service | API-Flooding ohne Rate Limiting | Hoch | ✅ Behoben |
-| T8 | Information Disclosure | Rohe Storage-Pfade im Client sichtbar | Hoch | ✅ Behoben |
-| T9 | Spoofing | Session-Hijacking via localStorage | Hoch | ✅ Behoben |
-| T10 | Information Disclosure | Idle-Session bleibt unbegrenzt aktiv | Mittel | ✅ Behoben |
-| T11 | Spoofing | E-Mail-Enumeration bei Passwort-Reset | Mittel | ✅ Behoben |
-| T12 | Tampering | Open Redirect nach Login | Mittel | ✅ Behoben |
-| T13 | Information Disclosure | Interne Fehlermeldungen im Client | Mittel | ✅ Behoben |
-| T14 | Tampering | SQL/NoSQL-Injection über Inputs | Mittel | ✅ Behoben |
-| T15 | Tampering | XSS via unsicheres CSP | Mittel | ✅ Behoben |
-| T16 | Tampering | Clickjacking | Mittel | ✅ Behoben |
-| T17 | Information Disclosure | Tenant-Datenisolierung fehlt | Kritisch | ✅ Behoben (RLS) |
-| T18 | Denial of Service | Upload sehr großer Dateien | Niedrig | ✅ Behoben |
+| ID  | STRIDE-Kategorie       | Beschreibung                             | Priorität | Status           |
+| --- | ---------------------- | ---------------------------------------- | --------- | ---------------- |
+| T1  | Spoofing               | Brute-Force auf Tenant-Login             | Kritisch  | ✅ Behoben       |
+| T2  | Tampering              | MIME-Typ-Manipulation beim Upload        | Kritisch  | ✅ Behoben       |
+| T3  | Information Disclosure | Gast sieht Galerie ohne Upload           | Kritisch  | ✅ Behoben       |
+| T4  | Elevation of Privilege | Gast greift auf Tenant-Funktionen zu     | Kritisch  | ✅ Behoben       |
+| T5  | Tampering              | Path-Injection in Storage-Pfad           | Hoch      | ✅ Behoben       |
+| T6  | Tampering              | Consent-Zeitstempel vom Client fälschbar | Hoch      | ✅ Behoben       |
+| T7  | Denial of Service      | API-Flooding ohne Rate Limiting          | Hoch      | ✅ Behoben       |
+| T8  | Information Disclosure | Rohe Storage-Pfade im Client sichtbar    | Hoch      | ✅ Behoben       |
+| T9  | Spoofing               | Session-Hijacking via localStorage       | Hoch      | ✅ Behoben       |
+| T10 | Information Disclosure | Idle-Session bleibt unbegrenzt aktiv     | Mittel    | ✅ Behoben       |
+| T11 | Spoofing               | E-Mail-Enumeration bei Passwort-Reset    | Mittel    | ✅ Behoben       |
+| T12 | Tampering              | Open Redirect nach Login                 | Mittel    | ✅ Behoben       |
+| T13 | Information Disclosure | Interne Fehlermeldungen im Client        | Mittel    | ✅ Behoben       |
+| T14 | Tampering              | SQL/NoSQL-Injection über Inputs          | Mittel    | ✅ Behoben       |
+| T15 | Tampering              | XSS via unsicheres CSP                   | Mittel    | ✅ Behoben       |
+| T16 | Tampering              | Clickjacking                             | Mittel    | ✅ Behoben       |
+| T17 | Information Disclosure | Tenant-Datenisolierung fehlt             | Kritisch  | ✅ Behoben (RLS) |
+| T18 | Denial of Service      | Upload sehr großer Dateien               | Niedrig   | ✅ Behoben       |
 
 ---
 
@@ -50,32 +50,38 @@ GuestMatrix ist ein QR-basiertes Gast-UGC- und Feedback-Tool für kleine Tourope
 **Datei:** `lib/auth/session.ts`, `middleware.ts`, `app/login/`, `app/forgot-password/`, `app/reset-password/`
 
 #### Token-Speicherung
+
 - Supabase JWT-Tokens werden **ausschließlich in `httpOnly`-Cookies** gespeichert (nie `localStorage` oder `sessionStorage`)
 - Cookie-Attribute: `httpOnly: true`, `Secure: true`, `SameSite: lax`, `maxAge: 7 Tage`
 - `SameSite: lax` (nicht `strict`) ist notwendig, damit QR-Code-Links cross-origin navigieren können
 
 #### Passwort-Sicherheit
+
 - Passwort-Hashing wird vollständig von Supabase Auth übernommen (Argon2 intern)
 - Mindestlänge: 8 Zeichen (validiert via Zod in `lib/validation/schemas.ts`)
 - Maximallänge: 128 Zeichen (verhindert bcrypt-DoS bei sehr langen Strings)
 
 #### Idle-Timeout (T10)
+
 - 30-Minuten-Inaktivitäts-Timeout für Tenant-Sessions
 - Implementierung: `gm_last_active` httpOnly-Cookie, aktualisiert bei jeder authentifizierten Anfrage in `middleware.ts`
 - Ablauf: Redirect auf `/api/auth/logout?reason=idle_timeout`
 - Gilt **nicht** für anonyme Gast-Sessions (Gäste haben kein Dashboard)
 
 #### Passwort-Reset (T11 — E-Mail-Enumeration)
+
 - `forgotPasswordAction` gibt **immer dieselbe Antwort** zurück, unabhängig davon ob die E-Mail registriert ist
 - Rate Limiting: 3 Anfragen/Stunde/IP
 - PKCE-Flow: Reset-Code wird beim Einlösen invalidiert (`exchangeCodeForSession`)
 - Recovery-Session wird nach Passwortänderung sofort invalidiert (`signOut`)
 
 #### Open Redirect (T12)
+
 - `next`-Parameter nach Login wird validiert: nur Pfade, die mit `/` beginnen und nicht `//` (Protocol-relative URL)
 - Implementierung in `app/login/actions.ts`: `next.startsWith('/') && !next.startsWith('//')`
 
 #### Generische Fehlermeldungen (T13)
+
 - Login-Fehler: immer `"E-Mail-Adresse oder Passwort ist falsch."` — nie unterscheiden ob E-Mail oder Passwort falsch
 - Interne Fehlerdetails werden nie an den Client gesendet
 - `handleRouteError()` in `lib/auth/errors.ts` fängt alle unbehandelten Fehler ab
@@ -85,6 +91,7 @@ GuestMatrix ist ein QR-basiertes Gast-UGC- und Feedback-Tool für kleine Tourope
 **Datei:** `lib/auth/session.ts`, `supabase/migrations/`
 
 #### Row Level Security (RLS) — T17
+
 - **Jede Tabelle** (`tenants`, `events`, `submissions`) hat aktive RLS-Policies
 - `current_tenant_id()` PostgreSQL-Funktion liest Tenant-ID aus dem JWT
 - Daten eines Tenants sind für andere Tenants **auf Datenbankebene** nicht sichtbar
@@ -100,6 +107,7 @@ GuestMatrix ist ein QR-basiertes Gast-UGC- und Feedback-Tool für kleine Tourope
   (siehe `docs/extension-points.md`).
 
 #### Berechtigungshierarchie in Route-Handlern
+
 ```
 requireTenantAuth()       → Nur authentifizierte, nicht-anonyme User
 requireAnyAuth()          → Authentifizierte + anonyme Gäste
@@ -107,11 +115,13 @@ requireEventOwnership()   → Prüft ob Tenant das Event besitzt
 ```
 
 #### Galerie-Reziprozitätssperre (T3)
+
 - Server-seitig erzwungen in `app/api/events/[eventId]/gallery/route.ts`
 - Ein Gast kann die Galerie nur sehen, wenn er **mindestens eine bestätigte Datei** hochgeladen hat
 - Prüfung zählt Submissions mit `uploaded_at IS NOT NULL` und `deleted_at IS NULL`
 
 #### Admin-Client-Isolation
+
 - `supabaseAdmin` (Service-Role-Key) ist in `lib/supabase/admin.ts` mit `import 'server-only'` geschützt
 - Kann **niemals** in Client-Komponenten importiert werden
 - Wird nur für zwingend notwendige privilegierte Operationen verwendet
@@ -122,23 +132,25 @@ requireEventOwnership()   → Prüft ob Tenant das Event besitzt
 
 Alle API-Endpunkte und Server Actions validieren Eingaben mit **Zod** vor der Verarbeitung:
 
-| Schema | Validiert | Endpunkt |
-|--------|-----------|----------|
-| `loginSchema` | E-Mail (RFC 5321), Passwort (8–128 Zeichen) | `/login` |
-| `forgotPasswordSchema` | E-Mail | `/forgot-password` |
-| `resetPasswordSchema` | Passwort + Bestätigung | `/reset-password` |
-| `presignSchema` | EventID (UUID), Dateiname (Allowlist-Regex), MIME-Typ (Enum) | `POST /api/submissions/presign` |
-| `createEventSchema` | Name, Datum (ISO 8601), Beschreibung | Event-Erstellung |
-| `eventIdParam` | UUID | Route-Parameter |
-| `submissionIdParam` | UUID | Route-Parameter |
+| Schema                 | Validiert                                                    | Endpunkt                        |
+| ---------------------- | ------------------------------------------------------------ | ------------------------------- |
+| `loginSchema`          | E-Mail (RFC 5321), Passwort (8–128 Zeichen)                  | `/login`                        |
+| `forgotPasswordSchema` | E-Mail                                                       | `/forgot-password`              |
+| `resetPasswordSchema`  | Passwort + Bestätigung                                       | `/reset-password`               |
+| `presignSchema`        | EventID (UUID), Dateiname (Allowlist-Regex), MIME-Typ (Enum) | `POST /api/submissions/presign` |
+| `createEventSchema`    | Name, Datum (ISO 8601), Beschreibung                         | Event-Erstellung                |
+| `eventIdParam`         | UUID                                                         | Route-Parameter                 |
+| `submissionIdParam`    | UUID                                                         | Route-Parameter                 |
 
 **NoSQL/SQL-Injection (T14):** Supabase-Queries verwenden parametrisierte Anfragen — kein direktes String-Interpolieren von User-Input in Queries.
 
 **Storage-Path-Injection (T5):**
+
 - Storage-Pfad wird **vollständig server-seitig** konstruiert: `{tenant_id}/{event_id}/{submission_id}/{uuid}{ext}`
 - Der Dateiname des Clients (`fileName`) wird nur für die UI-Anzeige gespeichert, **nie im Pfad verwendet**
 
 **Consent-Timestamp (T6):**
+
 - `consent_at` wird **server-seitig** in `presignSchema` gesetzt (`new Date().toISOString()`)
 - Der Client kann den Zeitstempel nicht manipulieren
 
@@ -146,14 +158,14 @@ Alle API-Endpunkte und Server Actions validieren Eingaben mit **Zod** vor der Ve
 
 **Datei:** `lib/rate-limit.ts`
 
-| Limiter | Strategie | Limit | Scope |
-|---------|-----------|-------|-------|
-| `login` | Fixed Window | 5 / 15 min | IP |
-| `forgotPassword` | Fixed Window | 3 / 1 Std | IP |
-| `anonSession` | Fixed Window | 10 / 1 Std | IP |
-| `presign` | Sliding Window | 20 / 1 min | User-ID |
-| `gallery` | Sliding Window | 60 / 1 min | IP |
-| `api` | Sliding Window | 200 / 1 min | IP |
+| Limiter          | Strategie      | Limit       | Scope   |
+| ---------------- | -------------- | ----------- | ------- |
+| `login`          | Fixed Window   | 5 / 15 min  | IP      |
+| `forgotPassword` | Fixed Window   | 3 / 1 Std   | IP      |
+| `anonSession`    | Fixed Window   | 10 / 1 Std  | IP      |
+| `presign`        | Sliding Window | 20 / 1 min  | User-ID |
+| `gallery`        | Sliding Window | 60 / 1 min  | IP      |
+| `api`            | Sliding Window | 200 / 1 min | IP      |
 
 **Infrastruktur:** Upstash Redis (serverless-kompatibel)
 
@@ -166,23 +178,26 @@ Alle API-Endpunkte und Server Actions validieren Eingaben mit **Zod** vor der Ve
 **Datei:** `lib/storage/mime.ts`, `app/api/submissions/presign/route.ts`, `app/api/submissions/[submissionId]/confirm/route.ts`
 
 #### Upload-Flow (3 Schritte)
+
 1. **Presign** (`POST /api/submissions/presign`): Server erstellt signierte Upload-URL, legt Submission in Pending-Status an
 2. **Upload**: Client lädt Datei direkt zu Supabase Storage hoch (presigned URL, max. 5 Minuten gültig)
 3. **Confirm** (`PATCH /api/submissions/[id]/confirm`): Server liest erste 12 Bytes via Range-Request, prüft Magic Bytes
 
 #### MIME-Validierung via Magic Bytes (T2)
+
 Erlaubte Typen werden anhand der ersten Bytes der Datei erkannt — nicht anhand des Content-Type-Headers:
 
-| Format | Magic Bytes | Offset |
-|--------|-------------|--------|
-| JPEG | `FF D8 FF` | 0 |
-| PNG | `89 50 4E 47` | 0 |
-| MP4 | `ftyp`-Box | 4–7 |
-| QuickTime | `ftyp qt  ` | 4–11 |
+| Format    | Magic Bytes   | Offset |
+| --------- | ------------- | ------ |
+| JPEG      | `FF D8 FF`    | 0      |
+| PNG       | `89 50 4E 47` | 0      |
+| MP4       | `ftyp`-Box    | 4–7    |
+| QuickTime | `ftyp qt  `   | 4–11   |
 
 Bei ungültigem MIME-Typ: Datei **und** Submission werden sofort gelöscht.
 
 #### Signierte Download-URLs (T8)
+
 - Rohe Storage-Pfade werden **nie an den Client** zurückgegeben
 - Galerie-Anzeige: signierte URLs mit 1-Stunde-Ablauf (`SIGNED_URL_EXPIRY.gallery`)
 - Upload-Vorschau: 5-Minuten-URL (`SIGNED_URL_EXPIRY.preview`)
@@ -192,17 +207,17 @@ Bei ungültigem MIME-Typ: Datei **und** Submission werden sofort gelöscht.
 
 **Datei:** `next.config.ts`
 
-| Header | Wert | Schutz gegen |
-|--------|------|--------------|
-| `Content-Security-Policy` | Eingeschränkte Allowlist | XSS (T15) |
-| `X-Frame-Options` | `DENY` | Clickjacking (T16) |
-| `X-Content-Type-Options` | `nosniff` | MIME-Sniffing |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Referrer-Leaks |
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | HTTPS-Erzwingung |
-| `Permissions-Policy` | Camera, Mic, Geo, Payment, USB deaktiviert | API-Missbrauch |
-| `Cross-Origin-Opener-Policy` | `same-origin` | Cross-Origin-Leaks |
-| `Cross-Origin-Embedder-Policy` | `require-corp` | Spectre-Angriffe |
-| `Cross-Origin-Resource-Policy` | `same-origin` | Cross-Origin-Reads |
+| Header                         | Wert                                           | Schutz gegen       |
+| ------------------------------ | ---------------------------------------------- | ------------------ |
+| `Content-Security-Policy`      | Eingeschränkte Allowlist                       | XSS (T15)          |
+| `X-Frame-Options`              | `DENY`                                         | Clickjacking (T16) |
+| `X-Content-Type-Options`       | `nosniff`                                      | MIME-Sniffing      |
+| `Referrer-Policy`              | `strict-origin-when-cross-origin`              | Referrer-Leaks     |
+| `Strict-Transport-Security`    | `max-age=63072000; includeSubDomains; preload` | HTTPS-Erzwingung   |
+| `Permissions-Policy`           | Camera, Mic, Geo, Payment, USB deaktiviert     | API-Missbrauch     |
+| `Cross-Origin-Opener-Policy`   | `same-origin`                                  | Cross-Origin-Leaks |
+| `Cross-Origin-Embedder-Policy` | `require-corp`                                 | Spectre-Angriffe   |
+| `Cross-Origin-Resource-Policy` | `same-origin`                                  | Cross-Origin-Reads |
 
 ### 2.7 Logging & Observability
 
@@ -232,13 +247,13 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 
 ## 3. Paket-Versionen und Abhängigkeiten
 
-| Paket | Version | Zweck |
-|-------|---------|-------|
-| `@supabase/ssr` | 0.12.x | Server-seitiger Supabase-Client (SSR/Cookie) |
-| `@supabase/supabase-js` | 2.110.x | Supabase-Datenbankzugriff |
-| `@upstash/ratelimit` | — | Redis-basiertes Rate Limiting |
-| `@upstash/redis` | — | Serverless-Redis-Client |
-| `zod` | — | Schema-Validierung |
+| Paket                   | Version | Zweck                                        |
+| ----------------------- | ------- | -------------------------------------------- |
+| `@supabase/ssr`         | 0.12.x  | Server-seitiger Supabase-Client (SSR/Cookie) |
+| `@supabase/supabase-js` | 2.110.x | Supabase-Datenbankzugriff                    |
+| `@upstash/ratelimit`    | —       | Redis-basiertes Rate Limiting                |
+| `@upstash/redis`        | —       | Serverless-Redis-Client                      |
+| `zod`                   | —       | Schema-Validierung                           |
 
 **Hinweis:** `@supabase/ssr` wurde von 0.6.1 auf 0.12.x aktualisiert, um eine Typ-Inkompatibilität mit `@supabase/supabase-js` 2.110+ zu beheben, die alle Query-Rückgabetypen auf `never` kollabieren ließ.
 
@@ -273,6 +288,7 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 ### 4.5 Datenschutz (DSGVO)
 
 **Identifizierte Anforderungen:**
+
 - Gäste-Medien gelten als personenbezogene Daten (Fotos/Videos)
 - Consent wird server-seitig mit Zeitstempel gespeichert (`consent_at`)
 - Löschpfad existiert (`deleted_at`-Soft-Delete + Storage-Datei-Löschung in `confirm/route.ts`)
@@ -283,6 +299,7 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 ## 5. Sicherheitscheckliste Phase 0
 
 ### Authentifizierung
+
 - [x] httpOnly + Secure + SameSite Cookies
 - [x] Keine Tokens in localStorage
 - [x] Idle-Timeout (30 Minuten)
@@ -293,6 +310,7 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 - [x] PKCE-Flow für Passwort-Reset
 
 ### Autorisierung
+
 - [x] RLS auf allen Tabellen aktiv
 - [x] Tabellen-GRANTs für API-Rollen gesetzt (`0007_grants.sql`; Zugriff = GRANT + RLS)
 - [x] Flow-Modus per CHECK auf `gallery` verengt (`0006`) — feedback/guestbook-Leak-Fläche geschlossen
@@ -302,6 +320,7 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 - [x] Admin-Client mit `server-only` geschützt
 
 ### Datei-Upload
+
 - [x] MIME-Validierung via Magic Bytes (nicht Content-Type-Header)
 - [x] Storage-Pfad vollständig server-seitig generiert
 - [x] Consent-Timestamp server-seitig gesetzt
@@ -309,12 +328,14 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 - [x] Defekte Dateien werden gelöscht (file + DB-Eintrag)
 
 ### API
+
 - [x] Zod-Validierung auf allen Endpunkten
 - [x] Rate Limiting (Upstash Redis, fail-open)
 - [x] Generische Fehlerantworten `{ error: string }`
 - [x] Kein Stack-Trace im Response-Body
 
 ### HTTP-Sicherheit
+
 - [x] Content-Security-Policy
 - [x] X-Frame-Options: DENY
 - [x] HSTS mit Preload
@@ -322,6 +343,7 @@ NEXT_PUBLIC_APP_URL=       # Öffentliche App-URL (z. B. https://app.guestmatrix
 - [x] COEP / COOP / CORP
 
 ### Secrets & Konfiguration
+
 - [x] Kein Secret im Code oder Repository
 - [x] Service-Role-Key ohne NEXT_PUBLIC_-Präfix
 - [x] Redis-Credentials ohne NEXT_PUBLIC_-Präfix

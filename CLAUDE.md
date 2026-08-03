@@ -59,11 +59,11 @@ tests/            # Testdateien (werden am Ende von Phase 0 hinzugefügt)
 
 ## Supabase-Client-Auswahl
 
-| Client  | Datei                     | Schlüssel    | RLS         | Wo einsetzen                                   |
-| ------- | ------------------------- | ------------ | ----------- | ---------------------------------------------- |
-| Browser | `lib/supabase/browser.ts` | anon         | ✅ Aktiv    | `"use client"`-Komponenten                     |
-| Server  | `lib/supabase/server.ts`  | anon         | ✅ Aktiv    | Server-Komponente, Action, Route-Handler        |
-| Admin   | `lib/supabase/admin.ts`   | service_role | ❌ Umgangen | Nur für zwingend notwendige privilegierte Ops  |
+| Client  | Datei                     | Schlüssel    | RLS         | Wo einsetzen                                  |
+| ------- | ------------------------- | ------------ | ----------- | --------------------------------------------- |
+| Browser | `lib/supabase/browser.ts` | anon         | ✅ Aktiv    | `"use client"`-Komponenten                    |
+| Server  | `lib/supabase/server.ts`  | anon         | ✅ Aktiv    | Server-Komponente, Action, Route-Handler      |
+| Admin   | `lib/supabase/admin.ts`   | service_role | ❌ Umgangen | Nur für zwingend notwendige privilegierte Ops |
 
 Admin-Client niemals in eine Datei mit `"use client"` importieren.
 
