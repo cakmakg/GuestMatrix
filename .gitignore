@@ -33,3 +33,5 @@ next-env.d.ts
 # Supabase local
 supabase/.branches/
 supabase/.temp/
+# Studio-SQL-Editor-Schnipsel (lokaler Scratch, kein Repo-Artefakt)
+supabase/snippets/
