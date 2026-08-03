@@ -44,6 +44,9 @@ export default function FeedbackFlow({
   description,
   labels,
 }: Props) {
+  // labels kommt als JSON über /api/events/[eventId]/public (fetch-gecacht). Defensiv gegen ein
+  // Payload ohne questions (z. B. veralteter Cache) — der Gäste-Flow darf nie deshalb crashen.
+  const questions = labels.questions ?? []
   const [step, setStep] = useState<Step>('landing')
   const [consentChecked, setConsentChecked] = useState(false)
   const [rating, setRating] = useState<number>(0)
@@ -201,9 +204,9 @@ export default function FeedbackFlow({
           </div>
 
           {/* Strukturierte Zusatzfragen (aus dem Kampagnen-Katalog) — alle optional. */}
-          {labels.questions.length > 0 && (
+          {questions.length > 0 && (
             <div className="space-y-3">
-              {labels.questions.map((q) => (
+              {questions.map((q) => (
                 <div key={q.id} className="flex items-center justify-between gap-3">
                   <span className="text-sm text-gray-600">{q.prompt}</span>
                   <div className="flex gap-1">
