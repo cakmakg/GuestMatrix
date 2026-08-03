@@ -160,6 +160,21 @@ export default async function EventDetailPage({
         </div>
       )}
 
+      {/* Export: lädt die Feedback-CSV dieser Kampagne (RLS-gefiltert, nur eigene Daten). */}
+      <div className="mb-4 flex flex-col items-end gap-1">
+        <a
+          href={`/api/events/${eventId}/export`}
+          download
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          ⬇ CSV-Export
+        </a>
+        <p className="text-xs text-gray-400">
+          Hinweis: Medien-Links im Export sind aus Datenschutzgründen nur 1 Stunde gültig — Dateien
+          zeitnah herunterladen.
+        </p>
+      </div>
+
       <div className="grid grid-cols-3 gap-6 mb-8">
         {/* Stats */}
         <div className="col-span-2 grid grid-cols-3 gap-4">
