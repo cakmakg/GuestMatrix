@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { logger } from '@/lib/logger'
+
 export class AppError extends Error {
   readonly code: string
   readonly httpStatus: number
@@ -76,6 +78,9 @@ export function handleRouteError(error: unknown): Response {
     return Response.json({ error: error.message }, { status: error.httpStatus })
   }
 
-  console.error('[unhandled_exception]', error)
+  logger.error('[unhandled_exception]', {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  })
   return Response.json({ error: 'Something went wrong.' }, { status: 500 })
 }

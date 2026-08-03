@@ -7,6 +7,7 @@ import {
   ValidationError,
 } from '@/lib/auth/errors'
 import { requireAnyAuth } from '@/lib/auth/session'
+import { logger } from '@/lib/logger'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -79,7 +80,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       .single<{ id: string }>()
 
     if (insertError || !submission) {
-      console.error('[presign] submission insert failed', insertError)
+      logger.error('[presign] submission insert failed', {
+        eventId,
+        error: insertError?.message,
+      })
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })
     }
 
@@ -94,7 +98,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       .createSignedUploadUrl(storagePath, { upsert: false })
 
     if (presignError || !presignData) {
-      console.error('[presign] signed URL generation failed', presignError)
+      logger.error('[presign] signed URL generation failed', {
+        eventId,
+        submissionId: submission.id,
+        error: presignError?.message,
+      })
       // Clean up the pending submission so it does not litter the DB
       await supabaseAdmin.from('submissions').delete().eq('id', submission.id)
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })

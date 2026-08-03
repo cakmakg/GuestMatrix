@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { handleRouteError, NotFoundError, AuthorizationError } from '@/lib/auth/errors'
 import { requireAnyAuth } from '@/lib/auth/session'
+import { logger } from '@/lib/logger'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -81,7 +82,10 @@ export async function GET(
       .createSignedUrls(paths, SIGNED_URL_EXPIRY_SECONDS)
 
     if (signedError) {
-      console.error('[gallery] signed URL generation failed', signedError)
+      logger.error('[gallery] signed URL generation failed', {
+        eventId,
+        error: signedError.message,
+      })
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })
     }
 

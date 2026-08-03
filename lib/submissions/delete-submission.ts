@@ -40,7 +40,7 @@ export async function deleteSubmission(submissionId: string): Promise<void> {
     if (storageError) {
       logger.error('[gdpr_delete] storage_remove_failed', {
         submissionId,
-        message: storageError.message,
+        error: storageError.message,
       })
       throw new StorageDeletionError()
     }

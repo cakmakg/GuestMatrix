@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { handleRouteError, NotFoundError, AuthorizationError, UploadError } from '@/lib/auth/errors'
 import { requireAnyAuth } from '@/lib/auth/session'
+import { logger } from '@/lib/logger'
 import { validateFileMime } from '@/lib/storage/mime'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { submissionIdParam } from '@/lib/validation/schemas'
@@ -51,7 +52,10 @@ export async function PATCH(
       .createSignedUrl(submission.media_url, MIME_CHECK_SIGNED_URL_EXPIRY)
 
     if (readUrlError || !readUrl) {
-      console.error('[confirm] could not create signed read URL', readUrlError)
+      logger.error('[confirm] could not create signed read URL', {
+        submissionId,
+        error: readUrlError?.message,
+      })
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })
     }
 
@@ -78,7 +82,10 @@ export async function PATCH(
       .eq('id', submissionId)
 
     if (updateError) {
-      console.error('[confirm] submission update failed', updateError)
+      logger.error('[confirm] submission update failed', {
+        submissionId,
+        error: updateError.message,
+      })
       return Response.json({ error: 'Something went wrong.' }, { status: 500 })
     }
 

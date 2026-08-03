@@ -4,6 +4,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 import { RateLimitError } from '@/lib/auth/errors'
+import { logger } from '@/lib/logger'
 
 const redis =
   process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -23,7 +24,7 @@ if (
   process.env.NODE_ENV === 'production' &&
   process.env.NEXT_PHASE !== 'phase-production-build'
 ) {
-  console.warn(
+  logger.warn(
     '[rate_limit] UPSTASH_REDIS_REST_URL/TOKEN nicht gesetzt — Rate Limiting ist deaktiviert (no-op). Für die Produktionshärtung (V2) konfigurieren.',
   )
 }
@@ -79,6 +80,8 @@ export async function checkRateLimit(limiter: Ratelimit, identifier: string): Pr
   } catch (error) {
     if (error instanceof RateLimitError) throw error
     // Redis unreachable: fail open, do not block the request
-    console.warn('[rate_limit_unavailable]', error)
+    logger.warn('[rate_limit_unavailable]', {
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 }
