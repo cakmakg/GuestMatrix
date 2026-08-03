@@ -24,7 +24,11 @@ const CSP = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  'upgrade-insecure-requests',
+  // upgrade-insecure-requests bricht HTTP-Tests im LAN (Handy → http://<LAN-IP>:3000): der Browser
+  // erzwingt HTTPS für alle Subressourcen (JS-Chunks, CSS), die der Dev-Server nicht über TLS
+  // ausliefert → sie laden nicht → keine Hydration. localhost ist als „secure context" ausgenommen,
+  // daher fällt es nur beim Geräte-Test über die LAN-IP auf. Deshalb NUR in Produktion setzen.
+  ...(isDev ? [] : ['upgrade-insecure-requests']),
 ]
   .join('; ')
   .trim()
@@ -37,8 +41,13 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   // Beschränkt Referrer-Informationen bei Cross-Origin-Anfragen
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Erzwingt HTTPS für 2 Jahre; inkl. Subdomains
-  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  // Erzwingt HTTPS für 2 Jahre; inkl. Subdomains — nur in Produktion (im Dev würde HSTS künftige
+  // HTTP-LAN-Tests auf demselben Host stören, sobald der Browser die Domain einmal „gemerkt" hat).
+  ...(isDev
+    ? []
+    : [
+        { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+      ]),
   // Deaktiviert nicht benötigte Browser-APIs
   {
     key: 'Permissions-Policy',
