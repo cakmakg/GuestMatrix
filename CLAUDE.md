@@ -16,9 +16,10 @@ Kampagnentyp bestimmt den Flow-Modus des Gäste-Ablaufs (`gallery` oder `feedbac
 
 Sektoren gehören dem **Betreiber** und werden als Code entwickelt: ein Ordner je Sektor
 unter `lib/sectors/<id>/`, aggregiert von `lib/sectors/index.ts` (einzige Quelle der Wahrheit).
-Kunden können keinen Sektor anlegen; der Betreiber **weist** den Sektor zu (`tenants.sector`),
-der Kunde sieht ihn nur schreibgeschützt. Ein neuer Sektor = ein Ordner unter `lib/sectors/` +
-Registry-Eintrag + CHECK-Wert in der Migration; kein Sonderfall-Code.
+Kunden können keinen Sektor **anlegen**. Der Kunde **wählt** seinen Sektor bei der Registrierung
+aus der vom Betreiber definierten, code-basierten Auswahl (oder der Betreiber **weist** ihn zu,
+`tenants.sector`); die Wahl ist danach **unveränderlich** und schreibgeschützt. Ein neuer Sektor =
+ein Ordner unter `lib/sectors/` + Registry-Eintrag + CHECK-Wert in der Migration; kein Sonderfall-Code.
 
 Vor jeder Arbeit: Spec-Dateien unter docs/ lesen.
 
@@ -36,7 +37,7 @@ Vor jeder Arbeit: Spec-Dateien unter docs/ lesen.
 - Tenant-Isolierung wird über RLS durchgesetzt. RLS ist auf jeder Tabelle aktiv; Tabellen ohne Policy sind nicht erreichbar. Das ist Sicherheit, keine Option.
 - Secrets nur in Umgebungsvariablen. Keine Secrets im Repository. .env.example bleibt aktuell.
 - Gästemedien = personenbezogene Daten. Kein Feature gilt als „fertig" ohne Consent + Moderations-Flag + Löschpfad.
-- Kein Sektor ist Standard; Sektoren gehören dem Betreiber. Sektor / Kampagnentyp / Flow-Modus werden aus `lib/sectors/` abgeleitet (ein Ordner je Sektor + Registry `index.ts`); ein neuer Sektor wird dort ergänzt (plus CHECK-Wert in der Migration), nicht über Sonderfälle im Code. Den Sektor eines Kunden weist der Betreiber zu (`tenants.sector`); Kunden können keinen Sektor anlegen oder ändern.
+- Kein Sektor ist Standard; Sektoren gehören dem Betreiber. Sektor / Kampagnentyp / Flow-Modus werden aus `lib/sectors/` abgeleitet (ein Ordner je Sektor + Registry `index.ts`); ein neuer Sektor wird dort ergänzt (plus CHECK-Wert in der Migration), nicht über Sonderfälle im Code. Den Sektor wählt der Kunde bei der Registrierung aus der vom Betreiber definierten, code-basierten Auswahl (oder der Betreiber weist ihn zu, `tenants.sector`); die Wahl ist danach unveränderlich. Kunden können keinen Sektor anlegen und ihn nach der Registrierung nicht ändern.
 - „Fertig" = funktioniert + Input-Validierung + Fehlerfälle behandelt + mindestens 1 Test + deploybar.
 
 ## Arbeitsstil

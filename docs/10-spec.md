@@ -2,11 +2,13 @@
 
 > **Multi-Sektor (designed-for):** Das Produkt ist für mehrere Branchen entworfen. Ein
 > **Tenant** = eine Kundenorganisation mit genau einem **Sektor** (`tourism`, `real_estate`,
-> `event`). Jeder Sektor enthält einen oder mehrere **Kampagnentypen**, die den **Flow-Modus**
-> des Gäste-Ablaufs bestimmen (`gallery`, `feedback` oder `guestbook`). Kein Sektor ist
-> Standard. Details in Abschnitt 0. Sektoren gehören dem Betreiber und liegen je Sektor in
-> einem eigenen Ordner unter `lib/sectors/<id>/`; der Kunde bekommt einen Sektor zugewiesen
-> und kann keinen anlegen.
+> `event`, `agency`). Jeder Sektor enthält einen oder mehrere **Kampagnentypen**, die den
+> **Flow-Modus** des Gäste-Ablaufs bestimmen (`gallery`, `feedback` oder `guestbook`). Kein
+> Sektor ist Standard. Details in Abschnitt 0. Sektoren gehören dem Betreiber und liegen je
+> Sektor in einem eigenen Ordner unter `lib/sectors/<id>/`. Der Kunde **wählt** seinen Sektor
+> bei der Registrierung aus der vom Betreiber definierten, code-basierten Auswahl (oder der
+> Betreiber weist ihn zu); die Wahl ist danach **unveränderlich**. Einen Sektor **anlegen** kann
+> der Kunde nicht.
 >
 > **Aktiver Umfang (Stand T2):** Gebaut **und aktiv** sind `tourism / tour / gallery` (MVP) UND
 > `tourism / stay / feedback` (Hotel-Feedback; seit Migration `0009`). Die übrigen Zeilen in
@@ -22,6 +24,7 @@
 | `tourism`     | Hotel/Aufenthalt (`stay`)  | `feedback`                    | Bewertung + Kommentar (Medien optional)                |
 | `real_estate` | Immobilie (`property`)     | `gallery` **oder** `feedback` | vom Operator je Kampagne wählbar                       |
 | `event`       | Hochzeit/Event (`wedding`) | `gallery`                     | wie Tour                                               |
+| `agency`      | Reise (`trip`)             | `gallery`                     | wie Tour (Reisende teilen Reisefotos)                  |
 
 - **`gallery`:** Medium Pflicht · öffentliche Galerie · Reziprozitätssperre · optionale Bewertung.
 - **`feedback`:** Medium optional · keine Galerie/Reziprozität · Bewertung + Kommentar, privat an den Tenant.
@@ -43,6 +46,7 @@ vorhanden, per Migration `0006` + Registry ausgeschaltet (designed-for).
 | `tourism` / `stay` / `feedback`   | **Aktiv (T2)**  | Hotel-Feedback; via `0009` geöffnet (B1-Audit `is_gallery_event`) + `0010` (`attach_feedback`). |
 | `real_estate` / `property`        | **Deaktiviert** | `gallery`/`feedback`; Code vorhanden, nicht aktiv.                                              |
 | `event` / `wedding` / `guestbook` | **Deaktiviert** | Momento-Gästebuch; Code vorhanden, nicht aktiv.                                                 |
+| `agency` / `trip` / `gallery`     | **Deaktiviert** | Reisebüro; dormantes Modul `lib/sectors/agency/`, per CHECK gesperrt, nicht aktiv.              |
 
 Die DB kann deaktivierte Werte nicht speichern (CHECK aus `0006`, um stay/feedback erweitert in
 `0009`). **Aktiv** abgedeckt sind `tour`/`gallery` (Stories B-3…B-5) UND `stay`/`feedback` (Hotel;
@@ -53,16 +57,16 @@ zur (Wieder-)Aktivierung: **`docs/extension-points.md`**.
 
 ### Persona A: Tenant (Kundenorganisation — z. B. Reiseleiter, Makler, Event-Veranstalter)
 
-| #   | Story                                                                                                           | Akzeptanzkriterium                                                                                                                                                                              |
-| --- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A-1 | Ich möchte mich im System anmelden, um meine Veranstaltungen verwalten zu können.                               | Gültige Anmeldedaten → Dashboard. Falsche Anmeldedaten → Fehlermeldung, kein Stack-Trace.                                                                                                       |
-| A-0 | Ich möchte meine zugewiesene Branche (Sektor) einsehen, damit ich weiß, welche Kampagnentypen ich anlegen kann. | Einstellungen zeigt die vom Betreiber zugewiesene Branche **schreibgeschützt** (aus `tenants.sector`) samt verfügbarer Kampagnentypen. Kunden können keinen Sektor anlegen oder ändern.         |
-| A-2 | Ich möchte eine neue Kampagne erstellen, um QR-Codes an Gäste verteilen zu können.                              | Formular: Kampagnentyp (nach Sektor) + Name + Datum (Pflicht); bei Immobilien zusätzlich Galerie/Feedback. POST → DB-Eintrag mit tenantId, campaign_type, flow_mode. Antwort: eventId + QR-URL. |
-| A-3 | Ich möchte den QR-Code einer Kampagne herunterladen, um ihn vor Ort einsetzen zu können.                        | QR als PNG herunterladbar. Kodierte URL: `/e/[eventId]`.                                                                                                                                        |
-| A-4 | Ich möchte hochgeladene Inhalte bzw. Feedback einer Kampagne einsehen können.                                   | `gallery`-Modus: Thumbnail-Raster mit Moderationsstatus. `feedback`-Modus: Liste aus Bewertung + Kommentar. Nur eigene tenantId-Inhalte sichtbar.                                               |
-| A-5 | Ich möchte eine Zusammenfassung des Gäste-Feedbacks einsehen können.                                            | Kampagnendetailseite: Durchschnittsbewertung, Anzahl Beiträge/Feedback, Anzahl Kommentare.                                                                                                      |
-| A-6 | Ich möchte Inhalte mit einem Moderations-Flag markieren können, um unangemessene Inhalte auszublenden.          | „Flag"-Button → `moderationFlag: true`. Geflaggte Inhalte sind in der Gästegalerie unsichtbar. Flag kann aufgehoben werden.                                                                     |
-| A-7 | Ich möchte Kampagnen archivieren / reaktivieren, um die Anzahl aktiver Kampagnen zu steuern.                    | Toggle setzt/entfernt `archived_at`. Übersicht zeigt „Aktive Kampagnen" (= `archived_at is null`).                                                                                              |
+| #   | Story                                                                                                  | Akzeptanzkriterium                                                                                                                                                                                                                                                                                                                   |
+| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A-1 | Ich möchte mich im System anmelden, um meine Veranstaltungen verwalten zu können.                      | Gültige Anmeldedaten → Dashboard. Falsche Anmeldedaten → Fehlermeldung, kein Stack-Trace.                                                                                                                                                                                                                                            |
+| A-0 | Ich möchte meine Branche (Sektor) einsehen, damit ich weiß, welche Kampagnentypen ich anlegen kann.    | Die Branche wird **bei der Registrierung gewählt** (aus der aktiven Auswahl; oder vom Betreiber zugewiesen) und ist danach **unveränderlich**. Einstellungen zeigt sie **schreibgeschützt** (aus `tenants.sector`) samt verfügbarer Kampagnentypen. Kunden können keinen Sektor anlegen und ihn nach der Registrierung nicht ändern. |
+| A-2 | Ich möchte eine neue Kampagne erstellen, um QR-Codes an Gäste verteilen zu können.                     | Formular: Kampagnentyp (nach Sektor) + Name + Datum (Pflicht); bei Immobilien zusätzlich Galerie/Feedback. POST → DB-Eintrag mit tenantId, campaign_type, flow_mode. Antwort: eventId + QR-URL.                                                                                                                                      |
+| A-3 | Ich möchte den QR-Code einer Kampagne herunterladen, um ihn vor Ort einsetzen zu können.               | QR als PNG herunterladbar. Kodierte URL: `/e/[eventId]`.                                                                                                                                                                                                                                                                             |
+| A-4 | Ich möchte hochgeladene Inhalte bzw. Feedback einer Kampagne einsehen können.                          | `gallery`-Modus: Thumbnail-Raster mit Moderationsstatus. `feedback`-Modus: Liste aus Bewertung + Kommentar. Nur eigene tenantId-Inhalte sichtbar.                                                                                                                                                                                    |
+| A-5 | Ich möchte eine Zusammenfassung des Gäste-Feedbacks einsehen können.                                   | Kampagnendetailseite: Durchschnittsbewertung, Anzahl Beiträge/Feedback, Anzahl Kommentare.                                                                                                                                                                                                                                           |
+| A-6 | Ich möchte Inhalte mit einem Moderations-Flag markieren können, um unangemessene Inhalte auszublenden. | „Flag"-Button → `moderationFlag: true`. Geflaggte Inhalte sind in der Gästegalerie unsichtbar. Flag kann aufgehoben werden.                                                                                                                                                                                                          |
+| A-7 | Ich möchte Kampagnen archivieren / reaktivieren, um die Anzahl aktiver Kampagnen zu steuern.           | Toggle setzt/entfernt `archived_at`. Übersicht zeigt „Aktive Kampagnen" (= `archived_at is null`).                                                                                                                                                                                                                                   |
 
 ### Persona B: Gast (Endnutzer, anonym)
 

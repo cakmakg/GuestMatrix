@@ -1,8 +1,16 @@
 import type { Metadata } from 'next'
 
 import { BRAND } from '@/lib/brand'
+import { SECTORS } from '@/lib/sectors'
 
 import { signupAction } from './actions'
+
+// Auswählbare Sektoren = die AKTIV registrierten (lib/sectors/index.ts). Aktuell nur 'tourism';
+// wird ein Sektor registriert + im CHECK geöffnet, erscheint er hier automatisch. flatMap statt
+// Cast, weil Object.entries über ein Partial die Werte als möglicherweise undefined typt.
+const ACTIVE_SECTORS = Object.entries(SECTORS).flatMap(([id, config]) =>
+  config ? [{ id, label: config.label }] : [],
+)
 
 export const metadata: Metadata = { title: `Konto erstellen – ${BRAND.name}` }
 
@@ -20,6 +28,10 @@ export default async function SignupPage({ searchParams }: Props) {
   const { error } = await searchParams
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? 'Ein Fehler ist aufgetreten.') : null
 
+  // Adaptiv: bei genau einem aktiven Sektor schreibgeschützt anzeigen (+ hidden input); bei
+  // mehreren echte Auswahl. Der Wert reist als `sector` in raw_user_meta_data zum Trigger.
+  const defaultSector = ACTIVE_SECTORS[0]
+
   return (
     <main style={styles.main}>
       <div style={styles.card}>
@@ -34,16 +46,49 @@ export default async function SignupPage({ searchParams }: Props) {
 
         <form action={signupAction} style={styles.form}>
           <label style={styles.label}>
-            Name des Brautpaars
+            Name deines Reiseunternehmens
             <input
               type="text"
               name="brandName"
               required
               maxLength={100}
-              placeholder="z. B. Anna & Ben"
+              placeholder="z. B. Sunrise Tours"
               style={styles.input}
             />
+            <span style={styles.hint}>Dieser Name wird deinen Gästen angezeigt.</span>
           </label>
+
+          {defaultSector &&
+            (ACTIVE_SECTORS.length > 1 ? (
+              <label style={styles.label}>
+                Branche
+                <select name="sector" required defaultValue={defaultSector.id} style={styles.input}>
+                  {ACTIVE_SECTORS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <span style={styles.hint}>
+                  Deine Branche bestimmt deine Kampagnentypen und kann später nicht geändert werden.
+                </span>
+              </label>
+            ) : (
+              <label style={styles.label}>
+                Branche
+                <input
+                  type="text"
+                  value={defaultSector.label}
+                  readOnly
+                  style={styles.inputReadonly}
+                />
+                <input type="hidden" name="sector" value={defaultSector.id} />
+                <span style={styles.hint}>
+                  Aktuell verfügbar: {defaultSector.label}. Die Branche kann später nicht geändert
+                  werden.
+                </span>
+              </label>
+            ))}
 
           <label style={styles.label}>
             E-Mail-Adresse
@@ -123,9 +168,23 @@ const styles = {
     fontWeight: 500,
     gap: '0.375rem',
   } as React.CSSProperties,
+  hint: {
+    color: '#6b7280',
+    fontSize: '0.75rem',
+    fontWeight: 400,
+  } as React.CSSProperties,
   input: {
     border: '1px solid #d1d5db',
     borderRadius: '6px',
+    fontSize: '1rem',
+    padding: '0.5rem 0.75rem',
+    outline: 'none',
+  } as React.CSSProperties,
+  inputReadonly: {
+    background: '#f9fafb',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    color: '#6b7280',
     fontSize: '1rem',
     padding: '0.5rem 0.75rem',
     outline: 'none',

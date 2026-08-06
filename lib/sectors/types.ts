@@ -9,8 +9,8 @@
 
 // ─── Tupel + Basistypen (zentrale Aufzählung, für Zod-Enums wiederverwendbar) ──
 
-export const SECTOR_TUPLE = ['tourism', 'real_estate', 'event'] as const
-export const CAMPAIGN_TYPE_TUPLE = ['tour', 'stay', 'property', 'wedding'] as const
+export const SECTOR_TUPLE = ['tourism', 'real_estate', 'event', 'agency'] as const
+export const CAMPAIGN_TYPE_TUPLE = ['tour', 'stay', 'property', 'wedding', 'trip'] as const
 export const FLOW_MODE_TUPLE = ['gallery', 'feedback', 'guestbook'] as const
 
 export type Sector = (typeof SECTOR_TUPLE)[number]
@@ -35,7 +35,8 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     galleryEnabled: true,
     reciprocityEnabled: true,
     ratingEnabled: true,
-    commentEnabled: false,
+    // Öffentliche Beschreibung/Caption zum Foto (für reziproke Gäste in der Galerie sichtbar).
+    commentEnabled: true,
     guestNameEnabled: false,
   },
   feedback: {
@@ -62,9 +63,9 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
 export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successText: string }> = {
   gallery: {
     consentText:
-      'Ich stimme zu, dass meine Fotos/Videos gespeichert und für alle Gäste sichtbar ' +
-      'gemacht werden. Ich kann meine Einwilligung jederzeit widerrufen und meine Daten ' +
-      'löschen lassen.',
+      'Ich stimme zu, dass meine Fotos/Videos und meine Beschreibung gespeichert und für ' +
+      'alle Gäste sichtbar gemacht werden. Ich kann meine Einwilligung jederzeit widerrufen ' +
+      'und meine Daten löschen lassen.',
     successText: 'Danke für deinen Beitrag!',
   },
   feedback: {

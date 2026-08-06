@@ -42,9 +42,10 @@ describe('signupSchema', () => {
     email: 'couple@example.com',
     password: 'password123',
     brandName: 'Anna & Ben',
+    sector: 'tourism',
   }
 
-  it('accepts a valid signup', () => {
+  it('accepts a valid signup with an active sector', () => {
     expect(signupSchema.safeParse(validBase).success).toBe(true)
   })
 
@@ -60,6 +61,26 @@ describe('signupSchema', () => {
 
   it('rejects a blank brand name', () => {
     expect(signupSchema.safeParse({ ...validBase, brandName: '   ' }).success).toBe(false)
+  })
+
+  it('rejects a missing sector', () => {
+    expect(
+      signupSchema.safeParse({
+        email: validBase.email,
+        password: validBase.password,
+        brandName: validBase.brandName,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('rejects designed-but-deactivated sectors (real_estate/event/agency)', () => {
+    for (const sector of ['real_estate', 'event', 'agency']) {
+      expect(signupSchema.safeParse({ ...validBase, sector }).success).toBe(false)
+    }
+  })
+
+  it('rejects a garbage sector', () => {
+    expect(signupSchema.safeParse({ ...validBase, sector: 'hackerman' }).success).toBe(false)
   })
 })
 

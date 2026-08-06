@@ -38,9 +38,18 @@ Rollen/Mehrbenutzer pro Tenant, KI-Funktionen außer Moderation.
 `is_gallery_event`, `0010` fügte die ownership-geprüfte RPC `attach_feedback` hinzu).
 **Weiterhin deaktiviert (designed-for, not built):** die Sektoren `real_estate` und `event`
 (Hochzeit/Momento) sowie der Flow-Modus `guestbook` — als Code vorhanden, per Migration `0006` +
-Registry gesperrt. Die oben exkludierte **Self-serve-Registrierung** bleibt konsistent deaktiviert
-(die Route `/signup` ist ausgeschaltet); Tenants weist der Betreiber zu. Anleitung zur
-(Wieder-)Aktivierung: **`docs/extension-points.md`**.
+Registry gesperrt. Anleitung zur (Wieder-)Aktivierung: **`docs/extension-points.md`**.
+
+> **Update (nach Phase 0):** Die oben unter „NICHT im Umfang" gelistete
+> **Self-serve-Registrierung** ist inzwischen für den Beachhead aktiviert — die Route `/signup`
+> (`app/signup/`) ist an. Der **Sektor wird bei der Registrierung gewählt** (aus der aktiven
+> Registry `lib/sectors/`; aktuell ist nur `tourism` auswählbar) und reist via
+> `raw_user_meta_data` zum DB-Trigger `handle_new_user` (`0015`), der ihn zweifach validiert:
+> Trigger-Allowlist (Spiegel von `SECTOR_TUPLE`) + DB-CHECK (`tenants.sector = 'tourism'`, 0006).
+> `real_estate`/`event`/`agency` bleiben CHECK-gesperrt; ein Müll- oder deaktivierter Sektor rollt
+> den Auth-Insert atomar zurück (kein verwaister Nutzer). Der Sektor ist nach der Registrierung
+> **unveränderlich**; der Betreiber kann Tenants weiterhin zuweisen. Kontext und Risiken:
+> **`docs/roadmap-analysis.md`**.
 
 ## Risikoreichste Annahme
 
