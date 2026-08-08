@@ -5,11 +5,13 @@
  * Die Sektoren selbst werden vom Betreiber entwickelt und liegen je Sektor in einem
  * eigenen Ordner (`lib/sectors/<id>/`). Kein Sektor ist Standard.
  *
- * ── AKTIVER UMFANG (Retrenchment 0006 + Öffnung 0009) ──────────────────────────
- * Aktiv registriert ist der Sektor tourism mit tour (gallery) UND stay (feedback).
- * Migration 0009 hat den CHECK auf campaign_type in (tour, stay) / flow_mode in
- * (gallery, feedback) erweitert und dabei ATOMAR public_gallery_select um is_gallery_event
- * ergänzt (B1: Feedback-Kommentare gelangen nie in die Gäste-Galerie).
+ * ── AKTIVER UMFANG (Retrenchment 0006 + Öffnung 0009 + Remodel 0016) ────────────
+ * Aktiv registriert ist der Sektor tourism mit agency (gallery + Feedback-Katalog) UND
+ * stay (feedback). Migration 0009 hat den CHECK auf flow_mode in (gallery, feedback) erweitert
+ * und dabei ATOMAR public_gallery_select um is_gallery_event ergänzt (B1: Feedback-Kommentare
+ * gelangen nie in die Gäste-Galerie); Migration 0016 hat den früheren Kampagnentyp `tour` zu
+ * `agency` umbenannt (campaign_type in (agency, stay)), den gallery-Flow behalten und einen
+ * agency-Feedback-Katalog ergänzt. Der Sektor bleibt 'tourism' (kein Sektorwechsel).
  * Weiterhin GESPERRT: die Sektoren `lib/sectors/event/` und `lib/sectors/real_estate/`
  * sowie der Modus guestbook — als Code vorhanden (types.ts hält die Tupel bewusst breit),
  * aber hier NICHT importiert/registriert und per DB-CHECK nicht speicherbar.
@@ -42,11 +44,11 @@ export * from './types'
 // ─── Aggregierte Registries (nur aktive Einträge; Partial wegen Retrenchment) ──
 
 export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
-  tourism: { label: tourism.label, campaignTypes: ['tour', 'stay'] },
+  tourism: { label: tourism.label, campaignTypes: ['agency', 'stay'] },
 }
 
 export const CAMPAIGN_TYPES: Partial<Record<CampaignType, CampaignTypeConfig>> = {
-  tour: tourism.campaignTypes.tour,
+  agency: tourism.campaignTypes.agency,
   stay: tourism.campaignTypes.stay,
 }
 

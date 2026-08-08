@@ -6,15 +6,21 @@
 
 ## Invariante (aktueller Zustand)
 
-**Aktiv sind `tourism / tour / gallery` UND `tourism / stay / feedback`** (Hotel-Feedback; seit
-Migration `0009`). Die Garantie besteht aus zwei Schichten:
+**Aktiv sind `tourism / agency / gallery` (+ Feedback-Katalog) UND `tourism / stay / feedback`**
+(Hotel-Feedback; seit Migration `0009`). Der frühere Kampagnentyp `tour` wurde von
+`0016_remodel_tour_to_agency.sql` zu `agency` umbenannt (Beachhead-Repositionierung auf
+Reiseagenturen), behält den gallery-Flow und erhielt einen strukturierten Feedback-Katalog
+(Reiseerlebnis + Agentur-Service) — kein neuer flow_mode, nur die vorhandene gallery+
+feedback_answers-Mechanik. Die Garantie besteht aus zwei Schichten:
 
-1. **DB-CHECK**: `tenants.sector = 'tourism'` (0006). `events.campaign_type in ('tour', 'stay')`
-   und `events.flow_mode in ('gallery', 'feedback')` — `0006_lockdown_tourism_gallery.sql` verengte
-   auf je einen Wert, `0009_reopen_tourism_stay_feedback.sql` erweiterte um stay/feedback. Weiterhin
-   **nicht speicherbar**: `flow_mode = 'guestbook'` sowie die Sektoren `real_estate`/`event`/`agency`
-   — eine solche Zeile kann physisch nicht existieren.
-2. **Registry** (`lib/sectors/index.ts`): `tourism` mit `tour` + `stay` sind in `SECTORS` +
+1. **DB-CHECK**: `tenants.sector = 'tourism'` (0006). `events.campaign_type in ('agency', 'stay')`
+   (0016 tauschte `tour`→`agency`) und `events.flow_mode in ('gallery', 'feedback')` —
+   `0006_lockdown_tourism_gallery.sql` verengte auf je einen Wert, `0009_reopen_tourism_stay_feedback.sql`
+   erweiterte um stay/feedback. Weiterhin **nicht speicherbar**: `flow_mode = 'guestbook'` sowie die
+   Sektoren `real_estate`/`event`/`agency` (der gleichnamige DORMANTE Sektor `lib/sectors/agency/`;
+   nicht zu verwechseln mit dem AKTIVEN Kampagnentyp `agency` im tourism-Sektor) — eine solche Zeile
+   kann physisch nicht existieren.
+2. **Registry** (`lib/sectors/index.ts`): `tourism` mit `agency` + `stay` sind in `SECTORS` +
    `CAMPAIGN_TYPES` eingetragen. UI, Validierung und Gäste-Flow leiten sich vollständig hieraus ab.
 
 **RLS-Update (0009): `public_gallery_select` IST jetzt flow-mode-aware.** Die Policy filtert über
@@ -193,6 +199,10 @@ im Dashboard **ohne Codeänderung**, weil alle drei `flow_mode`-Zweige bereits e
   aber ein eigener Refactor — erst fällig, wenn ein **vierter** Modus kommt.
 - B2 sollte die angebotenen Modi je Kampagnentyp aus der Config lesen (z. B. ein Feld
   `offeredFlowModes` am Kampagnentyp) statt sie hart zu listen.
+- **Toter Code `app/api/submissions/[submissionId]/rate/route.ts`:** wird von KEINEM Client
+  aufgerufen (grep-verifiziert 2026-08-08; die Gäste-Flows hängen Bewertung/Antworten über
+  `/api/events/[eventId]/feedback` an). Seit dem tour→agency-Remodel (0016) ist auch der Kommentar
+  in der Route veraltet („tour-only"). **In Phase 6 löschen** — in diesem Slice NICHT angefasst.
 
 ### Tests für einen neuen Sektor
 

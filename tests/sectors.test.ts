@@ -18,25 +18,27 @@ import {
 } from '@/lib/sectors'
 import { tourism } from '@/lib/sectors/tourism'
 
-// Aktiver Umfang (0006 Retrenchment + 0009 Öffnung): Sektor tourism mit tour (gallery) UND
-// stay (feedback). Weiterhin GESPERRT: real_estate/event und der Modus guestbook — als Code
-// vorhanden (types.ts hält die Tupel breit), aber nicht registriert und per DB-CHECK nicht
-// speicherbar. Diese Tests fixieren die aktive Registry. Siehe docs/extension-points.md.
+// Aktiver Umfang (0006 Retrenchment + 0009 Öffnung + 0016 Remodel): Sektor tourism mit
+// agency (gallery + Feedback-Katalog) UND stay (feedback). Der frühere Kampagnentyp `tour`
+// wurde von 0016 zu `agency` umbenannt und behält den gallery-Flow. Weiterhin GESPERRT:
+// real_estate/event und der Modus guestbook — als Code vorhanden (types.ts hält die Tupel
+// breit), aber nicht registriert und per DB-CHECK nicht speicherbar. Diese Tests fixieren die
+// aktive Registry. Siehe docs/extension-points.md.
 
-describe('active registry: tourism with tour (gallery) + stay (feedback)', () => {
-  it('registers exactly the tourism sector with tour + stay', () => {
+describe('active registry: tourism with agency (gallery) + stay (feedback)', () => {
+  it('registers exactly the tourism sector with agency + stay', () => {
     expect(Object.keys(SECTORS)).toEqual(['tourism'])
     expect(SECTORS.tourism?.label).toBe(tourism.label)
-    expect(SECTORS.tourism?.campaignTypes).toEqual(['tour', 'stay'])
+    expect(SECTORS.tourism?.campaignTypes).toEqual(['agency', 'stay'])
   })
 
-  it('registers exactly the tour and stay campaign types', () => {
-    expect(Object.keys(CAMPAIGN_TYPES)).toEqual(['tour', 'stay'])
-    expect(campaignTypesForSector('tourism')).toEqual(['tour', 'stay'])
+  it('registers exactly the agency and stay campaign types', () => {
+    expect(Object.keys(CAMPAIGN_TYPES)).toEqual(['agency', 'stay'])
+    expect(campaignTypesForSector('tourism')).toEqual(['agency', 'stay'])
   })
 
-  it('tour is a gallery campaign with no operator flow-mode choice', () => {
-    const config = getCampaignConfig('tour')
+  it('agency is a gallery campaign with no operator flow-mode choice', () => {
+    const config = getCampaignConfig('agency')
     expect(config?.sector).toBe('tourism')
     expect(config?.defaultFlowMode).toBe('gallery')
     expect(config?.allowFlowModeChoice).toBe(false)
@@ -58,10 +60,12 @@ describe('deactivated sectors / campaign types / modes stay rejected', () => {
     }
   })
 
-  it('tour and stay are recognised; property/wedding are not', () => {
-    expect(isCampaignType('tour')).toBe(true)
+  it('agency and stay are recognised; the renamed tour and dormant types are not', () => {
+    expect(isCampaignType('agency')).toBe(true)
     expect(isCampaignType('stay')).toBe(true)
-    for (const t of ['property', 'wedding', 'cruise']) {
+    // `tour` wurde von 0016 zu `agency` umbenannt und ist kein Kampagnentyp mehr.
+    // `trip` ist der Kampagnentyp des DORMANTEN agency-Sektors (nicht registriert).
+    for (const t of ['tour', 'property', 'wedding', 'trip']) {
       expect(isCampaignType(t)).toBe(false)
     }
   })
@@ -69,6 +73,7 @@ describe('deactivated sectors / campaign types / modes stay rejected', () => {
   it('campaignTypesForSector returns empty for unregistered sectors', () => {
     expect(campaignTypesForSector('real_estate')).toEqual([])
     expect(campaignTypesForSector('event')).toEqual([])
+    expect(campaignTypesForSector('agency')).toEqual([])
   })
 
   it('getCampaignConfig returns undefined for still-deactivated types', () => {
@@ -76,19 +81,19 @@ describe('deactivated sectors / campaign types / modes stay rejected', () => {
     expect(getCampaignConfig('property')).toBeUndefined()
   })
 
-  it('isValidCampaignForSector accepts tourism/tour + tourism/stay only', () => {
-    expect(isValidCampaignForSector('tourism', 'tour')).toBe(true)
+  it('isValidCampaignForSector accepts tourism/agency + tourism/stay only', () => {
+    expect(isValidCampaignForSector('tourism', 'agency')).toBe(true)
     expect(isValidCampaignForSector('tourism', 'stay')).toBe(true)
     expect(isValidCampaignForSector('tourism', 'wedding')).toBe(false)
     expect(isValidCampaignForSector('event', 'wedding')).toBe(false)
   })
 })
 
-describe('flow-mode resolution: tour→gallery, stay→feedback', () => {
-  it('tour always resolves to gallery, ignoring any chosen mode', () => {
-    expect(resolveFlowMode('tour')).toBe('gallery')
-    expect(resolveFlowMode('tour', 'feedback')).toBe('gallery')
-    expect(resolveFlowMode('tour', 'guestbook')).toBe('gallery')
+describe('flow-mode resolution: agency→gallery, stay→feedback', () => {
+  it('agency always resolves to gallery, ignoring any chosen mode', () => {
+    expect(resolveFlowMode('agency')).toBe('gallery')
+    expect(resolveFlowMode('agency', 'feedback')).toBe('gallery')
+    expect(resolveFlowMode('agency', 'guestbook')).toBe('gallery')
   })
 
   it('stay always resolves to feedback, ignoring any chosen mode', () => {
@@ -102,8 +107,8 @@ describe('flow-mode resolution: tour→gallery, stay→feedback', () => {
   })
 
   it('isFlowModeAllowed matches each campaign default only', () => {
-    expect(isFlowModeAllowed('tour', 'gallery')).toBe(true)
-    expect(isFlowModeAllowed('tour', 'feedback')).toBe(false)
+    expect(isFlowModeAllowed('agency', 'gallery')).toBe(true)
+    expect(isFlowModeAllowed('agency', 'feedback')).toBe(false)
     expect(isFlowModeAllowed('stay', 'feedback')).toBe(true)
     expect(isFlowModeAllowed('stay', 'gallery')).toBe(false)
     expect(isFlowModeAllowed('wedding', 'guestbook')).toBe(false)
@@ -111,11 +116,13 @@ describe('flow-mode resolution: tour→gallery, stay→feedback', () => {
 })
 
 describe('active flow labels + capabilities (gallery + feedback)', () => {
-  it('gallery requires media and enables gallery + reciprocity', () => {
+  it('gallery requires media and enables gallery + reciprocity + comment', () => {
     const caps = getCapabilities('gallery')
     expect(caps.mediaRequired).toBe(true)
     expect(caps.galleryEnabled).toBe(true)
     expect(caps.reciprocityEnabled).toBe(true)
+    // Öffentliche Foto-Beschreibung/Caption ist aktiv.
+    expect(caps.commentEnabled).toBe(true)
   })
 
   it('feedback has no gallery/reciprocity but enables rating + comment', () => {
@@ -127,9 +134,9 @@ describe('active flow labels + capabilities (gallery + feedback)', () => {
     expect(caps.commentEnabled).toBe(true)
   })
 
-  it('resolveLabels combines the tour headline with gallery consent/success text', () => {
-    const labels = resolveLabels('tour', 'gallery')
-    expect(labels.landingHeadline).toBe(getCampaignConfig('tour')?.labels.landingHeadline)
+  it('resolveLabels combines the agency headline with gallery consent/success text', () => {
+    const labels = resolveLabels('agency', 'gallery')
+    expect(labels.landingHeadline).toBe(getCampaignConfig('agency')?.labels.landingHeadline)
     expect(labels.consentText).toContain('sichtbar')
     expect(labels.successText).toBeTruthy()
   })
@@ -142,7 +149,7 @@ describe('active flow labels + capabilities (gallery + feedback)', () => {
   })
 })
 
-describe('structured feedback catalog (stay full, tour light)', () => {
+describe('structured feedback catalog (agency on gallery + stay on feedback)', () => {
   it('stay exposes a non-empty rating catalog with unique, stable ids', () => {
     const questions = getFeedbackQuestions('stay')
     expect(questions.length).toBeGreaterThan(0)
@@ -152,22 +159,27 @@ describe('structured feedback catalog (stay full, tour light)', () => {
     expect(ids).toEqual(['cleanliness', 'service', 'location', 'value'])
   })
 
-  it('tour stays light: no structured questions', () => {
-    expect(getFeedbackQuestions('tour')).toEqual([])
-    expect(getCampaignConfig('tour')?.questions).toBeUndefined()
+  it('agency exposes its own rating catalog stacked on the gallery flow', () => {
+    const questions = getFeedbackQuestions('agency')
+    expect(questions.length).toBeGreaterThan(0)
+    expect(questions.every((q) => q.type === 'rating')).toBe(true)
+    const ids = questions.map((q) => q.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    // Muss mit der Allowlist in validate_feedback_answers (Migration 0016) übereinstimmen.
+    expect(ids).toEqual(['experience', 'organization', 'service', 'value'])
   })
 
-  it('resolveLabels carries the stay catalog and an empty list for tour', () => {
+  it('resolveLabels carries the agency catalog on gallery and the stay catalog on feedback', () => {
+    expect(resolveLabels('agency', 'gallery').questions).toEqual(getFeedbackQuestions('agency'))
     expect(resolveLabels('stay', 'feedback').questions).toEqual(getFeedbackQuestions('stay'))
-    expect(resolveLabels('tour', 'gallery').questions).toEqual([])
   })
 
-  it('unknownAnswerKeys accepts catalog keys and rejects everything else', () => {
+  it('unknownAnswerKeys accepts each catalog and rejects everything else', () => {
+    expect(unknownAnswerKeys('agency', { experience: 5, value: 3 })).toEqual([])
+    expect(unknownAnswerKeys('agency', { experience: 5, cleanliness: 3 })).toEqual(['cleanliness'])
     expect(unknownAnswerKeys('stay', { cleanliness: 5, value: 3 })).toEqual([])
     expect(unknownAnswerKeys('stay', { cleanliness: 5, bogus: 3 })).toEqual(['bogus'])
-    // tour has no catalog → any key is unknown (structured answers do not belong on tour)
-    expect(unknownAnswerKeys('tour', { cleanliness: 5 })).toEqual(['cleanliness'])
-    expect(unknownAnswerKeys('stay', {})).toEqual([])
+    expect(unknownAnswerKeys('agency', {})).toEqual([])
   })
 })
 

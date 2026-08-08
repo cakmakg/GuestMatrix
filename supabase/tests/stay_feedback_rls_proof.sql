@@ -18,10 +18,10 @@ insert into auth.users (instance_id, id, aud, role, email, created_at, updated_a
 insert into public.tenants (id, user_id, name, brand_name, sector, plan) values
   ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Tenant A','Marke A','tourism','free');
 
--- Ein stay/feedback-Event (Hotel) und ein tour/gallery-Event (für die Regression).
+-- Ein stay/feedback-Event (Hotel) und ein agency/gallery-Event (für die Regression).
 insert into public.events (id, tenant_id, name, date, campaign_type, flow_mode) values
   ('55555555-5555-4555-8555-555555555555','11111111-1111-4111-8111-111111111111','Hotel-Feedback',current_date,'stay','feedback'),
-  ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Tour-Galerie',current_date,'tour','gallery');
+  ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Agentur-Galerie',current_date,'agency','gallery');
 
 -- Zwei Feedback-Beiträge auf dem stay-Event: media_url NULL, comment/rating gesetzt, uploaded_at set.
 insert into public.submissions (id, tenant_id, event_id, guest_user_id, file_type, media_url, consent_at, uploaded_at, moderation_flag, rating, comment) values

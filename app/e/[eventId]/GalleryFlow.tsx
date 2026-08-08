@@ -6,12 +6,13 @@ import type { GuestFlowLabels } from '@/lib/sectors'
 
 import GuestShell from './GuestShell'
 
-type Step = 'landing' | 'upload' | 'uploading' | 'success' | 'rating' | 'gallery'
+type Step = 'landing' | 'form' | 'submitting' | 'success' | 'gallery'
 
 type GalleryItem = {
   id: string
-  signedUrl: string | null
-  file_type: 'image' | 'video'
+  mediaUrl: string | null
+  fileType: 'image' | 'video'
+  caption: string | null
 }
 
 type Props = {
@@ -44,14 +45,18 @@ function uploadWithProgress(
 }
 
 export default function GalleryFlow({ eventId, eventName, brandName, description, labels }: Props) {
+  // Strukturierte Zusatzfragen aus dem Kampagnen-Katalog (leer, wenn der Typ keinen definiert).
+  // Defensiv gegen ein Payload ohne questions (z. B. veralteter fetch-Cache) — wie in FeedbackFlow.
+  const questions = labels.questions ?? []
   const [step, setStep] = useState<Step>('landing')
   const [consentChecked, setConsentChecked] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [rating, setRating] = useState<number>(0)
+  const [answers, setAnswers] = useState<Record<string, number>>({})
+  const [comment, setComment] = useState('')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
-  const [rating, setRating] = useState<number>(0)
-  const [ratingSubmitted, setRatingSubmitted] = useState(false)
   const [gallery, setGallery] = useState<GalleryItem[]>([])
   const [galleryLoading, setGalleryLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -61,22 +66,27 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
     try {
       const res = await fetch('/api/sessions', { method: 'POST' })
       if (!res.ok) throw new Error('Session creation failed')
-      setStep('upload')
+      setStep('form')
     } catch {
       setError('Verbindungsfehler. Bitte versuche es erneut.')
     }
   }, [])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null
-    setSelectedFile(file)
+    setSelectedFile(e.target.files?.[0] ?? null)
     setError(null)
   }, [])
 
-  const handleUpload = useCallback(async () => {
-    if (!selectedFile) return
+  // Ein Submit: Medien-Upload (presign → PUT → confirm), danach Bewertung + Beschreibung +
+  // strukturierte Antworten ownership-geprüft an denselben Beitrag anhängen (attach_feedback via
+  // /feedback). Medien sind Pflicht (Galerie); Bewertung, Beschreibung und Antworten sind optional.
+  const handleSubmit = useCallback(async () => {
+    if (!selectedFile) {
+      setError('Bitte wähle ein Foto oder Video aus.')
+      return
+    }
     setError(null)
-    setStep('uploading')
+    setStep('submitting')
     setProgress(0)
 
     try {
@@ -98,45 +108,43 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
         presignedUrl: string
         submissionId: string
       }
-      setSubmissionId(sid)
 
       await uploadWithProgress(presignedUrl, selectedFile, setProgress)
 
       const confirmRes = await fetch(`/api/submissions/${sid}/confirm`, { method: 'PATCH' })
       if (!confirmRes.ok) throw new Error('Confirm failed')
+      setSubmissionId(sid)
+
+      const trimmed = comment.trim()
+      const hasAnswers = Object.keys(answers).length > 0
+      if (rating > 0 || trimmed !== '' || hasAnswers) {
+        // Fehler hier sind nicht kritisch für den Upload — der Beitrag ist bereits gespeichert.
+        await fetch(`/api/events/${eventId}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rating: rating > 0 ? rating : undefined,
+            comment: trimmed !== '' ? trimmed : undefined,
+            answers: hasAnswers ? answers : undefined,
+            submissionId: sid,
+          }),
+        })
+      }
 
       setStep('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload fehlgeschlagen.')
-      setStep('upload')
+      setStep('form')
     }
-  }, [selectedFile, eventId])
-
-  const handleRating = useCallback(
-    async (stars: number) => {
-      if (!submissionId) return
-      setRating(stars)
-      try {
-        await fetch(`/api/submissions/${submissionId}/rate`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating: stars }),
-        })
-        setRatingSubmitted(true)
-      } catch {
-        // Rating is optional; silent failure is acceptable
-      }
-    },
-    [submissionId],
-  )
+  }, [selectedFile, rating, comment, answers, eventId])
 
   const handleViewGallery = useCallback(async () => {
     setGalleryLoading(true)
     try {
       const res = await fetch(`/api/events/${eventId}/gallery`)
       if (res.ok) {
-        const body = (await res.json()) as { submissions: GalleryItem[] }
-        setGallery(body.submissions ?? [])
+        const body = (await res.json()) as { items: GalleryItem[] }
+        setGallery(body.items ?? [])
       }
     } finally {
       setGalleryLoading(false)
@@ -146,7 +154,7 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
 
   const handleDelete = useCallback(async () => {
     if (!submissionId) return
-    if (!confirm('Möchtest du dein Foto/Video wirklich löschen?')) return
+    if (!confirm('Möchtest du deinen Beitrag wirklich löschen?')) return
     try {
       await fetch(`/api/submissions/${submissionId}`, { method: 'DELETE' })
       setSubmissionId(null)
@@ -160,7 +168,7 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
 
   return (
     <GuestShell brandName={brandName} eventName={eventName}>
-      {/* ── Landing ──────────────────────────────────────────────────────── */}
+      {/* ── Landing (Consent) ────────────────────────────────────────────── */}
       {step === 'landing' && (
         <div className="space-y-4">
           {description && <p className="text-gray-600 text-sm">{description}</p>}
@@ -192,35 +200,94 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
         </div>
       )}
 
-      {/* ── Upload ───────────────────────────────────────────────────────── */}
-      {step === 'upload' && (
-        <div className="space-y-4">
-          <p className="text-gray-700 font-medium">Foto oder Video auswählen</p>
+      {/* ── Ein Kart: Foto + Bewertung + Beschreibung ────────────────────── */}
+      {step === 'form' && (
+        <div className="space-y-5">
+          <div>
+            <p className="text-gray-700 font-medium mb-2">Foto oder Video</p>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center
+                         cursor-pointer hover:border-indigo-400 transition-colors"
+            >
+              {selectedFile ? (
+                <p className="text-sm text-gray-700 truncate">{selectedFile.name}</p>
+              ) : (
+                <p className="text-sm text-gray-400">Hier klicken oder Datei ziehen</p>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,video/mp4,video/quicktime"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-400">JPEG, PNG, MP4 oder MOV · Max. 50 MB</p>
+          </div>
 
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center
-                       cursor-pointer hover:border-indigo-400 transition-colors"
-          >
-            {selectedFile ? (
-              <p className="text-sm text-gray-700 truncate">{selectedFile.name}</p>
-            ) : (
-              <p className="text-sm text-gray-400">Hier klicken oder Datei ziehen</p>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,video/mp4,video/quicktime"
-              className="hidden"
-              onChange={handleFileSelect}
+          <div className="space-y-2 text-center">
+            <p className="text-gray-700 font-medium">{labels.ratingPrompt}</p>
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRating(star)}
+                  className="text-4xl hover:scale-110 transition-transform"
+                  aria-label={`${star} Sterne`}
+                >
+                  {star <= rating ? '★' : '☆'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Strukturierte Zusatzfragen (aus dem Kampagnen-Katalog) — alle optional. */}
+          {questions.length > 0 && (
+            <div className="space-y-3">
+              {questions.map((q) => (
+                <div key={q.id} className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-gray-600">{q.prompt}</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: star }))}
+                        className="text-2xl leading-none hover:scale-110 transition-transform"
+                        aria-label={`${q.prompt}: ${star} Sterne`}
+                      >
+                        {star <= (answers[q.id] ?? 0) ? '★' : '☆'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1.5">
+              {labels.commentPrompt}
+            </label>
+            <textarea
+              id="comment"
+              rows={3}
+              maxLength={1000}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder={labels.commentPlaceholder}
+              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                         resize-none"
             />
           </div>
-          <p className="text-xs text-gray-400">JPEG, PNG, MP4 oder MOV · Max. 50 MB</p>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <button
-            onClick={handleUpload}
+            onClick={handleSubmit}
             disabled={!selectedFile}
             className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium
                        disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700
@@ -232,7 +299,7 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
       )}
 
       {/* ── Uploading ────────────────────────────────────────────────────── */}
-      {step === 'uploading' && (
+      {step === 'submitting' && (
         <div className="space-y-4 py-4">
           <p className="text-gray-700 font-medium text-center">Wird hochgeladen…</p>
           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -251,25 +318,16 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
           <div className="text-5xl">🎉</div>
           <p className="text-gray-800 font-semibold text-lg">{labels.successText}</p>
           <p className="text-gray-500 text-sm">
-            Dein Upload wird kurz geprüft und dann in der Galerie erscheinen.
+            Dein Beitrag wird kurz geprüft und dann in der Galerie erscheinen.
           </p>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep('rating')}
-              className="flex-1 py-2.5 px-4 border border-indigo-600 text-indigo-600
-                         rounded-xl font-medium hover:bg-indigo-50 transition-colors text-sm"
-            >
-              Bewerten
-            </button>
-            <button
-              onClick={handleViewGallery}
-              className="flex-1 py-2.5 px-4 bg-indigo-600 text-white rounded-xl font-medium
-                         hover:bg-indigo-700 transition-colors text-sm"
-            >
-              Galerie
-            </button>
-          </div>
+          <button
+            onClick={handleViewGallery}
+            className="w-full py-2.5 px-4 bg-indigo-600 text-white rounded-xl font-medium
+                       hover:bg-indigo-700 transition-colors text-sm"
+          >
+            Galerie ansehen
+          </button>
 
           {submissionId && (
             <button
@@ -277,51 +335,6 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
               className="text-xs text-red-400 hover:text-red-600 underline mt-2"
             >
               Beitrag löschen (DSGVO)
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Rating ───────────────────────────────────────────────────────── */}
-      {step === 'rating' && (
-        <div className="space-y-4 text-center">
-          <p className="text-gray-700 font-medium">{labels.ratingPrompt}</p>
-
-          {ratingSubmitted ? (
-            <div className="space-y-4">
-              <p className="text-2xl">
-                {'★'.repeat(rating)}
-                {'☆'.repeat(5 - rating)}
-              </p>
-              <p className="text-gray-500 text-sm">Danke für deine Bewertung!</p>
-              <button
-                onClick={handleViewGallery}
-                className="w-full py-2.5 px-4 bg-indigo-600 text-white rounded-xl font-medium
-                           hover:bg-indigo-700 transition-colors"
-              >
-                Galerie ansehen
-              </button>
-            </div>
-          ) : (
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => handleRating(star)}
-                  className="text-4xl hover:scale-110 transition-transform"
-                >
-                  {star <= rating ? '★' : '☆'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {!ratingSubmitted && (
-            <button
-              onClick={handleViewGallery}
-              className="text-sm text-gray-400 hover:text-gray-600 underline"
-            >
-              Überspringen
             </button>
           )}
         </div>
@@ -339,34 +352,45 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
               Noch keine Beiträge. Sei der Erste!
             </p>
           ) : (
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               {gallery.map((item) =>
-                item.signedUrl ? (
-                  item.file_type === 'image' ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={item.id}
-                      src={item.signedUrl}
-                      alt=""
-                      className="w-full aspect-square object-cover rounded-lg"
-                    />
-                  ) : (
-                    <video
-                      key={item.id}
-                      src={item.signedUrl}
-                      className="w-full aspect-square object-cover rounded-lg"
-                      muted
-                      playsInline
-                      preload="metadata"
-                    />
-                  )
+                item.mediaUrl ? (
+                  <figure key={item.id} className="space-y-1">
+                    {item.fileType === 'image' ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.mediaUrl}
+                        alt={item.caption ?? ''}
+                        className="w-full aspect-square object-cover rounded-lg"
+                      />
+                    ) : (
+                      <video
+                        src={item.mediaUrl}
+                        className="w-full aspect-square object-cover rounded-lg"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    )}
+                    {item.caption && item.caption.trim() !== '' && (
+                      <figcaption className="text-xs text-gray-600 break-words">
+                        {item.caption}
+                      </figcaption>
+                    )}
+                  </figure>
                 ) : null,
               )}
             </div>
           )}
 
           <button
-            onClick={() => setStep('upload')}
+            onClick={() => {
+              setSelectedFile(null)
+              setRating(0)
+              setAnswers({})
+              setComment('')
+              setStep('form')
+            }}
             className="w-full py-2.5 px-4 border border-indigo-600 text-indigo-600
                        rounded-xl font-medium hover:bg-indigo-50 transition-colors text-sm"
           >

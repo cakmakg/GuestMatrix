@@ -473,6 +473,29 @@ export default async function EventDetailPage({
                     {'☆'.repeat(5 - sub.rating)}
                   </p>
                 )}
+
+                {sub.comment && sub.comment.trim() !== '' && (
+                  <p className="text-xs text-gray-600 mt-0.5 break-words">{sub.comment}</p>
+                )}
+
+                {/* Strukturierte Antworten (agency-Katalog auf dem gallery-Flow) — leer bei Typen ohne Katalog. */}
+                {feedbackQuestions.length > 0 && sub.feedback_answers && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {feedbackQuestions.map((q) => {
+                      const value = sub.feedback_answers?.[q.id]
+                      if (typeof value !== 'number') return null
+                      return (
+                        <p key={q.id} className="text-xs text-gray-500">
+                          {q.prompt}:{' '}
+                          <span className="text-amber-500">
+                            {'★'.repeat(value)}
+                            {'☆'.repeat(5 - value)}
+                          </span>
+                        </p>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </div>

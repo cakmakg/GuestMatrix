@@ -38,8 +38,9 @@ export async function GET(
       .eq('id', event.tenant_id)
       .single<{ brand_name: string }>()
 
-    // Fallback auf 'tour'/'gallery', falls Bestandsdaten den Wert nicht kennen.
-    const campaignType = isCampaignType(event.campaign_type) ? event.campaign_type : 'tour'
+    // Fallback auf 'agency'/'gallery', falls Bestandsdaten den Wert nicht kennen (agency ist der
+    // aktive gallery-Beachhead seit dem Remodel 0016).
+    const campaignType = isCampaignType(event.campaign_type) ? event.campaign_type : 'agency'
     const flowMode = isFlowMode(event.flow_mode) ? event.flow_mode : 'gallery'
 
     return Response.json({

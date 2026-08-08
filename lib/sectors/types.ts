@@ -9,8 +9,11 @@
 
 // ─── Tupel + Basistypen (zentrale Aufzählung, für Zod-Enums wiederverwendbar) ──
 
+// Hinweis: `agency` erscheint als Sektor-ID (dormanter Sektor `lib/sectors/agency/`) UND als
+// Kampagnentyp-ID (aktiver tourism-Kampagnentyp seit Remodel 0016). Getrennte Namensräume
+// (Sector vs. CampaignType) — kein Konflikt. Der Kampagnentyp `tour` wurde von 0016 zu `agency`.
 export const SECTOR_TUPLE = ['tourism', 'real_estate', 'event', 'agency'] as const
-export const CAMPAIGN_TYPE_TUPLE = ['tour', 'stay', 'property', 'wedding', 'trip'] as const
+export const CAMPAIGN_TYPE_TUPLE = ['agency', 'stay', 'property', 'wedding', 'trip'] as const
 export const FLOW_MODE_TUPLE = ['gallery', 'feedback', 'guestbook'] as const
 
 export type Sector = (typeof SECTOR_TUPLE)[number]

@@ -25,9 +25,9 @@ insert into public.tenants (id, user_id, name, brand_name, sector, plan) values
 
 insert into public.events (id, tenant_id, name, date, campaign_type, flow_mode) values
   ('55555555-5555-4555-8555-555555555555','11111111-1111-4111-8111-111111111111','Hotel-Feedback',current_date,'stay','feedback'),
-  ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Tour-Galerie',current_date,'tour','gallery');
+  ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Agentur-Galerie',current_date,'agency','gallery');
 
--- Medien-Beitrag von guest1 auf dem TOUR-Event (rating NULL) — für /rate vorher/nachher.
+-- Medien-Beitrag von guest1 auf dem AGENCY-Event (rating NULL) — für /rate vorher/nachher.
 insert into public.submissions (id, tenant_id, event_id, guest_user_id, file_type, media_url, consent_at, uploaded_at, moderation_flag) values
   ('a1a1a1a1-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111111','33333333-3333-4333-8333-333333333333','99999999-9999-4999-8999-999999999999','image','11111111-1111-4111-8111-111111111111/33333333-3333-4333-8333-333333333333/a1a1a1a1-1111-4111-8111-111111111111/x.jpg',now(),now(),false);
 
@@ -61,7 +61,7 @@ do $$ declare v uuid; r int; begin
   reset role; perform set_config('request.jwt.claims','', true);
   select rating into r from public.submissions where id='a1a1a1a1-1111-4111-8111-111111111111';
   if v = 'a1a1a1a1-1111-4111-8111-111111111111' and r = 5
-    then raise notice 'PASS (rate-after): attach_feedback setzt die Tour-Bewertung (rating=5)';
+    then raise notice 'PASS (rate-after): attach_feedback setzt die Galerie-Bewertung (rating=5)';
   else raise notice 'FAIL (rate-after): rpc=%, rating=%', v, r; end if;
 exception when others then reset role; raise notice 'ERR (rate-after): %', sqlerrm; end $$;
 
