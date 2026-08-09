@@ -1,16 +1,26 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  BUSINESS_TYPES,
   CAMPAIGN_TYPES,
   SECTORS,
+  SIGNUP_OPTIONS,
+  allowedCampaignTypes,
+  businessTypesForSector,
+  campaignTypesForBusinessType,
   campaignTypesForSector,
+  getBusinessTypeConfig,
   getCampaignConfig,
   getCapabilities,
   getFeedbackQuestions,
+  getSignupOption,
+  isBusinessType,
   isCampaignType,
   isFlowMode,
   isFlowModeAllowed,
   isSector,
+  isSignupChoice,
+  isValidCampaignForBusinessType,
   isValidCampaignForSector,
   resolveFlowMode,
   resolveLabels,
@@ -180,6 +190,68 @@ describe('structured feedback catalog (agency on gallery + stay on feedback)', (
     expect(unknownAnswerKeys('stay', { cleanliness: 5, value: 3 })).toEqual([])
     expect(unknownAnswerKeys('stay', { cleanliness: 5, bogus: 3 })).toEqual(['bogus'])
     expect(unknownAnswerKeys('agency', {})).toEqual([])
+  })
+})
+
+describe('business_type sub-role (tourism → hotel|agency)', () => {
+  it('registers hotel + agency, each mapped to exactly one campaign type', () => {
+    expect(Object.keys(BUSINESS_TYPES).sort()).toEqual(['agency', 'hotel'])
+    expect(businessTypesForSector('tourism').sort()).toEqual(['agency', 'hotel'])
+    expect(campaignTypesForBusinessType('hotel')).toEqual(['stay'])
+    expect(campaignTypesForBusinessType('agency')).toEqual(['agency'])
+  })
+
+  it('mirrors the DB mapping: hotel↔stay, agency↔agency; nothing crosses over', () => {
+    expect(isValidCampaignForBusinessType('hotel', 'stay')).toBe(true)
+    expect(isValidCampaignForBusinessType('hotel', 'agency')).toBe(false)
+    expect(isValidCampaignForBusinessType('agency', 'agency')).toBe(true)
+    expect(isValidCampaignForBusinessType('agency', 'stay')).toBe(false)
+  })
+
+  it('business type carries its sector and label', () => {
+    expect(getBusinessTypeConfig('hotel')?.sector).toBe('tourism')
+    expect(getBusinessTypeConfig('agency')?.sector).toBe('tourism')
+    expect(getBusinessTypeConfig('hotel')?.label).toBe(tourism.businessTypes?.hotel?.label)
+  })
+
+  it('isBusinessType narrows only hotel/agency', () => {
+    expect(isBusinessType('hotel')).toBe(true)
+    expect(isBusinessType('agency')).toBe(true)
+    for (const v of ['stay', 'tourism', 'wedding', 'nonsense']) {
+      expect(isBusinessType(v)).toBe(false)
+    }
+  })
+
+  it('allowedCampaignTypes filters by business type, falls back to sector when null', () => {
+    expect(allowedCampaignTypes('tourism', 'hotel')).toEqual(['stay'])
+    expect(allowedCampaignTypes('tourism', 'agency')).toEqual(['agency'])
+    // Null business type (future non-tourism tenant) → sector campaign types (no business gate).
+    expect(allowedCampaignTypes('tourism', null)).toEqual(campaignTypesForSector('tourism'))
+  })
+})
+
+describe('signup options (flat business list, registry-driven)', () => {
+  it('offers exactly the active (sector, business_type) combinations', () => {
+    expect(SIGNUP_OPTIONS.map((o) => o.value).sort()).toEqual(['tourism:agency', 'tourism:hotel'])
+  })
+
+  it('each option maps to the correct sector + business type + label', () => {
+    const hotel = getSignupOption('tourism:hotel')
+    expect(hotel?.sector).toBe('tourism')
+    expect(hotel?.businessType).toBe('hotel')
+    expect(hotel?.label).toBe(tourism.businessTypes?.hotel?.label)
+    const agency = getSignupOption('tourism:agency')
+    expect(agency?.sector).toBe('tourism')
+    expect(agency?.businessType).toBe('agency')
+  })
+
+  it('isSignupChoice accepts only offered values; rejects raw sectors and garbage', () => {
+    expect(isSignupChoice('tourism:hotel')).toBe(true)
+    expect(isSignupChoice('tourism:agency')).toBe(true)
+    for (const v of ['tourism', 'tourism:', 'event:', 'tourism:bogus', 'hackerman']) {
+      expect(isSignupChoice(v)).toBe(false)
+    }
+    expect(getSignupOption('event:')).toBeUndefined()
   })
 })
 

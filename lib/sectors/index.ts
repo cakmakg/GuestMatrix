@@ -27,6 +27,8 @@
  */
 
 import type {
+  BusinessType,
+  BusinessTypeConfig,
   CampaignCapabilities,
   CampaignType,
   CampaignTypeConfig,
@@ -44,12 +46,27 @@ export * from './types'
 // ─── Aggregierte Registries (nur aktive Einträge; Partial wegen Retrenchment) ──
 
 export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
-  tourism: { label: tourism.label, campaignTypes: ['agency', 'stay'] },
+  tourism: {
+    label: tourism.label,
+    campaignTypes: ['agency', 'stay'],
+    businessTypes: tourism.businessTypes,
+  },
 }
 
 export const CAMPAIGN_TYPES: Partial<Record<CampaignType, CampaignTypeConfig>> = {
   agency: tourism.campaignTypes.agency,
   stay: tourism.campaignTypes.stay,
+}
+
+// business_type-Registry, KEYED auf business_type (nicht auf Sektor) — spiegelt die DB-Grenze
+// current_tenant_allows_campaign (0017), die ebenfalls nur die business_type kennt. Invariante:
+// eine business_type-ID gehört genau EINEM Sektor (global eindeutig). `sector` ist mitgeführt, damit
+// Aufrufer ohne Sektor-Kontext den Sektor auflösen können.
+export const BUSINESS_TYPES: Partial<
+  Record<BusinessType, BusinessTypeConfig & { sector: Sector }>
+> = {
+  hotel: { ...tourism.businessTypes.hotel, sector: 'tourism' },
+  agency: { ...tourism.businessTypes.agency, sector: 'tourism' },
 }
 
 // ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
@@ -68,6 +85,42 @@ export function campaignTypesForSector(sector: Sector): CampaignType[] {
 
 export function isValidCampaignForSector(sector: Sector, type: CampaignType): boolean {
   return SECTORS[sector]?.campaignTypes.includes(type) ?? false
+}
+
+// ─── business_type (Tenant-Unterrolle) ─────────────────────────────────────────
+
+export function businessTypesForSector(sector: Sector): BusinessType[] {
+  return Object.keys(SECTORS[sector]?.businessTypes ?? {}) as BusinessType[]
+}
+
+export function getBusinessTypeConfig(
+  type: BusinessType,
+): (BusinessTypeConfig & { sector: Sector }) | undefined {
+  return BUSINESS_TYPES[type]
+}
+
+/** Kampagnentypen, die eine business_type anlegen darf (leer für unbekannte). */
+export function campaignTypesForBusinessType(type: BusinessType): CampaignType[] {
+  return BUSINESS_TYPES[type]?.campaignTypes ?? []
+}
+
+export function isValidCampaignForBusinessType(
+  type: BusinessType,
+  campaign: CampaignType,
+): boolean {
+  return BUSINESS_TYPES[type]?.campaignTypes.includes(campaign) ?? false
+}
+
+/**
+ * Erlaubte Kampagnentypen eines Tenants: hat er eine business_type (tourism), zählt deren Allowlist;
+ * sonst (nicht-tourism, business_type NULL) die Kampagnentypen des Sektors. Einziger Ableitungspunkt
+ * für UI + App-Validierung; die harte Grenze bleibt die RLS-WITH-CHECK (0017).
+ */
+export function allowedCampaignTypes(
+  sector: Sector,
+  businessType: BusinessType | null,
+): CampaignType[] {
+  return businessType ? campaignTypesForBusinessType(businessType) : campaignTypesForSector(sector)
 }
 
 export function isFlowModeAllowed(type: CampaignType, mode: FlowMode): boolean {
@@ -140,6 +193,54 @@ export function isCampaignType(value: string): value is CampaignType {
   return value in CAMPAIGN_TYPES
 }
 
+export function isBusinessType(value: string): value is BusinessType {
+  return value in BUSINESS_TYPES
+}
+
 export function isFlowMode(value: string): value is FlowMode {
   return (FLOW_MODE_TUPLE as readonly string[]).includes(value)
+}
+
+// ─── Signup-Auswahl (registry-getrieben, sektor-transparent) ───────────────────
+// Der Kunde sieht eine FLACHE Liste von Geschäftsarten — das Wort „Sektor" erscheint nicht. Jede
+// Option kodiert (sector, business_type). Nur AKTIVE Kombinationen erscheinen: je registriertem
+// Sektor eine Option pro business_type; ein Sektor ohne business_types liefert eine Option mit
+// business_type=null. Werden Hochzeit/Immobilien aktiviert, tauchen sie hier automatisch auf.
+
+export type SignupOption = {
+  value: string // stabiler Formularwert `${sector}:${businessType ?? ''}`
+  label: string
+  sector: Sector
+  businessType: BusinessType | null
+}
+
+export const SIGNUP_OPTIONS: SignupOption[] = Object.entries(SECTORS).flatMap(
+  ([sectorId, config]): SignupOption[] => {
+    if (!config || !isSector(sectorId)) return []
+    const btEntries = Object.entries(config.businessTypes ?? {})
+    if (btEntries.length === 0) {
+      return [{ value: `${sectorId}:`, label: config.label, sector: sectorId, businessType: null }]
+    }
+    return btEntries.flatMap(([bt, btConfig]): SignupOption[] =>
+      btConfig && isBusinessType(bt)
+        ? [
+            {
+              value: `${sectorId}:${bt}`,
+              label: btConfig.label,
+              sector: sectorId,
+              businessType: bt,
+            },
+          ]
+        : [],
+    )
+  },
+)
+
+/** Server-seitige Autorität: übersetzt den Formularwert in (sector, business_type). */
+export function getSignupOption(value: string): SignupOption | undefined {
+  return SIGNUP_OPTIONS.find((option) => option.value === value)
+}
+
+export function isSignupChoice(value: string): boolean {
+  return SIGNUP_OPTIONS.some((option) => option.value === value)
 }

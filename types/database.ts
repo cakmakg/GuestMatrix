@@ -153,6 +153,7 @@ export type Database = {
       tenants: {
         Row: {
           brand_name: string
+          business_type: string | null
           created_at: string
           id: string
           name: string
@@ -163,6 +164,7 @@ export type Database = {
         }
         Insert: {
           brand_name: string
+          business_type?: string | null
           created_at?: string
           id?: string
           name: string
@@ -173,6 +175,7 @@ export type Database = {
         }
         Update: {
           brand_name?: string
+          business_type?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -197,7 +200,13 @@ export type Database = {
         }
         Returns: string
       }
+      current_tenant_allows_campaign: {
+        Args: { p_campaign_type: string }
+        Returns: boolean
+      }
+      current_tenant_business_type: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
+      current_tenant_sector: { Args: never; Returns: string }
       has_completed_upload: { Args: { p_event_id: string }; Returns: boolean }
       is_gallery_event: { Args: { p_event_id: string }; Returns: boolean }
       owned_submission_media: {

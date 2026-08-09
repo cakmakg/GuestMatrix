@@ -4,8 +4,9 @@ import { redirect } from 'next/navigation'
 import {
   CAMPAIGN_TYPES,
   SECTORS,
-  campaignTypesForSector,
+  allowedCampaignTypes,
   getCampaignConfig,
+  isBusinessType,
   isSector,
 } from '@/lib/sectors'
 import { requireTenantAuth } from '@/lib/auth/session'
@@ -32,9 +33,9 @@ export default async function NewEventPage({
   const supabase = await createSupabaseServerClient()
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('sector')
+    .select('sector, business_type')
     .eq('id', tenantId)
-    .single<{ sector: string }>()
+    .single<{ sector: string; business_type: string | null }>()
 
   const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
 
@@ -44,7 +45,13 @@ export default async function NewEventPage({
     redirect('/dashboard/settings')
   }
 
-  const types = campaignTypesForSector(sector)
+  // Kampagnentypen nach der business_type-Unterrolle filtern (Hotel→stay, Agentur→agency). Reine
+  // UX-Einschränkung — die harte Grenze erzwingt die RLS-WITH-CHECK (0017) beim INSERT.
+  const businessType =
+    tenant && tenant.business_type && isBusinessType(tenant.business_type)
+      ? tenant.business_type
+      : null
+  const types = allowedCampaignTypes(sector, businessType)
   const singleType = types.length === 1 ? types[0] : null
   // Flow-Modus-Wahl nur, wenn der (einzige) Typ sie erlaubt (aktuell: Immobilie).
   const flowChoiceType =

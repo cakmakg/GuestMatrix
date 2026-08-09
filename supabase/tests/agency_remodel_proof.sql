@@ -24,9 +24,9 @@ insert into auth.users (instance_id, id, aud, role, email, created_at, updated_a
   ('00000000-0000-0000-0000-000000000000','88888888-8888-4888-8888-888888888888','authenticated','authenticated','guest2@example.com',now(),now()),
   ('00000000-0000-0000-0000-000000000000','77777777-7777-4777-8777-777777777777','authenticated','authenticated','guest3@example.com',now(),now());
 
-insert into public.tenants (id, user_id, name, brand_name, sector, plan) values
-  ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Agentur A','Marke A','tourism','free'),
-  ('22222222-2222-4222-8222-222222222222','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Agentur B','Marke B','tourism','free');
+insert into public.tenants (id, user_id, name, brand_name, sector, business_type, plan) values
+  ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Agentur A','Marke A','tourism','agency','free'),
+  ('22222222-2222-4222-8222-222222222222','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Agentur B','Marke B','tourism','agency','free');
 
 -- ═══ (a)+(b) Migrations-Sequenz gegen ECHTE tour-Daten (läuft ZUERST, events-Tabelle leer) ═══
 -- Nach db reset ist der 0016-CHECK bereits ('agency','stay') und der Seed leer; der Migrations-

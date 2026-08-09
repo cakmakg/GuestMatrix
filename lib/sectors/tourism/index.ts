@@ -17,6 +17,13 @@ import type { SectorModule } from '../types'
 export const tourism = {
   id: 'tourism',
   label: 'Tourismus',
+  // Unterrollen (tenants.business_type): Hotels machen Aufenthalts-Feedback (stay), Reiseagenturen
+  // die Foto-Galerie + Agentur-Feedback (agency). Diese Allowlist spiegelt die DB-Sicherheitsgrenze
+  // (current_tenant_allows_campaign, Migration 0017): hotel→stay, agency→agency.
+  businessTypes: {
+    hotel: { label: 'Hotel / Resort', campaignTypes: ['stay'] },
+    agency: { label: 'Reiseagentur', campaignTypes: ['agency'] },
+  },
   campaignTypes: {
     agency: {
       sector: 'tourism',

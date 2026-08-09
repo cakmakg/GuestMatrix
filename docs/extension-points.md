@@ -23,6 +23,19 @@ feedback_answers-Mechanik. Die Garantie besteht aus zwei Schichten:
 2. **Registry** (`lib/sectors/index.ts`): `tourism` mit `agency` + `stay` sind in `SECTORS` +
    `CAMPAIGN_TYPES` eingetragen. UI, Validierung und Gäste-Flow leiten sich vollständig hieraus ab.
 
+**business_type-Unterrolle (0017): `hotel` vs. `agency` INNERHALB von tourism.** Der tourism-Sektor
+ist in zwei Geschäftsmodelle geteilt (`tenants.business_type` ∈ {hotel, agency}) — KEIN Sektor-Split.
+Die Zuordnung ist keine Identität: `hotel → campaign_type=stay`, `agency → campaign_type=agency`.
+Sie wird an EINER Stelle in der DB gehalten (`current_tenant_allows_campaign`, security definer +
+`search_path=''` + stable) und von `lib/sectors/` (`BUSINESS_TYPES` + `businessTypes` je Sektor)
+gespiegelt. Die Grenze ist **hart**: `events`-INSERT/UPDATE tragen eine RLS-`WITH CHECK`, die
+`campaign_type` gegen die business_type des Tenants prüft — ein Hotel kann per direktem API-Aufruf
+kein agency-Event anlegen (Nachweis: `business_type_boundary_proof.sql`, (a)). NULL-Sicherheit: eine
+`business_type IS NULL` (nur NICHT-tourism-Tenants) passiert die Grenze ungehindert; `sector='tourism'
+AND business_type IS NULL` ist per `tenants_business_type_check` unmöglich, also kein Loch. Neuer Sektor
+mit eigenen Geschäftsmodellen → `businessTypes` im Sektor-Modul + `tenants_business_type_check`
+erweitern; ein Sektor OHNE business_type lässt die Spalte NULL (keine business-Grenze).
+
 **RLS-Update (0009): `public_gallery_select` IST jetzt flow-mode-aware.** Die Policy filtert über
 den SECURITY-DEFINER-Helfer `is_gallery_event(event_id)` — nur `gallery`-Events erreichen die
 Gäste-Galerie, sodass private Feedback-Kommentare NIE an andere Gäste gelangen (B1-Audit, atomar in
@@ -52,13 +65,16 @@ guest-sichtbaren Modus reaktiviert, muss `public_gallery_select` erneut prüfen*
 > 0006). `real_estate`/`event`/`agency` bleiben CHECK-gesperrt — das Aktivieren eines dieser Sektoren
 > öffnet den CHECK und macht ihn damit automatisch auch im Signup auswählbar.
 >
-> **Immutabilität des Sektors (WARNUNG für spätere Änderungen).** Der Sektor ist nach der Registrierung
-> unveränderlich. Das wird aktuell **allein durch das FEHLEN einer UPDATE-Policy** auf `tenants`
-> durchgesetzt, die einem Kunden das Ändern von `sector` erlaubte (es gibt keinen Änderungs-Pfad).
-> Wird künftig eine UPDATE-Policy auf `tenants` ergänzt (z. B. um `brand_name` editierbar zu machen),
-> **MUSS** sie `sector` per `WITH CHECK` (z. B. `sector = (select sector from …)` bzw. Spaltenschutz)
-> gegen Änderung sichern — sonst bricht die Immutabilität. Eine DB-seitige BEFORE-UPDATE-Sperre ist
-> bewusst noch nicht Teil dieses Slices.
+> **Immutabilität von Sektor + business_type (Stand 0017).** Beide sind nach der Registrierung
+> unveränderlich. `tenants` hat eine UPDATE-Policy `tenant_update_own` (schon aus 0001), die 0017 um
+> ein `WITH CHECK` erweitert: der Kunde (Rolle `authenticated`) darf `sector` und `business_type`
+> NICHT ändern (beide werden per `current_tenant_sector()` / `current_tenant_business_type()` gegen
+> den Bestandswert gepinnt). Der Betreiber (`service_role`, BYPASSRLS Admin-Client) umgeht RLS und
+> kann weiterhin zuweisen/umstellen — genau die „Betreiber weist zu"-Regel. HINWEIS: Frühere Slices
+> ließen `tenant_update_own` OHNE `WITH CHECK` (nur `USING`) — ein Kunde hätte per direktem PostgREST
+> theoretisch Spalten seiner eigenen Zeile ändern können; für `sector` fing das der CHECK ab, für
+> `business_type` wäre es ein Loch gewesen. 0017 schließt beides. Wer diese Policy künftig anfasst,
+> MUSS `sector` + `business_type` im `WITH CHECK` gepinnt lassen.
 
 Die Tupel in `lib/sectors/types.ts` (`SECTOR_TUPLE`, `CAMPAIGN_TYPE_TUPLE`, `FLOW_MODE_TUPLE`)
 sind bewusst **breit** geblieben, damit dieser Code weiter kompiliert. Reaktivieren heißt daher:

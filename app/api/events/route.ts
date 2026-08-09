@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 
-import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/sectors'
+import { allowedCampaignTypes, isBusinessType, isSector, resolveFlowMode } from '@/lib/sectors'
 import { handleRouteError, ValidationError } from '@/lib/auth/errors'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -52,13 +52,18 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('sector')
+      .select('sector, business_type')
       .eq('id', tenantId)
-      .single<{ sector: string }>()
+      .single<{ sector: string; business_type: string | null }>()
 
     const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
-    if (!sector || !isValidCampaignForSector(sector, parsed.data.campaignType)) {
-      throw new ValidationError('Campaign type does not match sector.')
+    const businessType =
+      tenant && tenant.business_type && isBusinessType(tenant.business_type)
+        ? tenant.business_type
+        : null
+    // App-Vorprüfung; die harte Grenze erzwingt die RLS-WITH-CHECK (0017) beim INSERT.
+    if (!sector || !allowedCampaignTypes(sector, businessType).includes(parsed.data.campaignType)) {
+      throw new ValidationError('Campaign type does not match business type.')
     }
 
     const flowMode = resolveFlowMode(parsed.data.campaignType, parsed.data.flowMode ?? null)

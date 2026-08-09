@@ -1,16 +1,15 @@
 import type { Metadata } from 'next'
 
 import { BRAND } from '@/lib/brand'
-import { SECTORS } from '@/lib/sectors'
+import { SIGNUP_OPTIONS } from '@/lib/sectors'
 
 import { signupAction } from './actions'
 
-// Auswählbare Sektoren = die AKTIV registrierten (lib/sectors/index.ts). Aktuell nur 'tourism';
-// wird ein Sektor registriert + im CHECK geöffnet, erscheint er hier automatisch. flatMap statt
-// Cast, weil Object.entries über ein Partial die Werte als möglicherweise undefined typt.
-const ACTIVE_SECTORS = Object.entries(SECTORS).flatMap(([id, config]) =>
-  config ? [{ id, label: config.label }] : [],
-)
+// Auswählbare Geschäftsarten = die AKTIVEN (sector, business_type)-Kombinationen aus der Registry
+// (lib/sectors/index.ts). Aktuell „Hotel / Resort" und „Reiseagentur" (beide sector=tourism). Wird
+// ein Sektor/eine business_type aktiviert, erscheint die Option hier automatisch. Das technische
+// Wort „Branche"/„Sektor" wird dem Kunden bewusst NICHT gezeigt.
+const BUSINESS_OPTIONS = SIGNUP_OPTIONS
 
 export const metadata: Metadata = { title: `Konto erstellen – ${BRAND.name}` }
 
@@ -28,9 +27,10 @@ export default async function SignupPage({ searchParams }: Props) {
   const { error } = await searchParams
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? 'Ein Fehler ist aufgetreten.') : null
 
-  // Adaptiv: bei genau einem aktiven Sektor schreibgeschützt anzeigen (+ hidden input); bei
-  // mehreren echte Auswahl. Der Wert reist als `sector` in raw_user_meta_data zum Trigger.
-  const defaultSector = ACTIVE_SECTORS[0]
+  // Adaptiv (0015-Muster erweitert): bei genau einer Geschäftsart schreibgeschützt anzeigen
+  // (+ hidden input); bei mehreren echte Auswahl. Der Wert reist als `signupChoice` zum Trigger,
+  // der die Server-Action serverseitig in sector + business_type auflöst.
+  const defaultOption = BUSINESS_OPTIONS[0]
 
   return (
     <main style={styles.main}>
@@ -46,7 +46,7 @@ export default async function SignupPage({ searchParams }: Props) {
 
         <form action={signupAction} style={styles.form}>
           <label style={styles.label}>
-            Name deines Reiseunternehmens
+            Name deines Unternehmens
             <input
               type="text"
               name="brandName"
@@ -58,33 +58,38 @@ export default async function SignupPage({ searchParams }: Props) {
             <span style={styles.hint}>Dieser Name wird deinen Gästen angezeigt.</span>
           </label>
 
-          {defaultSector &&
-            (ACTIVE_SECTORS.length > 1 ? (
+          {defaultOption &&
+            (BUSINESS_OPTIONS.length > 1 ? (
               <label style={styles.label}>
-                Branche
-                <select name="sector" required defaultValue={defaultSector.id} style={styles.input}>
-                  {ACTIVE_SECTORS.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
+                Was beschreibt dein Unternehmen?
+                <select
+                  name="signupChoice"
+                  required
+                  defaultValue={defaultOption.value}
+                  style={styles.input}
+                >
+                  {BUSINESS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
                 <span style={styles.hint}>
-                  Deine Branche bestimmt deine Kampagnentypen und kann später nicht geändert werden.
+                  Diese Wahl bestimmt deine Kampagnentypen und kann später nicht geändert werden.
                 </span>
               </label>
             ) : (
               <label style={styles.label}>
-                Branche
+                Was beschreibt dein Unternehmen?
                 <input
                   type="text"
-                  value={defaultSector.label}
+                  value={defaultOption.label}
                   readOnly
                   style={styles.inputReadonly}
                 />
-                <input type="hidden" name="sector" value={defaultSector.id} />
+                <input type="hidden" name="signupChoice" value={defaultOption.value} />
                 <span style={styles.hint}>
-                  Aktuell verfügbar: {defaultSector.label}. Die Branche kann später nicht geändert
+                  Aktuell verfügbar: {defaultOption.label}. Diese Wahl kann später nicht geändert
                   werden.
                 </span>
               </label>

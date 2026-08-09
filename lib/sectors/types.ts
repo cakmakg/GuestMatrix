@@ -16,9 +16,16 @@ export const SECTOR_TUPLE = ['tourism', 'real_estate', 'event', 'agency'] as con
 export const CAMPAIGN_TYPE_TUPLE = ['agency', 'stay', 'property', 'wedding', 'trip'] as const
 export const FLOW_MODE_TUPLE = ['gallery', 'feedback', 'guestbook'] as const
 
+// Unterrolle eines Tenants innerhalb eines Sektors (`tenants.business_type`). Sie partitioniert die
+// Kampagnentypen des Sektors in Geschäftsmodelle und wird bei der Registrierung fest gewählt
+// (unveränderlich). Aktiv: tourism → hotel|agency. Sektoren ohne business_type lassen die Spalte
+// NULL. Namensraum getrennt von CampaignType (`agency` steht in beiden; `hotel`≠`stay`).
+export const BUSINESS_TYPE_TUPLE = ['hotel', 'agency'] as const
+
 export type Sector = (typeof SECTOR_TUPLE)[number]
 export type CampaignType = (typeof CAMPAIGN_TYPE_TUPLE)[number]
 export type FlowMode = (typeof FLOW_MODE_TUPLE)[number]
+export type BusinessType = (typeof BUSINESS_TYPE_TUPLE)[number]
 
 // ─── Fähigkeiten je Flow-Modus ────────────────────────────────────────────────
 
@@ -143,14 +150,26 @@ export type CampaignTypeConfig = {
   questions?: readonly FeedbackQuestion[]
 }
 
+// Eine business_type-Unterrolle bündelt die Kampagnentypen eines Geschäftsmodells. `campaignTypes`
+// ist die Allowlist, die die DB-Grenze (current_tenant_allows_campaign, Migration 0017) spiegelt —
+// aktuell je genau ein Typ (hotel→stay, agency→agency), das Array lässt aber mehrere zu.
+export type BusinessTypeConfig = {
+  label: string
+  campaignTypes: CampaignType[]
+}
+
 /** Eine vom Betreiber entwickelte Sektor-Einheit (ein Ordner unter `lib/sectors/<id>/`). */
 export type SectorModule = {
   id: Sector
   label: string
   campaignTypes: Partial<Record<CampaignType, CampaignTypeConfig>>
+  // Optional: partitioniert die Kampagnentypen in Geschäftsmodelle (Tenant-Unterrolle). Fehlt sie,
+  // hat der Sektor keine business_type (Spalte bleibt NULL) — z. B. die dormanten Sektoren.
+  businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
 }
 
 export type SectorConfig = {
   label: string
   campaignTypes: CampaignType[]
+  businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
 }

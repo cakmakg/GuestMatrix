@@ -15,8 +15,10 @@ insert into auth.users (instance_id, id, aud, role, email, created_at, updated_a
   ('00000000-0000-0000-0000-000000000000','99999999-9999-4999-8999-999999999999','authenticated','authenticated','guest1@example.com',now(),now()),
   ('00000000-0000-0000-0000-000000000000','88888888-8888-4888-8888-888888888888','authenticated','authenticated','guest2@example.com',now(),now());
 
-insert into public.tenants (id, user_id, name, brand_name, sector, plan) values
-  ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Tenant A','Marke A','tourism','free');
+-- business_type als Owner gesetzt (0017-CHECK verlangt es für tourism); die Owner-Seeds unten
+-- umgehen RLS, deshalb ist der Wert für die stay/agency-Events hier ohne Belang.
+insert into public.tenants (id, user_id, name, brand_name, sector, business_type, plan) values
+  ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Tenant A','Marke A','tourism','agency','free');
 
 -- Ein stay/feedback-Event (Hotel) und ein agency/gallery-Event (für die Regression).
 insert into public.events (id, tenant_id, name, date, campaign_type, flow_mode) values

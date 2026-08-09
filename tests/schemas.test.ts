@@ -42,11 +42,14 @@ describe('signupSchema', () => {
     email: 'couple@example.com',
     password: 'password123',
     brandName: 'Anna & Ben',
-    sector: 'tourism',
+    signupChoice: 'tourism:hotel',
   }
 
-  it('accepts a valid signup with an active sector', () => {
+  it('accepts a valid signup with an active business choice', () => {
     expect(signupSchema.safeParse(validBase).success).toBe(true)
+    expect(signupSchema.safeParse({ ...validBase, signupChoice: 'tourism:agency' }).success).toBe(
+      true,
+    )
   })
 
   it('lowercases the email', () => {
@@ -63,7 +66,7 @@ describe('signupSchema', () => {
     expect(signupSchema.safeParse({ ...validBase, brandName: '   ' }).success).toBe(false)
   })
 
-  it('rejects a missing sector', () => {
+  it('rejects a missing choice', () => {
     expect(
       signupSchema.safeParse({
         email: validBase.email,
@@ -73,14 +76,16 @@ describe('signupSchema', () => {
     ).toBe(false)
   })
 
-  it('rejects designed-but-deactivated sectors (real_estate/event/agency)', () => {
-    for (const sector of ['real_estate', 'event', 'agency']) {
-      expect(signupSchema.safeParse({ ...validBase, sector }).success).toBe(false)
+  it('rejects a raw sector value (must be a full sector:business_type choice)', () => {
+    for (const choice of ['tourism', 'tourism:', 'event:', 'real_estate:']) {
+      expect(signupSchema.safeParse({ ...validBase, signupChoice: choice }).success).toBe(false)
     }
   })
 
-  it('rejects a garbage sector', () => {
-    expect(signupSchema.safeParse({ ...validBase, sector: 'hackerman' }).success).toBe(false)
+  it('rejects a deactivated or garbage choice', () => {
+    for (const choice of ['tourism:bogus', 'event:wedding', 'hackerman']) {
+      expect(signupSchema.safeParse({ ...validBase, signupChoice: choice }).success).toBe(false)
+    }
   })
 })
 

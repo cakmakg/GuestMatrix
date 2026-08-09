@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 
-import { isSector, isValidCampaignForSector, resolveFlowMode } from '@/lib/sectors'
+import { allowedCampaignTypes, isBusinessType, isSector, resolveFlowMode } from '@/lib/sectors'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -28,12 +28,17 @@ export async function createEventAction(formData: FormData): Promise<void> {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('sector, plan')
+    .select('sector, business_type, plan')
     .eq('id', tenantId)
-    .single<{ sector: string; plan: string }>()
+    .single<{ sector: string; business_type: string | null; plan: string }>()
 
   const sector = tenant && isSector(tenant.sector) ? tenant.sector : null
-  if (!sector || !isValidCampaignForSector(sector, parsed.data.campaignType)) {
+  const businessType =
+    tenant && tenant.business_type && isBusinessType(tenant.business_type)
+      ? tenant.business_type
+      : null
+  // App-Vorprüfung (freundliche Fehlermeldung); die harte Grenze ist die RLS-WITH-CHECK (0017).
+  if (!sector || !allowedCampaignTypes(sector, businessType).includes(parsed.data.campaignType)) {
     redirect(
       '/dashboard/events/new?error=' + encodeURIComponent('Kampagnentyp passt nicht zur Branche.'),
     )

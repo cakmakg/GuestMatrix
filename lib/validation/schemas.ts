@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { CAMPAIGN_TYPE_TUPLE, FLOW_MODE_TUPLE, isSector } from '@/lib/sectors'
+import { CAMPAIGN_TYPE_TUPLE, FLOW_MODE_TUPLE, isSignupChoice } from '@/lib/sectors'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -46,18 +46,18 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email('Invalid email address.').max(254).toLowerCase().trim(),
 })
 
-// Self-Service-Registrierung. Der Sektor wird bei der Registrierung GEWÄHLT und hier gegen die
-// AKTIVE Registry validiert (isSector prüft `value in SECTORS` → aktuell nur 'tourism'). Das ist
-// der Formular-Kontrakt: akzeptiert wird nur, was das Formular auch anbietet; ein designter, aber
-// deaktivierter Sektor (real_estate/event/agency) wird hier abgelehnt. brandName und sector reisen
-// via signUp options.data in raw_user_meta_data und werden vom Trigger handle_new_user (0015)
-// gelesen — dort validieren Allowlist + DB-CHECK unabhängig (Defense-in-Depth, falls diese Ebene
-// per direktem auth.signUp umgangen wird).
+// Self-Service-Registrierung. Der Kunde wählt EINE Geschäftsart aus der aktiven Registry
+// (SIGNUP_OPTIONS); `signupChoice` kodiert (sector, business_type) als `${sector}:${businessType}`.
+// isSignupChoice akzeptiert nur, was das Formular auch anbietet (nur aktive Kombinationen). Die
+// Server-Action übersetzt die Wahl serverseitig in sector + business_type (Autorität = Registry,
+// nicht der Client) und schickt beides via signUp options.data in raw_user_meta_data. Der Trigger
+// handle_new_user (0017) validiert Allowlist + DB-CHECK unabhängig (Defense-in-Depth, falls diese
+// Ebene per direktem auth.signUp umgangen wird).
 export const signupSchema = z.object({
   email: z.string().email('Invalid email address.').max(254).toLowerCase().trim(),
   password: z.string().min(8, 'Password must be at least 8 characters.').max(128),
   brandName: z.string().trim().min(1, 'Name is required.').max(100),
-  sector: z.string().refine(isSector, { message: 'Invalid sector.' }),
+  signupChoice: z.string().refine(isSignupChoice, { message: 'Invalid selection.' }),
 })
 
 export const resetPasswordSchema = z

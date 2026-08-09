@@ -18,9 +18,9 @@ insert into auth.users (instance_id, id, aud, role, email, created_at, updated_a
   ('00000000-0000-0000-0000-000000000000','99999999-9999-4999-8999-999999999999','authenticated','authenticated','guest1@example.com',now(),now()),
   ('00000000-0000-0000-0000-000000000000','88888888-8888-4888-8888-888888888888','authenticated','authenticated','guest2@example.com',now(),now());
 
-insert into public.tenants (id, user_id, name, brand_name, sector, plan) values
-  ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Tenant A','Marke A','tourism','free'),
-  ('22222222-2222-4222-8222-222222222222','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Tenant B','Marke B','tourism','free');
+insert into public.tenants (id, user_id, name, brand_name, sector, business_type, plan) values
+  ('11111111-1111-4111-8111-111111111111','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Tenant A','Marke A','tourism','agency','free'),
+  ('22222222-2222-4222-8222-222222222222','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Tenant B','Marke B','tourism','agency','free');
 
 insert into public.events (id, tenant_id, name, date, campaign_type, flow_mode) values
   ('33333333-3333-4333-8333-333333333333','11111111-1111-4111-8111-111111111111','Agentur A',current_date,'agency','gallery');
