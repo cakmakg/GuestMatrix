@@ -17,10 +17,13 @@ type Props = {
 export default async function LoginPage({ searchParams }: Props) {
   const { error, next, message } = await searchParams
   const errorMessage = error ? (ERROR_MESSAGES[error] ?? 'Ein Fehler ist aufgetreten.') : null
-  const successMessage =
-    message === 'password-reset-success'
-      ? 'Passwort erfolgreich geändert. Bitte melden Sie sich an.'
-      : null
+  const SUCCESS_MESSAGES: Record<string, string> = {
+    'password-reset-success': 'Passwort erfolgreich geändert. Bitte melden Sie sich an.',
+    'signup-success':
+      'Registrierung erfolgreich. Falls E-Mail-Bestätigung aktiv ist, bestätigen Sie bitte Ihre E-Mail und melden Sie sich anschließend an.',
+    confirmed: 'E-Mail bestätigt. Bitte melden Sie sich an.',
+  }
+  const successMessage = message ? (SUCCESS_MESSAGES[message] ?? null) : null
 
   return (
     <main style={styles.main}>
@@ -66,6 +69,9 @@ export default async function LoginPage({ searchParams }: Props) {
 
         <a href="/forgot-password" style={styles.link}>
           Passwort vergessen?
+        </a>
+        <a href="/signup" style={styles.link}>
+          Noch kein Konto? Registrieren
         </a>
       </div>
     </main>
