@@ -15,6 +15,7 @@ type GalleryItem = {
   media_url: string | null
   file_type: 'image' | 'video'
   uploaded_at: string | null
+  comment: string | null
 }
 
 export async function GET(
@@ -62,7 +63,7 @@ export async function GET(
     // ── Fetch approved gallery items ───────────────────────────────────────────
     const { data: submissions } = await supabase
       .from('submissions')
-      .select('id, media_url, file_type, uploaded_at')
+      .select('id, media_url, file_type, uploaded_at, comment')
       .eq('event_id', eventId)
       .eq('moderation_flag', false)
       .is('deleted_at', null)
@@ -98,6 +99,7 @@ export async function GET(
         mediaUrl: urlMap.get(s.media_url!)!,
         fileType: s.file_type,
         uploadedAt: s.uploaded_at,
+        caption: s.comment,
       }))
 
     return Response.json({ eventName: event.name, items })
