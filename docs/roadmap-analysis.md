@@ -103,3 +103,8 @@ Beachhead frei:
 - `auth/callback`-Flow (PKCE-Code-Exchange) statt des vorläufigen `/login?message=confirmed`.
 - Produktions-SMTP + E-Mail-Templates (Bestätigung, Passwort-Reset) mit Tenant-Marke.
 - Ob `plan` (`free`/`pro`) schon in Phase 1 an eine Kontingent-Grenze gebunden wird.
+- **`auth.users`-Bereinigungsstrategie:** Beim `0017`-Cloud-Apply (2026-08-09) standen ~20
+  verwaiste/anonyme `auth.users`-Einträge ohne Tenant (Alt-Anonymgäste + Nutzer vor dem
+  `0014`-Trigger). Sie beeinflussen Migrationen nicht (`0017` liest nur `tenants`), akkumulieren
+  aber unbegrenzt. Nötig: TTL/Cron für anonyme Gast-Sessions + Aufräumen tenant-loser
+  Nicht-Anonym-Nutzer (vgl. R2/R3).
