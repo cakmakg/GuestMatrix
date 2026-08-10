@@ -6,22 +6,26 @@
 
 ## Invariante (aktueller Zustand)
 
-**Aktiv sind `tourism / agency / gallery` (+ Feedback-Katalog) UND `tourism / stay / feedback`**
-(Hotel-Feedback; seit Migration `0009`). Der frühere Kampagnentyp `tour` wurde von
+**Aktiv sind `tourism / agency / gallery` (+ Feedback-Katalog), `tourism / stay / feedback`**
+(Hotel-Feedback; seit Migration `0009`) **UND `event / wedding / guestbook`** (Hochzeit/Event;
+seit Migration `0018`). Der frühere Kampagnentyp `tour` wurde von
 `0016_remodel_tour_to_agency.sql` zu `agency` umbenannt (Beachhead-Repositionierung auf
 Reiseagenturen), behält den gallery-Flow und erhielt einen strukturierten Feedback-Katalog
 (Reiseerlebnis + Agentur-Service) — kein neuer flow_mode, nur die vorhandene gallery+
 feedback_answers-Mechanik. Die Garantie besteht aus zwei Schichten:
 
-1. **DB-CHECK**: `tenants.sector = 'tourism'` (0006). `events.campaign_type in ('agency', 'stay')`
-   (0016 tauschte `tour`→`agency`) und `events.flow_mode in ('gallery', 'feedback')` —
+1. **DB-CHECK**: `tenants.sector in ('tourism', 'event')` (0006 verengte auf tourism, `0018` öffnete
+   event). `events.campaign_type in ('agency', 'stay', 'wedding')` (0016 tauschte `tour`→`agency`,
+   0018 ergänzte `wedding`) und `events.flow_mode in ('gallery', 'feedback', 'guestbook')` —
    `0006_lockdown_tourism_gallery.sql` verengte auf je einen Wert, `0009_reopen_tourism_stay_feedback.sql`
-   erweiterte um stay/feedback. Weiterhin **nicht speicherbar**: `flow_mode = 'guestbook'` sowie die
-   Sektoren `real_estate`/`event`/`agency` (der gleichnamige DORMANTE Sektor `lib/sectors/agency/`;
-   nicht zu verwechseln mit dem AKTIVEN Kampagnentyp `agency` im tourism-Sektor) — eine solche Zeile
-   kann physisch nicht existieren.
-2. **Registry** (`lib/sectors/index.ts`): `tourism` mit `agency` + `stay` sind in `SECTORS` +
-   `CAMPAIGN_TYPES` eingetragen. UI, Validierung und Gäste-Flow leiten sich vollständig hieraus ab.
+   erweiterte um stay/feedback, `0018_activate_event_wedding_guestbook.sql` um wedding/guestbook.
+   Weiterhin **nicht speicherbar**: der Sektor `real_estate` sowie der DORMANTE Sektor
+   `lib/sectors/agency/` (nicht zu verwechseln mit dem AKTIVEN Kampagnentyp `agency` im
+   tourism-Sektor) und dessen Kampagnentyp `trip`/`property` — eine solche Zeile kann physisch
+   nicht existieren.
+2. **Registry** (`lib/sectors/index.ts`): `tourism` mit `agency` + `stay` und `event` mit `wedding`
+   sind in `SECTORS` + `CAMPAIGN_TYPES` eingetragen. UI, Validierung und Gäste-Flow leiten sich
+   vollständig hieraus ab.
 
 **business_type-Unterrolle (0017): `hotel` vs. `agency` INNERHALB von tourism.** Der tourism-Sektor
 ist in zwei Geschäftsmodelle geteilt (`tenants.business_type` ∈ {hotel, agency}) — KEIN Sektor-Split.
@@ -45,25 +49,29 @@ guest-sichtbaren Modus reaktiviert, muss `public_gallery_select` erneut prüfen*
 
 ## Vorhandener Code als Vorlage (dormant, nicht gelöscht)
 
-| Konzept                           | Ort (deaktiviert/dormant)                                             |
-| --------------------------------- | --------------------------------------------------------------------- |
-| Sektor-Modul `event` (Momento)    | `lib/sectors/event/index.ts`                                          |
-| Sektor-Modul `real_estate`        | `lib/sectors/real_estate/index.ts`                                    |
-| Sektor-Modul `agency` (Reisebüro) | `lib/sectors/agency/index.ts`                                         |
-| Flow-Modus-Capabilities/Labels    | `lib/sectors/types.ts` (`FLOW_MODE_CAPABILITIES`, `FLOW_MODE_LABELS`) |
-| Gäste-Flow `guestbook`            | `app/e/[eventId]/GuestbookFlow.tsx`                                   |
-| Route Gästebuch-Gruß              | `app/api/events/[eventId]/_guestbook/route.ts`                        |
+| Konzept                                               | Ort (deaktiviert/dormant)                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| Sektor-Modul `real_estate`                            | `lib/sectors/real_estate/index.ts`                             |
+| Sektor-Modul `agency` (Reisebüro)                     | `lib/sectors/agency/index.ts`                                  |
+| Breite Typ-Tupel (halten dormanten Code kompilierbar) | `lib/sectors/types.ts` (`SECTOR_TUPLE`, `CAMPAIGN_TYPE_TUPLE`) |
 
 > `feedback` ist NICHT mehr dormant: `FeedbackFlow.tsx` + `app/api/events/[eventId]/feedback/route.ts`
 > (ohne `_`) sind seit `0009` aktiv (Hotel/`stay`). Ergänzend liefert `0010` die RPC `attach_feedback`
 > (rating/comment an einen Medien-Beitrag anhängen, ownership-geprüft).
 >
+> Auch `guestbook` ist NICHT mehr dormant: seit `0018` sind der Sektor `event` (`lib/sectors/event/`),
+> `GuestbookFlow.tsx` und `app/api/events/[eventId]/guestbook/route.ts` (ohne `_`) aktiv
+> (Hochzeit/`wedding`, geschlossenes Gästebuch). Damit sind **alle drei** Flow-Modi
+> (`gallery`/`feedback`/`guestbook`) aktiv; dormant bleiben nur noch ganze Sektoren (`real_estate`,
+> `agency`), deren Werte `lib/sectors/types.ts` bewusst breit in den Tupeln hält.
+>
 > Die **Self-Service-Registrierung** ist ebenfalls NICHT mehr dormant: `app/signup/` (ohne `_`) ist
-> aktiv. Der **Sektor wird bei der Registrierung gewählt** (aus der aktiven Registry; aktuell nur
-> `tourism`) und reist via `raw_user_meta_data` zum Trigger `handle_new_user` (`0015`). Dort greifen
-> zwei Schichten: Trigger-Allowlist (Spiegel von `SECTOR_TUPLE`) + DB-CHECK (`tenants.sector = 'tourism'`,
-> 0006). `real_estate`/`event`/`agency` bleiben CHECK-gesperrt — das Aktivieren eines dieser Sektoren
-> öffnet den CHECK und macht ihn damit automatisch auch im Signup auswählbar.
+> aktiv. Der **Sektor wird bei der Registrierung gewählt** (aus der aktiven Registry; aktuell `tourism`
+> und `event`) und reist via `raw_user_meta_data` zum Trigger `handle_new_user` (`0015`). Dort greifen
+> zwei Schichten: Trigger-Allowlist (Spiegel von `SECTOR_TUPLE`) + DB-CHECK
+> (`tenants.sector in ('tourism', 'event')`; 0006 verengte auf tourism, `0018` öffnete event).
+> `real_estate` und der dormante Sektor `agency` bleiben CHECK-gesperrt — das Aktivieren eines dieser
+> Sektoren öffnet den CHECK und macht ihn damit automatisch auch im Signup auswählbar.
 >
 > **Immutabilität von Sektor + business_type (Stand 0017).** Beide sind nach der Registrierung
 > unveränderlich. `tenants` hat eine UPDATE-Policy `tenant_update_own` (schon aus 0001), die 0017 um
@@ -82,24 +90,29 @@ Registry-Eintrag + CHECK erweitern (+ ggf. RLS-Audit) — keine Typänderungen n
 
 ## Rezept — einen deaktivierten Sektor/Modus aktivieren
 
-Beispiel: `event` / `wedding` / `guestbook` wieder aktivieren. (Ein bereits durchgeführtes, echtes
-Beispiel dieses Rezepts ist `tourism / stay / feedback` in Migration `0009` — inklusive Schritt 4,
-dem B1-Gallery-Audit via `is_gallery_event`.)
+Beispiel (das verbleibende dormante Ziel): `real_estate` / `property` aktivieren. Zwei bereits
+durchgeführte, echte Beispiele dieses Rezepts: `tourism / stay / feedback` (Migration `0009`) und
+`event / wedding / guestbook` (Migration `0018`) — beide inklusive Schritt 4, dem B1-Gallery-Audit
+via `is_gallery_event`. `0018` ist zusätzlich das Muster, falls der reaktivierte Modus zuvor dormant
+war (Gäste-Flow-Zweig + Route-Entsperrung, s. Schritt 5); `property` dagegen nutzt die schon aktiven
+Modi `gallery`/`feedback` und braucht diesen Teil nicht.
 
 1. **Migration — CHECK erweitern** (neue Datei `supabase/migrations/00NN_*.sql`, drop + recreate):
 
    ```sql
    alter table public.tenants drop constraint if exists tenants_sector_check;
    alter table public.tenants add constraint tenants_sector_check
-     check (sector in ('tourism', 'event'));
+     check (sector in ('tourism', 'event', 'real_estate'));
 
    alter table public.events drop constraint if exists events_campaign_type_check;
    alter table public.events add constraint events_campaign_type_check
-     check (campaign_type in ('tour', 'wedding'));
+     check (campaign_type in ('agency', 'stay', 'wedding', 'property'));
 
+   -- property nutzt gallery ODER feedback (allowFlowModeChoice) — beide bereits aktiv,
+   -- daher KEIN neuer flow_mode-Wert nötig. Nur ein WIRKLICH neuer Modus wird hier ergänzt.
    alter table public.events drop constraint if exists events_flow_mode_check;
    alter table public.events add constraint events_flow_mode_check
-     check (flow_mode in ('gallery', 'guestbook'));
+     check (flow_mode in ('gallery', 'feedback', 'guestbook'));
    ```
 
    Danach `npx supabase gen types typescript --local > types/database.ts`.
@@ -110,27 +123,27 @@ dem B1-Gallery-Audit via `is_gallery_event`.)
    Tabelle ebenfalls nicht vergessen.
 
 2. **Registry — Modul eintragen** (`lib/sectors/index.ts`): das Modul importieren und in
-   `SECTORS` + `CAMPAIGN_TYPES` ergänzen (Vorlage: der bestehende `tourism`-Eintrag; das
-   `event`-Modul liegt bereits unter `lib/sectors/event/`):
+   `SECTORS` + `CAMPAIGN_TYPES` ergänzen (Vorlagen: die bestehenden `tourism`- und `event`-Einträge;
+   das `real_estate`-Modul liegt bereits unter `lib/sectors/real_estate/`):
 
    ```ts
-   import { event } from './event'
+   import { realEstate } from './real_estate'
    // ...
    export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
-     tourism: { label: tourism.label, campaignTypes: ['tour'] },
-     event: { label: event.label, campaignTypes: ['wedding'] },
+     // tourism + event sind bereits aktiv …
+     real_estate: { label: realEstate.label, campaignTypes: ['property'] },
    }
    export const CAMPAIGN_TYPES: Partial<Record<CampaignType, CampaignTypeConfig>> = {
-     tour: tourism.campaignTypes.tour,
-     wedding: event.campaignTypes.wedding,
+     // agency, stay, wedding sind bereits aktiv …
+     property: realEstate.campaignTypes.property,
    }
    ```
 
    `resolveFlowMode()` bleibt der einzige Dispatch-Punkt — nichts weiter zu ändern.
 
-3. **Capabilities/Labels prüfen**: für `guestbook`/`feedback` bereits in `lib/sectors/types.ts`
-   vorhanden. Ein **neuer** Modus braucht dort je einen `FLOW_MODE_CAPABILITIES`- und
-   `FLOW_MODE_LABELS`-Eintrag (und den Wert in `FLOW_MODE_TUPLE`).
+3. **Capabilities/Labels prüfen**: für `gallery`/`feedback` (property) — wie für alle drei aktiven
+   Modi — bereits in `lib/sectors/types.ts` vorhanden. Ein **neuer** Modus braucht dort je einen
+   `FLOW_MODE_CAPABILITIES`- und `FLOW_MODE_LABELS`-Eintrag (und den Wert in `FLOW_MODE_TUPLE`).
 
 4. **Sicherheit — RLS-Audit (PFLICHT bei guest-sichtbaren Daten):** Prüfe, ob der reaktivierte
    Modus Zeilen erzeugt, die über `public_gallery_select` / `public_select_events` an Gäste
@@ -139,12 +152,15 @@ dem B1-Gallery-Audit via `is_gallery_event`.)
    in `public_gallery_select` ergänzen — **in derselben Migration** wie Schritt 1 und mit Test
    (siehe Schritt 6, Isolationsprüfung).
 
-5. **Gäste-Flow + Route reaktivieren**:
-   - In `app/e/[eventId]/GuestFlow.tsx` den Dispatch-Zweig wieder ergänzen
-     (`if (flowMode === 'guestbook') return <GuestbookFlow {...rest} />`).
-   - Die Route zurückbenennen (`_`-Präfix entfernen): `app/api/events/[eventId]/_guestbook`
-     → `.../guestbook`. (Die Self-Service-Registrierung ist bereits aktiv und sektor-unabhängig;
-     sie muss beim Reaktivieren eines Sektors nicht mehr angefasst werden.)
+5. **Gäste-Flow + Route** — nur, wenn der reaktivierte Modus zuvor **dormant** war. `property` nutzt
+   die bereits aktiven Modi `gallery`/`feedback`; Dispatch-Zweig und Route existieren, hier ist NICHTS
+   zu tun. War der Modus dagegen dormant (Muster `0018`, `guestbook`), dann:
+   - In `app/e/[eventId]/GuestFlow.tsx` den Dispatch-Zweig ergänzen
+     (`0018`: `if (flowMode === 'guestbook') return <GuestbookFlow {...rest} />`).
+   - Die Route entsperren (`_`-Präfix entfernen), wie `0018` `app/api/events/[eventId]/_guestbook`
+     → `.../guestbook`.
+     Die Self-Service-Registrierung ist bereits aktiv und sektor-unabhängig; sie muss beim
+     Reaktivieren eines Sektors nicht mehr angefasst werden.
 
 6. **Tests** — mindestens:
    - `tests/sectors.test.ts`: aktive Registry-Erwartungen anpassen (`Object.keys(SECTORS)`,

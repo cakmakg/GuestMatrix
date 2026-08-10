@@ -26,25 +26,36 @@ import {
   resolveLabels,
   unknownAnswerKeys,
 } from '@/lib/sectors'
+import { event } from '@/lib/sectors/event'
 import { tourism } from '@/lib/sectors/tourism'
 
-// Aktiver Umfang (0006 Retrenchment + 0009 Öffnung + 0016 Remodel): Sektor tourism mit
-// agency (gallery + Feedback-Katalog) UND stay (feedback). Der frühere Kampagnentyp `tour`
-// wurde von 0016 zu `agency` umbenannt und behält den gallery-Flow. Weiterhin GESPERRT:
-// real_estate/event und der Modus guestbook — als Code vorhanden (types.ts hält die Tupel
-// breit), aber nicht registriert und per DB-CHECK nicht speicherbar. Diese Tests fixieren die
-// aktive Registry. Siehe docs/extension-points.md.
+// Aktiver Umfang (0006 Retrenchment + 0009 Öffnung + 0016 Remodel + 0018 Event): Sektor tourism mit
+// agency (gallery + Feedback-Katalog) UND stay (feedback) SOWIE Sektor event mit wedding (guestbook).
+// Der frühere Kampagnentyp `tour` wurde von 0016 zu `agency` umbenannt und behält den gallery-Flow;
+// 0018 hat event/wedding/guestbook geöffnet. Weiterhin GESPERRT: real_estate und der dormante Sektor
+// agency (nicht der aktive Kampagnentyp agency) — als Code vorhanden (types.ts hält die Tupel breit),
+// aber nicht registriert und per DB-CHECK nicht speicherbar. Diese Tests fixieren die aktive
+// Registry. Siehe docs/extension-points.md.
 
-describe('active registry: tourism with agency (gallery) + stay (feedback)', () => {
-  it('registers exactly the tourism sector with agency + stay', () => {
-    expect(Object.keys(SECTORS)).toEqual(['tourism'])
+describe('active registry: tourism (agency+stay) + event (wedding)', () => {
+  it('registers exactly the tourism and event sectors', () => {
+    expect(Object.keys(SECTORS)).toEqual(['tourism', 'event'])
     expect(SECTORS.tourism?.label).toBe(tourism.label)
     expect(SECTORS.tourism?.campaignTypes).toEqual(['agency', 'stay'])
+    expect(SECTORS.event?.label).toBe(event.label)
+    expect(SECTORS.event?.campaignTypes).toEqual(['wedding'])
   })
 
-  it('registers exactly the agency and stay campaign types', () => {
-    expect(Object.keys(CAMPAIGN_TYPES)).toEqual(['agency', 'stay'])
+  it('registers exactly the agency, stay and wedding campaign types', () => {
+    expect(Object.keys(CAMPAIGN_TYPES)).toEqual(['agency', 'stay', 'wedding'])
     expect(campaignTypesForSector('tourism')).toEqual(['agency', 'stay'])
+    expect(campaignTypesForSector('event')).toEqual(['wedding'])
+  })
+
+  it('event carries no business_type (non-tourism → tenants.business_type stays NULL)', () => {
+    expect(SECTORS.event?.businessTypes).toBeUndefined()
+    // allowedCampaignTypes fällt für business_type=null auf die Sektor-Typen zurück.
+    expect(allowedCampaignTypes('event', null)).toEqual(['wedding'])
   })
 
   it('agency is a gallery campaign with no operator flow-mode choice', () => {
@@ -60,46 +71,57 @@ describe('active registry: tourism with agency (gallery) + stay (feedback)', () 
     expect(config?.defaultFlowMode).toBe('feedback')
     expect(config?.allowFlowModeChoice).toBe(false)
   })
+
+  it('wedding is a guestbook campaign with no operator flow-mode choice', () => {
+    const config = getCampaignConfig('wedding')
+    expect(config?.sector).toBe('event')
+    expect(config?.defaultFlowMode).toBe('guestbook')
+    expect(config?.allowFlowModeChoice).toBe(false)
+  })
 })
 
 describe('deactivated sectors / campaign types / modes stay rejected', () => {
-  it('only tourism is a recognised sector', () => {
+  it('tourism and event are recognised sectors; real_estate + dormant agency are not', () => {
     expect(isSector('tourism')).toBe(true)
-    for (const s of ['real_estate', 'event', 'retail']) {
+    expect(isSector('event')).toBe(true)
+    // `agency` ist ein aktiver Kampagnentyp, aber der GLEICHNAMIGE Sektor bleibt dormant.
+    for (const s of ['real_estate', 'agency', 'retail']) {
       expect(isSector(s)).toBe(false)
     }
   })
 
-  it('agency and stay are recognised; the renamed tour and dormant types are not', () => {
+  it('agency, stay and wedding are recognised; the renamed tour and dormant types are not', () => {
     expect(isCampaignType('agency')).toBe(true)
     expect(isCampaignType('stay')).toBe(true)
+    expect(isCampaignType('wedding')).toBe(true)
     // `tour` wurde von 0016 zu `agency` umbenannt und ist kein Kampagnentyp mehr.
-    // `trip` ist der Kampagnentyp des DORMANTEN agency-Sektors (nicht registriert).
-    for (const t of ['tour', 'property', 'wedding', 'trip']) {
+    // `property` (real_estate) und `trip` (dormanter agency-Sektor) bleiben nicht registriert.
+    for (const t of ['tour', 'property', 'trip']) {
       expect(isCampaignType(t)).toBe(false)
     }
   })
 
   it('campaignTypesForSector returns empty for unregistered sectors', () => {
     expect(campaignTypesForSector('real_estate')).toEqual([])
-    expect(campaignTypesForSector('event')).toEqual([])
     expect(campaignTypesForSector('agency')).toEqual([])
   })
 
   it('getCampaignConfig returns undefined for still-deactivated types', () => {
-    expect(getCampaignConfig('wedding')).toBeUndefined()
     expect(getCampaignConfig('property')).toBeUndefined()
+    expect(getCampaignConfig('trip')).toBeUndefined()
   })
 
-  it('isValidCampaignForSector accepts tourism/agency + tourism/stay only', () => {
+  it('isValidCampaignForSector accepts the active sector/campaign pairs only', () => {
     expect(isValidCampaignForSector('tourism', 'agency')).toBe(true)
     expect(isValidCampaignForSector('tourism', 'stay')).toBe(true)
+    expect(isValidCampaignForSector('event', 'wedding')).toBe(true)
+    // Kreuz-Zuordnungen bleiben ungültig (Registry pinnt campaign_type an den Sektor).
     expect(isValidCampaignForSector('tourism', 'wedding')).toBe(false)
-    expect(isValidCampaignForSector('event', 'wedding')).toBe(false)
+    expect(isValidCampaignForSector('event', 'agency')).toBe(false)
   })
 })
 
-describe('flow-mode resolution: agency→gallery, stay→feedback', () => {
+describe('flow-mode resolution: agency→gallery, stay→feedback, wedding→guestbook', () => {
   it('agency always resolves to gallery, ignoring any chosen mode', () => {
     expect(resolveFlowMode('agency')).toBe('gallery')
     expect(resolveFlowMode('agency', 'feedback')).toBe('gallery')
@@ -111,9 +133,14 @@ describe('flow-mode resolution: agency→gallery, stay→feedback', () => {
     expect(resolveFlowMode('stay', 'gallery')).toBe('feedback')
   })
 
+  it('wedding always resolves to guestbook, ignoring any chosen mode', () => {
+    expect(resolveFlowMode('wedding')).toBe('guestbook')
+    expect(resolveFlowMode('wedding', 'gallery')).toBe('guestbook')
+  })
+
   it('deactivated campaign types fall back to gallery', () => {
-    expect(resolveFlowMode('wedding')).toBe('gallery')
     expect(resolveFlowMode('property', 'feedback')).toBe('gallery')
+    expect(resolveFlowMode('trip')).toBe('gallery')
   })
 
   it('isFlowModeAllowed matches each campaign default only', () => {
@@ -121,7 +148,8 @@ describe('flow-mode resolution: agency→gallery, stay→feedback', () => {
     expect(isFlowModeAllowed('agency', 'feedback')).toBe(false)
     expect(isFlowModeAllowed('stay', 'feedback')).toBe(true)
     expect(isFlowModeAllowed('stay', 'gallery')).toBe(false)
-    expect(isFlowModeAllowed('wedding', 'guestbook')).toBe(false)
+    expect(isFlowModeAllowed('wedding', 'guestbook')).toBe(true)
+    expect(isFlowModeAllowed('wedding', 'gallery')).toBe(false)
   })
 })
 
@@ -232,7 +260,11 @@ describe('business_type sub-role (tourism → hotel|agency)', () => {
 
 describe('signup options (flat business list, registry-driven)', () => {
   it('offers exactly the active (sector, business_type) combinations', () => {
-    expect(SIGNUP_OPTIONS.map((o) => o.value).sort()).toEqual(['tourism:agency', 'tourism:hotel'])
+    expect(SIGNUP_OPTIONS.map((o) => o.value).sort()).toEqual([
+      'event:',
+      'tourism:agency',
+      'tourism:hotel',
+    ])
   })
 
   it('each option maps to the correct sector + business type + label', () => {
@@ -243,29 +275,37 @@ describe('signup options (flat business list, registry-driven)', () => {
     const agency = getSignupOption('tourism:agency')
     expect(agency?.sector).toBe('tourism')
     expect(agency?.businessType).toBe('agency')
+    // event: sektor-transparente Option ohne business_type (business_type bleibt NULL).
+    const wedding = getSignupOption('event:')
+    expect(wedding?.sector).toBe('event')
+    expect(wedding?.businessType).toBeNull()
+    expect(wedding?.label).toBe(event.label)
   })
 
   it('isSignupChoice accepts only offered values; rejects raw sectors and garbage', () => {
     expect(isSignupChoice('tourism:hotel')).toBe(true)
     expect(isSignupChoice('tourism:agency')).toBe(true)
-    for (const v of ['tourism', 'tourism:', 'event:', 'tourism:bogus', 'hackerman']) {
+    expect(isSignupChoice('event:')).toBe(true)
+    // `tourism` ohne business_type ist ungültig; `event:wedding` ist ungültig (wedding ist ein
+    // campaign_type, keine business_type); `real_estate:` bleibt gesperrt.
+    for (const v of ['tourism', 'tourism:', 'event:wedding', 'real_estate:', 'hackerman']) {
       expect(isSignupChoice(v)).toBe(false)
     }
-    expect(getSignupOption('event:')).toBeUndefined()
+    expect(getSignupOption('real_estate:')).toBeUndefined()
   })
 })
 
-describe('guestbook stays dormant but type-guard-valid for future re-enablement', () => {
-  it('gallery/feedback are active flow-mode types; unknown strings are rejected', () => {
+describe('guestbook is active for event/wedding (0018)', () => {
+  it('gallery/feedback/guestbook are active flow-mode types; unknown strings are rejected', () => {
     expect(isFlowMode('gallery')).toBe(true)
     expect(isFlowMode('feedback')).toBe(true)
+    expect(isFlowMode('guestbook')).toBe(true)
     expect(isFlowMode('none')).toBe(false)
   })
 
-  it('guestbook remains a valid flow-mode *type* though no campaign can use it', () => {
-    // Der Typ bleibt (types.ts unverändert); die Sperre ist Registry + DB-CHECK, nicht das
-    // Typsystem. Die guestbook-Capabilities bleiben für eine spätere Wiederaktivierung erhalten.
-    expect(isFlowMode('guestbook')).toBe(true)
+  it('wedding drives the guestbook mode, which captures the guest name', () => {
+    expect(resolveFlowMode('wedding')).toBe('guestbook')
+    // guestbook ist der einzige Modus, der den Gastnamen erfasst (privater Gruß ans Brautpaar).
     expect(getCapabilities('guestbook').guestNameEnabled).toBe(true)
   })
 })

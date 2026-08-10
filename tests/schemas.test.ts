@@ -50,6 +50,8 @@ describe('signupSchema', () => {
     expect(signupSchema.safeParse({ ...validBase, signupChoice: 'tourism:agency' }).success).toBe(
       true,
     )
+    // event (0018) hat keine business_type → die Signup-Option ist `event:` (business_type leer).
+    expect(signupSchema.safeParse({ ...validBase, signupChoice: 'event:' }).success).toBe(true)
   })
 
   it('lowercases the email', () => {
@@ -76,14 +78,18 @@ describe('signupSchema', () => {
     ).toBe(false)
   })
 
-  it('rejects a raw sector value (must be a full sector:business_type choice)', () => {
-    for (const choice of ['tourism', 'tourism:', 'event:', 'real_estate:']) {
+  it('rejects a raw tourism sector value (must carry a business_type; event carries none)', () => {
+    // `event:` ist gültig (kein business_type), aber `tourism`/`tourism:` NICHT (tourism verlangt
+    // hotel|agency), und `real_estate:` bleibt gesperrt (Sektor nicht aktiv).
+    for (const choice of ['tourism', 'tourism:', 'real_estate:']) {
       expect(signupSchema.safeParse({ ...validBase, signupChoice: choice }).success).toBe(false)
     }
   })
 
   it('rejects a deactivated or garbage choice', () => {
-    for (const choice of ['tourism:bogus', 'event:wedding', 'hackerman']) {
+    // `event:wedding` ist ungültig: wedding ist ein campaign_type, keine business_type — die
+    // aktive event-Option ist `event:`. Ebenso deaktivierte/erfundene Werte.
+    for (const choice of ['tourism:bogus', 'event:wedding', 'real_estate:property', 'hackerman']) {
       expect(signupSchema.safeParse({ ...validBase, signupChoice: choice }).success).toBe(false)
     }
   })

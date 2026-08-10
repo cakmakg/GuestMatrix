@@ -5,15 +5,17 @@
  * Die Sektoren selbst werden vom Betreiber entwickelt und liegen je Sektor in einem
  * eigenen Ordner (`lib/sectors/<id>/`). Kein Sektor ist Standard.
  *
- * ── AKTIVER UMFANG (Retrenchment 0006 + Öffnung 0009 + Remodel 0016) ────────────
- * Aktiv registriert ist der Sektor tourism mit agency (gallery + Feedback-Katalog) UND
- * stay (feedback). Migration 0009 hat den CHECK auf flow_mode in (gallery, feedback) erweitert
- * und dabei ATOMAR public_gallery_select um is_gallery_event ergänzt (B1: Feedback-Kommentare
- * gelangen nie in die Gäste-Galerie); Migration 0016 hat den früheren Kampagnentyp `tour` zu
- * `agency` umbenannt (campaign_type in (agency, stay)), den gallery-Flow behalten und einen
- * agency-Feedback-Katalog ergänzt. Der Sektor bleibt 'tourism' (kein Sektorwechsel).
- * Weiterhin GESPERRT: die Sektoren `lib/sectors/event/` und `lib/sectors/real_estate/`
- * sowie der Modus guestbook — als Code vorhanden (types.ts hält die Tupel bewusst breit),
+ * ── AKTIVER UMFANG (Retrenchment 0006 + Öffnung 0009 + Remodel 0016 + Event 0018) ─
+ * Aktiv registriert sind der Sektor tourism mit agency (gallery + Feedback-Katalog) UND
+ * stay (feedback) sowie der Sektor event mit wedding (guestbook). Migration 0009 hat den CHECK auf
+ * flow_mode in (gallery, feedback) erweitert und dabei ATOMAR public_gallery_select um
+ * is_gallery_event ergänzt (B1: Feedback-Kommentare gelangen nie in die Gäste-Galerie); Migration
+ * 0016 hat den früheren Kampagnentyp `tour` zu `agency` umbenannt (campaign_type in (agency, stay)),
+ * den gallery-Flow behalten und einen agency-Feedback-Katalog ergänzt; Migration 0018 hat den Sektor
+ * event + wedding + flow_mode guestbook geöffnet (geschlossenes Gästebuch: Gäste sehen nur den
+ * eigenen Gruß, alle nur das Brautpaar) und dabei denselben B1-Audit erneut abgesichert.
+ * Weiterhin GESPERRT: der Sektor `lib/sectors/real_estate/` und der dormante Sektor
+ * `lib/sectors/agency/` — als Code vorhanden (types.ts hält die Tupel bewusst breit),
  * aber hier NICHT importiert/registriert und per DB-CHECK nicht speicherbar.
  *
  * ── Einen deaktivierten Sektor/Modus (wieder) aktivieren ────────────────────────
@@ -39,6 +41,7 @@ import type {
   SectorConfig,
 } from './types'
 import { FLOW_MODE_CAPABILITIES, FLOW_MODE_LABELS, FLOW_MODE_TUPLE } from './types'
+import { event } from './event'
 import { tourism } from './tourism'
 
 export * from './types'
@@ -51,11 +54,18 @@ export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
     campaignTypes: ['agency', 'stay'],
     businessTypes: tourism.businessTypes,
   },
+  // event (Hochzeit/Event) seit 0018 aktiv: ein Kampagnentyp `wedding` (Flow-Modus guestbook).
+  // Kein business_type (nicht-tourism → tenants.business_type bleibt NULL, tenants_business_type_check).
+  event: {
+    label: event.label,
+    campaignTypes: ['wedding'],
+  },
 }
 
 export const CAMPAIGN_TYPES: Partial<Record<CampaignType, CampaignTypeConfig>> = {
   agency: tourism.campaignTypes.agency,
   stay: tourism.campaignTypes.stay,
+  wedding: event.campaignTypes.wedding,
 }
 
 // business_type-Registry, KEYED auf business_type (nicht auf Sektor) — spiegelt die DB-Grenze
