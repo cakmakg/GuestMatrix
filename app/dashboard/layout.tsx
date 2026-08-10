@@ -7,7 +7,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   try {
     await requireTenantAuth()
   } catch {
-    redirect('/login')
+    // Authentifiziert, aber ohne Tenant (verwaister Auth-Nutzer) → NICHT direkt auf /login:
+    // die Middleware würde einen eingeloggten Nutzer sofort wieder auf /dashboard schicken
+    // (endlose /dashboard ↔ /login-307-Schleife). Stattdessen die Session über den
+    // Logout-Endpunkt löschen; danach ist /login wirklich erreichbar.
+    redirect('/api/auth/logout?next=/login')
   }
 
   return (

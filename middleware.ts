@@ -4,10 +4,24 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+const ACTIVITY_REFRESH_MS = 60 * 1000 // Aktivitäts-Cookie höchstens 1×/Minute neu schreiben
 const LAST_ACTIVE_COOKIE = 'gm_last_active'
 
 const PROTECTED_PREFIXES = ['/dashboard']
 const AUTH_PREFIXES = ['/login', '/signup', '/forgot-password', '/reset-password']
+
+/**
+ * @supabase/ssr-Pflicht: Gibt die Middleware statt `supabaseResponse` einen EIGENEN Response
+ * (hier: jede Redirect-Antwort) zurück, MÜSSEN die von getUser() ggf. erneuerten Auth-Cookies
+ * mitkopiert werden. Sonst geraten Browser und Server aus dem Takt und die Session wird vorzeitig
+ * beendet — der Login „klebt" nicht und man landet immer wieder auf /login.
+ */
+function withSessionCookies(source: NextResponse, target: NextResponse): NextResponse {
+  for (const cookie of source.cookies.getAll()) {
+    target.cookies.set(cookie)
+  }
+  return target
+}
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
@@ -65,7 +79,20 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   } = await supabase.auth.getUser()
 
   // ── 3. Idle timeout (tenant sessions only, not anonymous guests) ─────────────
-  if (user && !user.is_anonymous) {
+  // Den Logout-Endpunkt AUSNEHMEN: sonst trifft die Idle-Weiterleitung auch
+  // /api/auth/logout selbst und der Request erreicht nie den Handler, der die Session
+  // löscht — die Middleware leitet ihn immer wieder auf /api/auth/logout um
+  // (Redirect-Schleife, die getUser() flutet und in ein Auth-Rate-Limit 429 kippt).
+  //
+  // Prefetch-Requests AUSNEHMEN: sie sind spekulativ, keine echte Nutzeraktivität — sie dürfen
+  // den Idle-Timer nicht zurücksetzen und keine Logout-Weiterleitung auslösen. Vor allem aber
+  // würde ein bei jedem (Pre)fetch mitgesendetes, sich änderndes Set-Cookie (gm_last_active)
+  // den App-Router-Cache verwerfen und endlose Nachlade-Schleifen erzeugen (GET /dashboard …).
+  const isLogoutRoute = pathname.startsWith('/api/auth/logout')
+  const isPrefetch =
+    request.headers.get('next-router-prefetch') === '1' ||
+    request.headers.get('purpose') === 'prefetch'
+  if (user && !user.is_anonymous && !isLogoutRoute && !isPrefetch) {
     const lastActiveRaw = request.cookies.get(LAST_ACTIVE_COOKIE)?.value
     const lastActive = lastActiveRaw ? parseInt(lastActiveRaw, 10) : null
     const now = Date.now()
@@ -76,16 +103,21 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       url.pathname = '/api/auth/logout'
       url.searchParams.set('reason', 'idle_timeout')
       url.searchParams.set('next', '/login')
-      return NextResponse.redirect(url)
+      return withSessionCookies(supabaseResponse, NextResponse.redirect(url))
     }
 
-    supabaseResponse.cookies.set(LAST_ACTIVE_COOKIE, String(now), {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    })
+    // Cookie nur setzen, wenn es sich wirklich ändert (max. 1×/Minute). Ein bei JEDEM Request
+    // neu geschriebenes Set-Cookie würde den Router-Cache thrashen und die Nachlade-Schleife
+    // selbst dann auslösen, wenn der Request kein Prefetch ist.
+    if (lastActive === null || now - lastActive > ACTIVITY_REFRESH_MS) {
+      supabaseResponse.cookies.set(LAST_ACTIVE_COOKIE, String(now), {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      })
+    }
   }
 
   // ── 4. Protected route guard ─────────────────────────────────────────────────
@@ -94,7 +126,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('next', pathname)
-    return NextResponse.redirect(url)
+    return withSessionCookies(supabaseResponse, NextResponse.redirect(url))
   }
 
   // ── 5. Redirect authenticated tenants away from auth pages ──────────────────
@@ -102,7 +134,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (isAuthPage && user && !user.is_anonymous) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+    return withSessionCookies(supabaseResponse, NextResponse.redirect(url))
   }
 
   return supabaseResponse

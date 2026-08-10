@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { logger } from '@/lib/logger'
@@ -44,6 +44,18 @@ export async function loginAction(formData: FormData): Promise<never> {
     logger.warn('[auth] login_failed', { ip, code: error.code })
     redirect('/login?error=invalid_credentials')
   }
+
+  // Idle-Uhr für die frische Session zurücksetzen. Ein veraltetes gm_last_active (aus einer
+  // früheren Session, das die Middleware als „inaktiv" liest) würde den gerade eingeloggten
+  // Nutzer sonst sofort wieder ausloggen. Attribute wie in der Middleware.
+  const cookieStore = await cookies()
+  cookieStore.set('gm_last_active', String(Date.now()), {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  })
 
   // Open-Redirect-Schutz: nur interne Pfade erlaubt
   const next = String(formData.get('next') ?? '/dashboard')
