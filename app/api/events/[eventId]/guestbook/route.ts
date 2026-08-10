@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
 import { requireAnyAuth } from '@/lib/auth/session'
+import { invalidAnswerTypes, isCampaignType, unknownAnswerKeys } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { eventIdParam, guestbookMessageSchema } from '@/lib/validation/schemas'
 
@@ -27,7 +28,7 @@ export async function POST(
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid request.')
     }
-    const { guestName, message } = parsed.data
+    const { guestName, message, answers } = parsed.data
 
     // Server client so RLS enforces guest_user_id = auth.uid()
     const supabase = await createSupabaseServerClient()
@@ -35,11 +36,27 @@ export async function POST(
     // Public RLS policy allows any authenticated user to read events.
     const { data: event } = await supabase
       .from('events')
-      .select('id, tenant_id')
+      .select('id, tenant_id, campaign_type')
       .eq('id', eventId)
-      .single<{ id: string; tenant_id: string }>()
+      .single<{ id: string; tenant_id: string; campaign_type: string }>()
 
     if (!event) throw new NotFoundError('Event')
+
+    // Strukturierte Antworten: Schlüssel-Zugehörigkeit UND Wert-Typ gegen den Katalog prüfen
+    // (UX / frühe klare Ablehnung). Der DB-Trigger validiert erneut (jsonb ist schemalos).
+    if (answers) {
+      if (!isCampaignType(event.campaign_type)) {
+        throw new ValidationError('Feedback answers are not accepted for this campaign.')
+      }
+      const unknown = unknownAnswerKeys(event.campaign_type, answers)
+      if (unknown.length > 0) {
+        throw new ValidationError(`Unknown feedback answer(s): ${unknown.join(', ')}.`)
+      }
+      const badTypes = invalidAnswerTypes(event.campaign_type, answers)
+      if (badTypes.length > 0) {
+        throw new ValidationError(`Invalid answer type(s): ${badTypes.join(', ')}.`)
+      }
+    }
 
     const now = new Date().toISOString()
     // consent_at is set server-side — the client cannot falsify the timestamp.
@@ -52,6 +69,8 @@ export async function POST(
         guest_user_id: userId,
         guest_name: guestName,
         comment: message,
+        // Optionale strukturierte Antworten (z. B. Hochzeit „drei Worte"); der DB-Trigger validiert.
+        feedback_answers: answers ?? null,
         consent_at: now,
         uploaded_at: now,
       })

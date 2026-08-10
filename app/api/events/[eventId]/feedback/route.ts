@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
 import { requireAnyAuth } from '@/lib/auth/session'
-import { isCampaignType, unknownAnswerKeys } from '@/lib/sectors'
+import { invalidAnswerTypes, isCampaignType, unknownAnswerKeys } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { eventIdParam, feedbackSchema } from '@/lib/validation/schemas'
 
@@ -51,6 +51,10 @@ export async function POST(
       const unknown = unknownAnswerKeys(event.campaign_type, answers)
       if (unknown.length > 0) {
         throw new ValidationError(`Unknown feedback answer(s): ${unknown.join(', ')}.`)
+      }
+      const badTypes = invalidAnswerTypes(event.campaign_type, answers)
+      if (badTypes.length > 0) {
+        throw new ValidationError(`Invalid answer type(s): ${badTypes.join(', ')}.`)
       }
     }
 

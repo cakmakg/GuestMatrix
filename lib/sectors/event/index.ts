@@ -23,6 +23,16 @@ export const event = {
         namePrompt: 'Euer Name',
         namePlaceholder: 'Von wem ist der Gruß?',
       },
+      // Optionale, verspielte Kurzfrage (Freitext). Landet generisch in feedback_answers.three_words;
+      // der Werttyp (string) wird von Zod, Handler und DB (0019) erzwungen. `id` ist STABIL.
+      questions: [
+        {
+          id: 'three_words',
+          prompt: 'Beschreibt die Feier in drei Worten',
+          type: 'text',
+          maxLength: 60,
+        },
+      ],
     },
   },
 } satisfies SectorModule

@@ -97,10 +97,12 @@ export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successTe
 // ─── Strukturiertes Feedback (Feedback-Anreicherung) ──────────────────────────
 
 /**
- * Eine strukturierte Feedback-Frage (v1: nur Sterne-Bewertung 1–5; weitere Typen wie 'text'
- * später). Der Katalog je Kampagnentyp liegt im Sektor-Modul; die Antworten landen generisch
- * in `submissions.feedback_answers` unter `id`. `id` ist deshalb ein STABILER Schlüssel und
- * darf nie geändert werden (sonst verwaisen alte Antworten).
+ * Eine strukturierte Feedback-Frage. Zwei Werttypen: `rating` (Sterne 1–5, Wert `number`) und
+ * `text` (freie Kurzantwort, Wert `string`, z. B. Hochzeit „drei Worte"). Der Katalog je
+ * Kampagnentyp liegt im Sektor-Modul; die Antworten landen generisch in
+ * `submissions.feedback_answers` unter `id`. `id` ist deshalb ein STABILER Schlüssel und darf nie
+ * geändert werden (sonst verwaisen alte Antworten). Der Werttyp wird an ALLEN Ebenen erzwungen:
+ * Zod (Form), Handler (`invalidAnswerTypes`) und DB (`validate_feedback_answers`, Migration 0019).
  *
  * Compliance: Alle Fragen sind OPTIONAL („anbieten, nicht erzwingen"). Es gibt KEIN
  * Rating-Gating — nirgends wird nach der Bewertung verzweigt, um zufriedene Gäste zu
@@ -109,7 +111,9 @@ export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successTe
 export type FeedbackQuestion = {
   id: string
   prompt: string
-  type: 'rating'
+  type: 'rating' | 'text'
+  // Nur bei type: 'text' — Maximallänge der freien Antwort in Zeichen. Die DB erzwingt sie erneut.
+  maxLength?: number
 }
 
 // ─── Kampagnentyp + Sektor-Modul ──────────────────────────────────────────────

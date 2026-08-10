@@ -14,6 +14,7 @@ import {
   getCapabilities,
   getFeedbackQuestions,
   getSignupOption,
+  invalidAnswerTypes,
   isBusinessType,
   isCampaignType,
   isFlowMode,
@@ -218,6 +219,38 @@ describe('structured feedback catalog (agency on gallery + stay on feedback)', (
     expect(unknownAnswerKeys('stay', { cleanliness: 5, value: 3 })).toEqual([])
     expect(unknownAnswerKeys('stay', { cleanliness: 5, bogus: 3 })).toEqual(['bogus'])
     expect(unknownAnswerKeys('agency', {})).toEqual([])
+  })
+})
+
+describe('wedding fun prompt: optional text feedback question (0019)', () => {
+  it('wedding exposes a single optional text question with a stable id + maxLength', () => {
+    const questions = getFeedbackQuestions('wedding')
+    expect(questions).toHaveLength(1)
+    const q = questions[0]
+    expect(q?.id).toBe('three_words')
+    expect(q?.type).toBe('text')
+    expect(q?.maxLength).toBe(60)
+  })
+
+  it('resolveLabels carries the wedding text catalog on the guestbook mode', () => {
+    expect(resolveLabels('wedding', 'guestbook').questions).toEqual(getFeedbackQuestions('wedding'))
+  })
+
+  it('unknownAnswerKeys accepts three_words and rejects everything else for wedding', () => {
+    expect(unknownAnswerKeys('wedding', { three_words: 'schön laut emotional' })).toEqual([])
+    expect(unknownAnswerKeys('wedding', { bogus: 'x' })).toEqual(['bogus'])
+  })
+
+  it('invalidAnswerTypes enforces the value type per question kind (text→string, rating→number)', () => {
+    // wedding.three_words is a text question → string ok, a number is a type mismatch.
+    expect(invalidAnswerTypes('wedding', { three_words: 'drei worte' })).toEqual([])
+    expect(invalidAnswerTypes('wedding', { three_words: 5 })).toEqual(['three_words'])
+    // stay/agency are rating questions → number ok, a string is a type mismatch (regression guard).
+    expect(invalidAnswerTypes('stay', { cleanliness: 4 })).toEqual([])
+    expect(invalidAnswerTypes('stay', { cleanliness: 'sauber' })).toEqual(['cleanliness'])
+    expect(invalidAnswerTypes('agency', { experience: 5 })).toEqual([])
+    // Unknown keys are ignored here — that is unknownAnswerKeys' job.
+    expect(invalidAnswerTypes('wedding', { bogus: 5 })).toEqual([])
   })
 })
 

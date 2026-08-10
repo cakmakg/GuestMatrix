@@ -204,6 +204,13 @@ describe('presignSchema', () => {
     }
   })
 
+  it('accepts optional structured answers (e.g. wedding three_words as text)', () => {
+    expect(
+      presignSchema.safeParse({ ...validBase, answers: { three_words: 'schön laut emotional' } })
+        .success,
+    ).toBe(true)
+  })
+
   it('accepts all allowed MIME types', () => {
     for (const mimeType of ['image/jpeg', 'image/png', 'video/mp4', 'video/quicktime'] as const) {
       expect(presignSchema.safeParse({ ...validBase, mimeType }).success).toBe(true)
@@ -290,6 +297,18 @@ describe('feedbackSchema', () => {
     expect(feedbackSchema.safeParse({ answers: { cleanliness: 5, service: 4 } }).success).toBe(true)
   })
 
+  it('accepts a string answer at the form level (value type/key checked downstream)', () => {
+    // Zod prüft nur die Form: rating (Zahl 1–5) ODER Text (String). Die Zuordnung Wert-Typ ↔
+    // Fragentyp erledigt der Handler (invalidAnswerTypes) + die DB (validate_feedback_answers).
+    expect(
+      feedbackSchema.safeParse({ answers: { three_words: 'schön laut emotional' } }).success,
+    ).toBe(true)
+  })
+
+  it('rejects a blank string answer (min length 1 after trim)', () => {
+    expect(feedbackSchema.safeParse({ answers: { three_words: '   ' } }).success).toBe(false)
+  })
+
   it('rejects an answer value out of the 1–5 range', () => {
     expect(feedbackSchema.safeParse({ answers: { cleanliness: 0 } }).success).toBe(false)
     expect(feedbackSchema.safeParse({ answers: { cleanliness: 6 } }).success).toBe(false)
@@ -306,6 +325,13 @@ describe('guestbookMessageSchema', () => {
 
   it('accepts a name + message with consent', () => {
     expect(guestbookMessageSchema.safeParse(validBase).success).toBe(true)
+  })
+
+  it('accepts optional structured answers alongside the greeting', () => {
+    expect(
+      guestbookMessageSchema.safeParse({ ...validBase, answers: { three_words: 'drei worte' } })
+        .success,
+    ).toBe(true)
   })
 
   it('trims name and message', () => {

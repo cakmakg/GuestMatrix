@@ -50,6 +50,8 @@ export default function GuestbookFlow({
   const [consentChecked, setConsentChecked] = useState(false)
   const [name, setName] = useState('')
   const [message, setMessage] = useState('')
+  // Optionale strukturierte Kurzfragen (z. B. „drei Worte"), key = Fragen-id.
+  const [answers, setAnswers] = useState<Record<string, string>>({})
   const [files, setFiles] = useState<File[]>([])
   const [progress, setProgress] = useState(0)
   const [fileIndex, setFileIndex] = useState(0)
@@ -78,7 +80,12 @@ export default function GuestbookFlow({
   }, [])
 
   const uploadOne = useCallback(
-    async (file: File, trimmedName: string, trimmedMessage: string): Promise<string> => {
+    async (
+      file: File,
+      trimmedName: string,
+      trimmedMessage: string,
+      answersPayload?: Record<string, string>,
+    ): Promise<string> => {
       const presignRes = await fetch('/api/submissions/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,6 +96,7 @@ export default function GuestbookFlow({
           consent: true,
           guestName: trimmedName,
           message: trimmedMessage !== '' ? trimmedMessage : undefined,
+          answers: answersPayload,
         }),
       })
       if (!presignRes.ok) {
@@ -127,14 +135,26 @@ export default function GuestbookFlow({
     setProgress(0)
     setFileIndex(0)
 
+    // Strukturierte Antworten (z. B. „drei Worte") einmalig senden: am ersten Medienbeitrag, sonst
+    // am medienlosen Gruß. Leere Felder werden weggelassen (alle Fragen sind optional).
+    const trimmedAnswers: Record<string, string> = {}
+    for (const [key, value] of Object.entries(answers)) {
+      const v = value.trim()
+      if (v !== '') trimmedAnswers[key] = v
+    }
+    const answersPayload = Object.keys(trimmedAnswers).length > 0 ? trimmedAnswers : undefined
+
     try {
       const ids: string[] = []
 
-      // Beiträge mit Medien: pro Datei ein Submission-Datensatz (Name + Gruß je Datei).
+      // Beiträge mit Medien: pro Datei ein Submission-Datensatz (Name + Gruß je Datei). Die
+      // Antworten hängen nur am ERSTEN Beitrag (einmal pro Gast, nicht pro Datei).
       for (const [i, file] of files.entries()) {
         setFileIndex(i)
         setProgress(0)
-        ids.push(await uploadOne(file, trimmedName, trimmedMessage))
+        ids.push(
+          await uploadOne(file, trimmedName, trimmedMessage, i === 0 ? answersPayload : undefined),
+        )
       }
 
       // Reiner Glückwunsch ohne Medien: separater medienloser Beitrag.
@@ -142,7 +162,12 @@ export default function GuestbookFlow({
         const res = await fetch(`/api/events/${eventId}/guestbook`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guestName: trimmedName, message: trimmedMessage, consent: true }),
+          body: JSON.stringify({
+            guestName: trimmedName,
+            message: trimmedMessage,
+            consent: true,
+            answers: answersPayload,
+          }),
         })
         if (!res.ok) {
           const body = (await res.json()) as { error?: string }
@@ -158,7 +183,7 @@ export default function GuestbookFlow({
       setError(err instanceof Error ? err.message : 'Senden fehlgeschlagen.')
       setStep('form')
     }
-  }, [name, message, files, eventId, uploadOne])
+  }, [name, message, answers, files, eventId, uploadOne])
 
   const handleDelete = useCallback(async () => {
     if (submissionIds.length === 0) return
@@ -245,6 +270,29 @@ export default function GuestbookFlow({
                          resize-none"
             />
           </div>
+
+          {/* Optionale strukturierte Kurzfragen (Freitext) aus dem Kampagnentyp-Katalog. */}
+          {labels.questions
+            .filter((q) => q.type === 'text')
+            .map((q) => (
+              <div key={q.id}>
+                <label
+                  htmlFor={`q-${q.id}`}
+                  className="block text-sm font-medium text-gray-700 mb-1.5"
+                >
+                  {q.prompt} <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <input
+                  id={`q-${q.id}`}
+                  type="text"
+                  maxLength={q.maxLength ?? 280}
+                  value={answers[q.id] ?? ''}
+                  onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+            ))}
 
           <div>
             <div

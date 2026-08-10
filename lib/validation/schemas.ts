@@ -85,6 +85,18 @@ export const createEventSchema = z.object({
 
 // ─── Submissions ──────────────────────────────────────────────────────────────
 
+// Strukturierte Zusatzantworten, generisch als { fragenId: Wert } gespeichert. Zwei Werttypen:
+// rating (Zahl 1–5) und text (String). Das Zod-Schema prüft NUR die FORM (beide Typen erlaubt); die
+// Zuordnung Wert-Typ ↔ Fragentyp macht der Handler (invalidAnswerTypes) und — als letzte
+// Verteidigungslinie — die DB (validate_feedback_answers, Migration 0019), da jsonb schemalos ist.
+export const feedbackAnswersSchema = z.record(
+  z.string(),
+  z.union([
+    z.number({ invalid_type_error: 'Answer must be a number.' }).int().min(1).max(5),
+    z.string().trim().min(1).max(280),
+  ]),
+)
+
 // fileName is sanitised on the server; the field exists only for UX (original name display).
 // The actual storage path is always server-generated.
 export const presignSchema = z.object({
@@ -101,6 +113,8 @@ export const presignSchema = z.object({
   // Nur im guestbook-Modus mitgesendet: Name + Glückwunsch am Medienbeitrag.
   guestName: guestName.optional(),
   message: z.string().max(1000, 'Message is too long.').trim().optional(),
+  // Optionale strukturierte Antworten (z. B. Hochzeit „drei Worte") am Medienbeitrag.
+  answers: feedbackAnswersSchema.optional(),
 })
 
 // Gästebuch-Modus (Event/Hochzeit) ohne Medien: reiner Glückwunsch mit Name.
@@ -109,6 +123,8 @@ export const guestbookMessageSchema = z.object({
   guestName,
   message: z.string().trim().min(1, 'Message is required.').max(1000),
   consent,
+  // Optionale strukturierte Antworten (z. B. Hochzeit „drei Worte") am medienlosen Gruß.
+  answers: feedbackAnswersSchema.optional(),
 })
 
 export const moderationSchema = z.object({
@@ -118,15 +134,6 @@ export const moderationSchema = z.object({
 export const ratingSchema = z.object({
   rating: z.number({ invalid_type_error: 'Rating must be a number.' }).int().min(1).max(5),
 })
-
-// Strukturierte Zusatzantworten: { fragenId: 1..5 }. Das Zod-Schema prüft NUR Form + Wertebereich
-// (UX / schnelle Ablehnung). Die Schlüssel-Zugehörigkeit zum Kampagnentyp-Katalog prüft der
-// Handler (unknownAnswerKeys); als letzte Verteidigungslinie validiert zusätzlich die DB
-// (attach_feedback-Körper + Trigger), da jsonb schemalos ist.
-export const feedbackAnswersSchema = z.record(
-  z.string(),
-  z.number({ invalid_type_error: 'Answer must be a number.' }).int().min(1).max(5),
-)
 
 // Feedback-Modus (z. B. Hotel-Aufenthalt, Immobilien-Besichtigung): Bewertung und/oder
 // Kommentar ohne zwingenden Medien-Upload. Wenn eine submissionId vorliegt, wurde bereits

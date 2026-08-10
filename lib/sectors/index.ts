@@ -188,9 +188,30 @@ export function getFeedbackQuestions(type: CampaignType): readonly FeedbackQuest
  * alle Schlüssel gültig; der Handler wirft bei nicht-leerem Ergebnis ValidationError. Die
  * Wertebereiche (1–5) prüft bereits das Zod-Schema — hier geht es allein um die Zugehörigkeit.
  */
-export function unknownAnswerKeys(type: CampaignType, answers: Record<string, number>): string[] {
+export function unknownAnswerKeys(
+  type: CampaignType,
+  answers: Record<string, number | string>,
+): string[] {
   const allowed = new Set(getFeedbackQuestions(type).map((q) => q.id))
   return Object.keys(answers).filter((key) => !allowed.has(key))
+}
+
+/**
+ * Liefert die Antwort-Schlüssel, deren WERT-Typ nicht zum Fragentyp passt (rating → number,
+ * text → string). Ergänzt unknownAnswerKeys (Zugehörigkeit); zusammen bilden sie die App-seitige
+ * Prüfung, die DB (validate_feedback_answers) bleibt die letzte Verteidigungslinie. Unbekannte
+ * Schlüssel ignoriert diese Funktion (das prüft unknownAnswerKeys). Leeres Array = alle Typen passen.
+ */
+export function invalidAnswerTypes(
+  type: CampaignType,
+  answers: Record<string, number | string>,
+): string[] {
+  const kinds = new Map(getFeedbackQuestions(type).map((q) => [q.id, q.type] as const))
+  return Object.keys(answers).filter((key) => {
+    const kind = kinds.get(key)
+    if (!kind) return false
+    return kind === 'text' ? typeof answers[key] !== 'string' : typeof answers[key] !== 'number'
+  })
 }
 
 // ─── Narrowing für DB-Strings (text-Spalten kommen als string zurück) ─────────

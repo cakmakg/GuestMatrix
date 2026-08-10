@@ -10,6 +10,7 @@ import { requireAnyAuth } from '@/lib/auth/session'
 import { logger } from '@/lib/logger'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { checkRateLimit, rateLimiters } from '@/lib/rate-limit'
+import { invalidAnswerTypes, isCampaignType, unknownAnswerKeys } from '@/lib/sectors'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { presignSchema, MIME_TO_EXT, type AllowedMimeType } from '@/lib/validation/schemas'
@@ -29,19 +30,36 @@ export async function POST(request: NextRequest): Promise<Response> {
       const message = parsed.error.issues[0]?.message ?? 'Invalid request.'
       throw new ValidationError(message)
     }
-    const { eventId, mimeType, guestName, message } = parsed.data
+    const { eventId, mimeType, guestName, message, answers } = parsed.data
 
     const supabase = await createSupabaseServerClient()
 
-    // ── Verify event exists and retrieve tenant_id ─────────────────────────────
+    // ── Verify event exists and retrieve tenant_id (+ campaign_type für Antwort-Katalog) ──
     // Public RLS policy allows any authenticated user to read events.
     const { data: event } = await supabase
       .from('events')
-      .select('id, tenant_id')
+      .select('id, tenant_id, campaign_type')
       .eq('id', eventId)
-      .single<{ id: string; tenant_id: string }>()
+      .single<{ id: string; tenant_id: string; campaign_type: string }>()
 
     if (!event) throw new NotFoundError('Event')
+
+    // ── Strukturierte Antworten: Schlüssel-Zugehörigkeit UND Wert-Typ gegen den Katalog prüfen
+    // (UX / frühe klare Ablehnung). Die DB (validate_feedback_answers, Trigger) validiert erneut —
+    // die App ist bewusst nicht die einzige Verteidigungslinie (jsonb ist schemalos).
+    if (answers) {
+      if (!isCampaignType(event.campaign_type)) {
+        throw new ValidationError('Feedback answers are not accepted for this campaign.')
+      }
+      const unknown = unknownAnswerKeys(event.campaign_type, answers)
+      if (unknown.length > 0) {
+        throw new ValidationError(`Unknown feedback answer(s): ${unknown.join(', ')}.`)
+      }
+      const badTypes = invalidAnswerTypes(event.campaign_type, answers)
+      if (badTypes.length > 0) {
+        throw new ValidationError(`Invalid answer type(s): ${badTypes.join(', ')}.`)
+      }
+    }
 
     // ── Tarif-Kontingent: abgeschlossene Uploads je Event begrenzen ────────────
     const { data: tenant } = await supabaseAdmin
@@ -74,6 +92,8 @@ export async function POST(request: NextRequest): Promise<Response> {
         // guestbook: Name + Glückwunsch am Medienbeitrag; sonst null.
         guest_name: guestName ?? null,
         comment: message ?? null,
+        // Optionale strukturierte Antworten (z. B. Hochzeit „drei Worte"); der DB-Trigger validiert.
+        feedback_answers: answers ?? null,
         consent_at: new Date().toISOString(),
       })
       .select('id')

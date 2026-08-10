@@ -19,7 +19,7 @@ type SubmissionRow = {
   moderation_flag: boolean
   rating: number | null
   comment: string | null
-  feedback_answers: Record<string, number> | null
+  feedback_answers: Record<string, number | string> | null
 }
 
 async function getEventData(tenantId: string, eventId: string) {
@@ -325,6 +325,21 @@ export default async function EventDetailPage({
                       </p>
                     ) : (
                       <p className="mt-1 text-sm italic text-gray-300">Kein Text</p>
+                    )}
+                    {/* Strukturierte Freitext-Antworten (z. B. „drei Worte") — nur Text-Fragen. */}
+                    {feedbackQuestions.length > 0 && sub.feedback_answers && (
+                      <div className="mt-1 space-y-0.5">
+                        {feedbackQuestions.map((q) => {
+                          const value = sub.feedback_answers?.[q.id]
+                          if (q.type !== 'text' || typeof value !== 'string' || value.trim() === '')
+                            return null
+                          return (
+                            <p key={q.id} className="text-xs text-gray-500">
+                              {q.prompt}: <span className="italic text-gray-700">„{value}“</span>
+                            </p>
+                          )
+                        })}
+                      </div>
                     )}
                     {sub.moderation_flag && (
                       <span className="mt-1 inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
