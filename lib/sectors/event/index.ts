@@ -9,6 +9,12 @@ import type { SectorModule } from '../types'
 export const event = {
   id: 'event',
   label: 'Hochzeit / Event',
+  // Kein business_type in diesem Sektor — die Benennung hängt hier am Sektor selbst.
+  dashboardLabels: {
+    experiences: 'Feiern',
+    experience: 'Feier',
+    activeExperiences: 'Aktive Feiern',
+  },
   campaignTypes: {
     wedding: {
       sector: 'event',

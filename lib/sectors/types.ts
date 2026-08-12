@@ -154,12 +154,33 @@ export type CampaignTypeConfig = {
   questions?: readonly FeedbackQuestion[]
 }
 
+// ─── Betreiber-Dashboard: Benennung je Geschäftsmodell ────────────────────────
+
+/**
+ * Wie das Dashboard die Arbeitseinheit des Kunden nennt. Ein Hotel verwaltet „Aufenthalte",
+ * eine Reiseagentur „Reisen" — dasselbe `events`-Objekt, andere Sprache.
+ *
+ * Diese Beschriftungen gehören in die Registry, NICHT in die Seiten: sonst entstünde genau der
+ * `if (businessType === 'hotel')`-Sonderfall, den die Sektor-Architektur vermeiden soll. Ein neuer
+ * Sektor bringt seine Benennung als Code mit; das Dashboard liest sie.
+ */
+export type DashboardLabels = {
+  /** Plural — Navigation und Seitentitel. */
+  experiences: string
+  /** Singular — Fließtext und Leerzustände. */
+  experience: string
+  /** Kennzahl auf der Übersicht. */
+  activeExperiences: string
+}
+
 // Eine business_type-Unterrolle bündelt die Kampagnentypen eines Geschäftsmodells. `campaignTypes`
 // ist die Allowlist, die die DB-Grenze (current_tenant_allows_campaign, Migration 0017) spiegelt —
 // aktuell je genau ein Typ (hotel→stay, agency→agency), das Array lässt aber mehrere zu.
 export type BusinessTypeConfig = {
   label: string
   campaignTypes: CampaignType[]
+  // Fehlt sie, greift die Benennung des Sektors, sonst der neutrale Standard.
+  dashboardLabels?: DashboardLabels
 }
 
 /** Eine vom Betreiber entwickelte Sektor-Einheit (ein Ordner unter `lib/sectors/<id>/`). */
@@ -170,10 +191,13 @@ export type SectorModule = {
   // Optional: partitioniert die Kampagnentypen in Geschäftsmodelle (Tenant-Unterrolle). Fehlt sie,
   // hat der Sektor keine business_type (Spalte bleibt NULL) — z. B. die dormanten Sektoren.
   businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
+  // Benennung für Sektoren ohne business_type (z. B. event). Eine business_type darf sie überschreiben.
+  dashboardLabels?: DashboardLabels
 }
 
 export type SectorConfig = {
   label: string
   campaignTypes: CampaignType[]
   businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
+  dashboardLabels?: DashboardLabels
 }

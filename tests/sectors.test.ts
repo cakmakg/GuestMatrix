@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   BUSINESS_TYPES,
   CAMPAIGN_TYPES,
+  DEFAULT_DASHBOARD_LABELS,
   SECTORS,
   SIGNUP_OPTIONS,
+  resolveDashboardLabels,
   allowedCampaignTypes,
   businessTypesForSector,
   campaignTypesForBusinessType,
@@ -340,5 +342,51 @@ describe('guestbook is active for event/wedding (0018)', () => {
     expect(resolveFlowMode('wedding')).toBe('guestbook')
     // guestbook ist der einzige Modus, der den Gastnamen erfasst (privater Gruß ans Brautpaar).
     expect(getCapabilities('guestbook').guestNameEnabled).toBe(true)
+  })
+})
+
+// Die Dashboard-Benennung ist der Ersatz für `if (businessType === 'hotel')`-Sonderfälle.
+// Bricht die Auflösung, spricht das Dashboard wieder Betreiber-Sprache („Kampagnen").
+describe('dashboard labels resolve from the registry', () => {
+  it('gives each tourism business type its own vocabulary', () => {
+    expect(resolveDashboardLabels('tourism', 'hotel').experiences).toBe('Aufenthalte')
+    expect(resolveDashboardLabels('tourism', 'agency').experiences).toBe('Reisen')
+  })
+
+  it('prefers the business type over the sector', () => {
+    const hotel = resolveDashboardLabels('tourism', 'hotel')
+    const bare = resolveDashboardLabels('tourism', null)
+    expect(hotel.experiences).not.toBe(bare.experiences)
+  })
+
+  it('falls back to the sector when there is no business type', () => {
+    // event hat keine business_type (Spalte bleibt NULL) — die Benennung hängt am Sektor.
+    expect(resolveDashboardLabels('event', null).experiences).toBe('Feiern')
+  })
+
+  it('falls back to the neutral default for unknown or missing input', () => {
+    expect(resolveDashboardLabels(null, null)).toEqual(DEFAULT_DASHBOARD_LABELS)
+    expect(resolveDashboardLabels('real_estate', null)).toEqual(DEFAULT_DASHBOARD_LABELS)
+    expect(resolveDashboardLabels('nonsense', 'nonsense')).toEqual(DEFAULT_DASHBOARD_LABELS)
+  })
+
+  it('never returns an empty string — every field is renderable', () => {
+    const cases = [
+      resolveDashboardLabels('tourism', 'hotel'),
+      resolveDashboardLabels('tourism', 'agency'),
+      resolveDashboardLabels('event', null),
+      resolveDashboardLabels(null, null),
+    ]
+    for (const labels of cases) {
+      expect(labels.experiences.length).toBeGreaterThan(0)
+      expect(labels.experience.length).toBeGreaterThan(0)
+      expect(labels.activeExperiences.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('every active business type ships its own labels', () => {
+    for (const [id, config] of Object.entries(BUSINESS_TYPES)) {
+      expect(config?.dashboardLabels, `${id} has no dashboardLabels`).toBeDefined()
+    }
   })
 })

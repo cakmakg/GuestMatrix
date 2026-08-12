@@ -21,8 +21,25 @@ export const tourism = {
   // die Foto-Galerie + Agentur-Feedback (agency). Diese Allowlist spiegelt die DB-Sicherheitsgrenze
   // (current_tenant_allows_campaign, Migration 0017): hotel→stay, agency→agency.
   businessTypes: {
-    hotel: { label: 'Hotel / Resort', campaignTypes: ['stay'] },
-    agency: { label: 'Reiseagentur', campaignTypes: ['agency'] },
+    hotel: {
+      label: 'Hotel / Resort',
+      campaignTypes: ['stay'],
+      // Ein Hotel verwaltet Aufenthalte, keine „Kampagnen" — dieselbe events-Zeile, andere Sprache.
+      dashboardLabels: {
+        experiences: 'Aufenthalte',
+        experience: 'Aufenthalt',
+        activeExperiences: 'Aktive Aufenthalte',
+      },
+    },
+    agency: {
+      label: 'Reiseagentur',
+      campaignTypes: ['agency'],
+      dashboardLabels: {
+        experiences: 'Reisen',
+        experience: 'Reise',
+        activeExperiences: 'Aktive Reisen',
+      },
+    },
   },
   campaignTypes: {
     agency: {

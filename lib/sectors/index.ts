@@ -34,6 +34,7 @@ import type {
   CampaignCapabilities,
   CampaignType,
   CampaignTypeConfig,
+  DashboardLabels,
   FeedbackQuestion,
   FlowMode,
   GuestFlowLabels,
@@ -59,6 +60,7 @@ export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
   event: {
     label: event.label,
     campaignTypes: ['wedding'],
+    dashboardLabels: event.dashboardLabels,
   },
 }
 
@@ -131,6 +133,40 @@ export function allowedCampaignTypes(
   businessType: BusinessType | null,
 ): CampaignType[] {
   return businessType ? campaignTypesForBusinessType(businessType) : campaignTypesForSector(sector)
+}
+
+// ─── Betreiber-Dashboard: Benennung ───────────────────────────────────────────
+
+/**
+ * Neutraler Rückfall, wenn weder business_type noch Sektor eine Benennung mitbringen.
+ * „Kampagne" ist das Wort des Betreibers, nicht das des Kunden — deshalb nur Notnagel.
+ */
+export const DEFAULT_DASHBOARD_LABELS: DashboardLabels = {
+  experiences: 'Kampagnen',
+  experience: 'Kampagne',
+  activeExperiences: 'Aktive Kampagnen',
+}
+
+/**
+ * Wie das Dashboard dieses Tenants seine Arbeitseinheit nennt. Reihenfolge: business_type
+ * (feinste Auflösung) → Sektor → neutraler Standard. Einziger Ableitungspunkt; die Seiten
+ * verzweigen NICHT selbst über die Geschäftsart.
+ */
+export function resolveDashboardLabels(
+  sector: string | null | undefined,
+  businessType: string | null | undefined,
+): DashboardLabels {
+  if (businessType && isBusinessType(businessType)) {
+    const fromBusinessType = BUSINESS_TYPES[businessType]?.dashboardLabels
+    if (fromBusinessType) return fromBusinessType
+  }
+
+  if (sector && isSector(sector)) {
+    const fromSector = SECTORS[sector]?.dashboardLabels
+    if (fromSector) return fromSector
+  }
+
+  return DEFAULT_DASHBOARD_LABELS
 }
 
 export function isFlowModeAllowed(type: CampaignType, mode: FlowMode): boolean {
