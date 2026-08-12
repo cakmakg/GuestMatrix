@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
@@ -14,6 +15,12 @@ import {
 } from '@/lib/dashboard/feedback-summary'
 import type { DimensionSummary } from '@/lib/dashboard/feedback-summary'
 import { formatNumber } from '@/lib/dashboard/metrics'
+import {
+  applyDateRange,
+  hasActiveRange,
+  parseReportFilters,
+  rangeQuery,
+} from '@/lib/dashboard/report-filters'
 import { getCampaignConfig, isCampaignType } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -27,9 +34,52 @@ type SubmissionRow = {
   feedback_answers: unknown
   media_url: string | null
   moderation_flag: boolean
+  uploaded_at: string | null
+}
+
+type Props = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
 const MUTED = 'color-mix(in srgb, var(--color-text) 55%, transparent)'
+
+/** Ein Datumsfeld des Zeitraum-Formulars — dieselbe Beschriftungsform wie die Listenfilter. */
+function DateField({
+  label,
+  name,
+  value,
+}: {
+  label: string
+  name: string
+  value: string
+}): React.ReactElement {
+  const id = `range-${name}`
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+      <label
+        htmlFor={id}
+        style={{ fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: MUTED }}
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        name={name}
+        type="date"
+        defaultValue={value}
+        style={{
+          minHeight: 34,
+          padding: '5px 8px',
+          font: 'inherit',
+          fontSize: 13,
+          color: 'var(--color-text)',
+          background: 'var(--color-bg)',
+          border: '1px solid var(--color-divider)',
+        }}
+      />
+    </div>
+  )
+}
 
 /** Balken auf der 1–5-Skala. `null` bleibt sichtbar leer statt als 0 gezeichnet zu werden. */
 function DimensionRow({ summary }: { summary: DimensionSummary }): React.ReactElement {
@@ -71,7 +121,7 @@ function DimensionRow({ summary }: { summary: DimensionSummary }): React.ReactEl
   )
 }
 
-export default async function ReportsPage() {
+export default async function ReportsPage({ searchParams }: Props) {
   let tenantId: string
   try {
     const session = await requireTenantAuth()
@@ -80,6 +130,7 @@ export default async function ReportsPage() {
     redirect('/login')
   }
 
+  const filters = parseReportFilters(await searchParams)
   const supabase = await createSupabaseServerClient()
 
   const { data: tenant } = await supabase
@@ -95,13 +146,20 @@ export default async function ReportsPage() {
 
   const { data: subsData } = await supabase
     .from('submissions')
-    .select('event_id, rating, feedback_answers, media_url, moderation_flag')
+    .select('event_id, rating, feedback_answers, media_url, moderation_flag, uploaded_at')
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
     .not('uploaded_at', 'is', null)
 
   const events = (eventsData as EventRow[]) ?? []
-  const subs = (subsData as SubmissionRow[]) ?? []
+  const allSubs = (subsData as SubmissionRow[]) ?? []
+
+  // Ab hier rechnet der ganze Bericht auf dem gewählten Ausschnitt — dieselbe reine Funktion,
+  // die auch der CSV-Export benutzt, damit Bildschirm und Datei nicht auseinanderlaufen.
+  const subs = applyDateRange(
+    allSubs.map((sub) => ({ ...sub, uploadedAt: sub.uploaded_at })),
+    filters,
+  )
 
   // Der Fragenkatalog kommt aus der Registry, abgeleitet aus (sector, business_type) —
   // kein Sonderfall-Code je Geschäftsart. Mehrere erlaubte Kampagnentypen werden vereinigt;
@@ -181,8 +239,38 @@ export default async function ReportsPage() {
         </div>
       </div>
 
+      {/* ═══ Zeitraum (GET, ohne Client-JavaScript) + Export ═══ */}
+      <form
+        method="GET"
+        className="gs-panel gs-rise"
+        data-i="1"
+        style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14 }}
+      >
+        <DateField label="Von" name="from" value={filters.from ?? ''} />
+        <DateField label="Bis" name="to" value={filters.to ?? ''} />
+
+        <button className="btn btn-primary" type="submit">
+          Anwenden
+        </button>
+
+        {hasActiveRange(filters) && (
+          <Link className="btn btn-secondary" href="/dashboard/reports">
+            Zurücksetzen
+          </Link>
+        )}
+
+        {/* Der Export trägt denselben Zeitraum wie die Ansicht. */}
+        <a
+          className="btn btn-secondary"
+          href={`/api/reports/export${rangeQuery(filters)}`}
+          style={{ marginLeft: 'auto' }}
+        >
+          ⬇ CSV-Export
+        </a>
+      </form>
+
       {/* ═══ Bereichs-Aufschlüsselung ═══ */}
-      <section className="gs-panel gs-rise" data-i="1">
+      <section className="gs-panel gs-rise" data-i="2">
         <div>
           <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Zufriedenheit nach Bereich</h3>
           <div style={{ fontSize: 12, color: MUTED }}>
@@ -235,7 +323,7 @@ export default async function ReportsPage() {
           alignItems: 'start',
         }}
       >
-        <section className="gs-panel gs-rise" data-i="2">
+        <section className="gs-panel gs-rise" data-i="3">
           <div>
             <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Gesamtbewertung</h3>
             <div style={{ fontSize: 12, color: MUTED }}>
@@ -295,7 +383,7 @@ export default async function ReportsPage() {
           )}
         </section>
 
-        <section className="gs-panel gs-rise" data-i="3">
+        <section className="gs-panel gs-rise" data-i="4">
           <div>
             <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Medien &amp; Freigabe</h3>
             <div style={{ fontSize: 12, color: MUTED }}>Was du im Marketing einsetzen kannst</div>
@@ -339,7 +427,7 @@ export default async function ReportsPage() {
       </div>
 
       {/* ═══ Kampagnen-Vergleich ═══ */}
-      <section className="gs-panel gs-rise" data-i="4">
+      <section className="gs-panel gs-rise" data-i="5">
         <div>
           <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Kampagnen im Vergleich</h3>
           <div style={{ fontSize: 12, color: MUTED }}>

@@ -96,6 +96,63 @@ export function buildEventFeedbackCsv(
   return BOM + toCsv([header, ...body])
 }
 
+/** Eine Export-Zeile des Berichts — dieselbe Form wie oben, plus Kampagnenzugehörigkeit. */
+export type TenantExportRow = ExportSubmissionRow & {
+  event_id: string
+  /** Service Recovery (Migration 0020) — leer heißt offen. */
+  resolved_at: string | null
+}
+
+/**
+ * Baut die kampagnenÜBERGREIFENDE Bericht-CSV eines Tenants.
+ *
+ * Unterschied zu buildEventFeedbackCsv:
+ *   * führende Spalte `kampagne` — ohne sie wären die Zeilen mehrerer Kampagnen nicht trennbar
+ *   * KEINE `medien_url`: eine signierte URL je Zeile zu erzeugen ist über den gesamten Bestand
+ *     teuer und kurzlebig; dieser Export ist zum Auswerten gedacht, nicht zum Verteilen von
+ *     Medien. Wer Dateien braucht, exportiert die einzelne Kampagne (mit signierten URLs) oder
+ *     lädt sie in der Medien-Bibliothek herunter.
+ *
+ * Der DSGVO-Filter (gelöscht / unbestätigt) gilt hier genauso — zweite, unit-testbare
+ * Verteidigungslinie hinter der Query.
+ */
+export function buildTenantFeedbackCsv(
+  submissions: readonly TenantExportRow[],
+  questions: readonly CsvFeedbackQuestion[],
+  eventNameById: ReadonlyMap<string, string>,
+): string {
+  const rows = submissions.filter((s) => s.deleted_at === null && s.uploaded_at !== null)
+
+  const header: string[] = [
+    'kampagne',
+    'submission_id',
+    'datum',
+    'bewertung',
+    ...questions.map((q) => q.prompt),
+    'kommentar',
+    'gesperrt',
+    'erledigt',
+    'medien_typ',
+  ]
+
+  const body: string[][] = rows.map((s) => [
+    eventNameById.get(s.event_id) ?? '',
+    s.id,
+    formatDate(s.uploaded_at),
+    s.rating !== null ? String(s.rating) : '',
+    ...questions.map((q) => {
+      const value = s.feedback_answers?.[q.id]
+      return typeof value === 'number' ? String(value) : ''
+    }),
+    s.comment ?? '',
+    s.moderation_flag ? 'ja' : 'nein',
+    s.resolved_at ? formatDate(s.resolved_at) : '',
+    mediaTypeLabel(s.file_type),
+  ])
+
+  return BOM + toCsv([header, ...body])
+}
+
 /** ASCII-sicherer Dateiname: `guestmatrix-<slug>-<datum>.csv`. Akzente/Sonderzeichen entfallen. */
 export function buildExportFilename(eventName: string, eventDate: string): string {
   const slug =

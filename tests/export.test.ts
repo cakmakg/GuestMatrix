@@ -6,9 +6,11 @@ import { describe, expect, it } from 'vitest'
 import {
   buildEventFeedbackCsv,
   buildExportFilename,
+  buildTenantFeedbackCsv,
   toCsv,
   type CsvFeedbackQuestion,
   type ExportSubmissionRow,
+  type TenantExportRow,
 } from '@/lib/export/csv'
 
 // Deckt zwei Ebenen ab:
@@ -109,6 +111,67 @@ describe('buildEventFeedbackCsv', () => {
   })
 })
 
+describe('buildTenantFeedbackCsv', () => {
+  const EVENT_A = '11111111-1111-4111-8111-111111111111'
+  const EVENT_B = '22222222-2222-4222-8222-222222222222'
+  const names = new Map([
+    [EVENT_A, 'Hotel Ölüdeniz'],
+    [EVENT_B, 'Sommertour'],
+  ])
+
+  function tenantRow(overrides: Partial<TenantExportRow> = {}): TenantExportRow {
+    return { ...row(), event_id: EVENT_A, resolved_at: null, ...overrides }
+  }
+
+  it('stellt die Kampagne voran, damit Zeilen mehrerer Kampagnen trennbar bleiben', () => {
+    const csv = buildTenantFeedbackCsv(
+      [tenantRow(), tenantRow({ id: 'zwei', event_id: EVENT_B })],
+      STAY_QUESTIONS,
+      names,
+    )
+    const [header, first, second] = csv.split('\r\n')
+
+    expect(header).toContain('kampagne')
+    expect(first).toContain('Hotel Ölüdeniz')
+    expect(second).toContain('Sommertour')
+  })
+
+  it('führt den Bearbeitungsstand statt einer Medien-URL', () => {
+    const csv = buildTenantFeedbackCsv(
+      [tenantRow({ resolved_at: '2026-08-05T09:00:00.000Z' })],
+      STAY_QUESTIONS,
+      names,
+    )
+
+    expect(csv).toContain('erledigt')
+    expect(csv).toContain('2026-08-05 09:00')
+    expect(csv).not.toContain('medien_url')
+  })
+
+  it('lässt eine unbekannte Kampagne leer statt die Zeile zu verlieren', () => {
+    const csv = buildTenantFeedbackCsv([tenantRow({ event_id: 'weg' })], [], new Map())
+
+    expect(csv.split('\r\n')).toHaveLength(2)
+  })
+
+  // Zweite Verteidigungslinie hinter der Query — gelöschte Inhalte dürfen nie exportiert werden.
+  it('filtert gelöschte und unbestätigte Zeilen wie der Einzel-Export', () => {
+    const csv = buildTenantFeedbackCsv(
+      [
+        tenantRow({ id: 'geloescht', deleted_at: '2026-08-02T00:00:00.000Z' }),
+        tenantRow({ id: 'unbestaetigt', uploaded_at: null }),
+        tenantRow({ id: 'sichtbar' }),
+      ],
+      STAY_QUESTIONS,
+      names,
+    )
+
+    expect(csv).toContain('sichtbar')
+    expect(csv).not.toContain('geloescht')
+    expect(csv).not.toContain('unbestaetigt')
+  })
+})
+
 describe('buildExportFilename', () => {
   it('translitiert Akzente auf Basisbuchstaben und entfernt Sonderzeichen', () => {
     expect(buildExportFilename('Hôtel Ölüdeniz — Sommer!', '2026-07-31')).toBe(
@@ -133,5 +196,26 @@ describe('Export-Route ist RLS-aktiv (kein service_role für Tabellenzugriff)', 
 
   it('importiert NICHT den service_role-Admin-Client direkt', () => {
     expect(routeSource).not.toContain('@/lib/supabase/admin')
+  })
+})
+
+describe('Bericht-Export-Route ist RLS-aktiv und Zod-validiert', () => {
+  const routeSource = readFileSync(
+    path.join(process.cwd(), 'app/api/reports/export/route.ts'),
+    'utf8',
+  )
+
+  it('importiert den RLS-aktiven Server-Client', () => {
+    expect(routeSource).toContain('@/lib/supabase/server')
+  })
+
+  it('importiert NICHT den service_role-Admin-Client direkt', () => {
+    expect(routeSource).not.toContain('@/lib/supabase/admin')
+  })
+
+  // Absolute Projektregel: jede Route validiert ihre Eingabe.
+  it('validiert den Zeitraum über das Zod-Schema', () => {
+    expect(routeSource).toContain('reportFilterSchema')
+    expect(routeSource).toContain('safeParse')
   })
 })
