@@ -11,8 +11,10 @@ import { describe, expect, it } from 'vitest'
 
 const ROOT = process.cwd()
 
+// `moderateAction` liegt seit der Medien-Bibliothek in den gemeinsamen Dashboard-Aktionen
+// (mehrere Seiten lösen sie aus), nicht mehr im Kampagnen-Routenordner.
 const MODERATION_MUTATION_PATHS = [
-  'app/dashboard/events/[eventId]/actions.ts',
+  'app/dashboard/actions.ts',
   'app/api/submissions/[submissionId]/moderate/route.ts',
 ] as const
 

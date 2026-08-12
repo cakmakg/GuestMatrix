@@ -7,7 +7,7 @@ import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
 
-import { deleteFromDashboardAction, moderateAction } from './actions'
+import { deleteFromDashboardAction, moderateAction } from '../../actions'
 import QrSection from './QrSection'
 
 type SubmissionRow = {
