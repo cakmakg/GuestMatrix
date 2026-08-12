@@ -15,7 +15,8 @@ import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
 import { SIGNED_URL_EXPIRY, createSignedUrls } from '@/lib/storage/signed-url'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-import { moderateAction } from '../actions'
+import { deleteFromDashboardAction, moderateAction } from '../actions'
+import { ConfirmSubmit } from '../ConfirmSubmit'
 
 export const metadata: Metadata = { title: `Medien – ${BRAND.name}` }
 
@@ -377,7 +378,6 @@ export default async function MediaPage({ searchParams }: Props) {
                           {row.blocked ? 'Freigeben' : 'Sperren'}
                         </button>
                       </form>
-
                       {url && (
                         <a
                           href={url}
@@ -387,6 +387,27 @@ export default async function MediaPage({ searchParams }: Props) {
                           Herunterladen
                         </a>
                       )}
+                      <form
+                        action={async () => {
+                          'use server'
+                          await deleteFromDashboardAction(row.id)
+                        }}
+                      >
+                        <ConfirmSubmit
+                          confirmMessage="Diese Datei endgültig löschen? Die Medien werden unwiderruflich entfernt."
+                          style={{
+                            background: 'none',
+                            border: 0,
+                            padding: 0,
+                            font: 'inherit',
+                            fontSize: 12,
+                            color: 'var(--color-accent)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Löschen
+                        </ConfirmSubmit>
+                      </form>
 
                       <Link
                         href={`/dashboard/events/${row.eventId}`}

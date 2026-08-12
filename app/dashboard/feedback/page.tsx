@@ -14,6 +14,9 @@ import { parseAnswers, resolveQuestionCatalog } from '@/lib/dashboard/feedback-s
 import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+import { deleteFromDashboardAction, moderateAction } from '../actions'
+import { ConfirmSubmit } from '../ConfirmSubmit'
+
 export const metadata: Metadata = { title: `Gästeantworten – ${BRAND.name}` }
 
 type TenantRow = { sector: string; business_type: string | null }
@@ -53,6 +56,16 @@ const SORT_LABELS: Record<string, string> = {
   recent: 'Neueste zuerst',
   lowest: 'Schlechteste zuerst',
   highest: 'Beste zuerst',
+}
+
+/** Aktionen sitzen als reine Textknöpfe in der Zeile — wie in der Medien-Bibliothek. */
+const ACTION_BUTTON: React.CSSProperties = {
+  background: 'none',
+  border: 0,
+  padding: 0,
+  font: 'inherit',
+  fontSize: 12,
+  cursor: 'pointer',
 }
 
 const SELECT_STYLE: React.CSSProperties = {
@@ -346,6 +359,40 @@ export default async function FeedbackPage({ searchParams }: Props) {
                     >
                       Kampagne →
                     </Link>
+
+                    {/* Moderation und Löschung greifen auf dieselben Actions zu wie das
+                        Kampagnendetail; sie revalidieren /dashboard als Layout, damit Kennzahlen,
+                        Medien-Bibliothek und Berichte nicht mit alten Zahlen zurückbleiben. */}
+                    <form
+                      action={async () => {
+                        'use server'
+                        await moderateAction(row.id, !row.blocked)
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        style={{
+                          ...ACTION_BUTTON,
+                          color: row.blocked ? 'var(--color-accent)' : MUTED,
+                        }}
+                      >
+                        {row.blocked ? 'Freigeben' : 'Sperren'}
+                      </button>
+                    </form>
+
+                    <form
+                      action={async () => {
+                        'use server'
+                        await deleteFromDashboardAction(row.id)
+                      }}
+                    >
+                      <ConfirmSubmit
+                        confirmMessage="Diesen Beitrag endgültig löschen? Medien werden unwiderruflich entfernt."
+                        style={{ ...ACTION_BUTTON, color: 'var(--color-accent)' }}
+                      >
+                        Löschen
+                      </ConfirmSubmit>
+                    </form>
                   </div>
                 </div>
               )

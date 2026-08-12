@@ -8,7 +8,11 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
 
 import { deleteFromDashboardAction, moderateAction } from '../../actions'
+import { ConfirmSubmit } from '../../ConfirmSubmit'
 import QrSection from './QrSection'
+
+/** Eine Löschung ist endgültig (Storage-Hard-Delete + Soft-Delete) — daher überall dieselbe Rückfrage. */
+const DELETE_CONFIRM = 'Diesen Beitrag endgültig löschen? Medien werden unwiderruflich entfernt.'
 
 type SubmissionRow = {
   id: string
@@ -287,12 +291,13 @@ export default async function EventDetailPage({
                         await deleteFromDashboardAction(sub.id)
                       }}
                     >
-                      <button
-                        type="submit"
+                      <ConfirmSubmit
+                        confirmMessage={DELETE_CONFIRM}
+                        ariaLabel="Beitrag löschen"
                         className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
                       >
                         🗑
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   </div>
                 </li>
@@ -389,12 +394,13 @@ export default async function EventDetailPage({
                         await deleteFromDashboardAction(sub.id)
                       }}
                     >
-                      <button
-                        type="submit"
+                      <ConfirmSubmit
+                        confirmMessage={DELETE_CONFIRM}
+                        ariaLabel="Beitrag löschen"
                         className="rounded bg-red-100 px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-200"
                       >
                         🗑
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   </div>
                 </li>
@@ -472,13 +478,14 @@ export default async function EventDetailPage({
                       await deleteFromDashboardAction(sub.id)
                     }}
                   >
-                    <button
-                      type="submit"
+                    <ConfirmSubmit
+                      confirmMessage={DELETE_CONFIRM}
+                      ariaLabel="Beitrag löschen"
                       className="text-xs py-1 px-2 bg-red-100 text-red-600 rounded
                                  hover:bg-red-200 transition-colors"
                     >
                       🗑
-                    </button>
+                    </ConfirmSubmit>
                   </form>
                 </div>
 
