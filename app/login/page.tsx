@@ -11,12 +11,16 @@ const ERROR_MESSAGES: Record<string, string> = {
 }
 
 type Props = {
-  searchParams: Promise<{ error?: string; next?: string; message?: string }>
+  searchParams: Promise<{ error?: string; reason?: string; next?: string; message?: string }>
 }
 
 export default async function LoginPage({ searchParams }: Props) {
-  const { error, next, message } = await searchParams
-  const errorMessage = error ? (ERROR_MESSAGES[error] ?? 'Ein Fehler ist aufgetreten.') : null
+  const { error, reason, next, message } = await searchParams
+  // Die Middleware leitet den Idle-Logout über /api/auth/logout mit `?reason=` hierher; die
+  // Server-Actions melden Fehler mit `?error=`. Beide Schlüssel treffen denselben Katalog —
+  // ohne `reason` bliebe die Sitzungsablauf-Meldung unsichtbar (der Nutzer flöge kommentarlos raus).
+  const errorKey = error ?? reason
+  const errorMessage = errorKey ? (ERROR_MESSAGES[errorKey] ?? 'Ein Fehler ist aufgetreten.') : null
   const SUCCESS_MESSAGES: Record<string, string> = {
     'password-reset-success': 'Passwort erfolgreich geändert. Bitte melden Sie sich an.',
     'signup-success':

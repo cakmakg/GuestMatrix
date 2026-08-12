@@ -1,7 +1,30 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
+import { BRAND } from '@/lib/brand'
+import { quotaPercent } from '@/lib/dashboard/metrics'
+import { getPlanConfig, resolvePlan } from '@/lib/plans'
+import { resolveDashboardLabels } from '@/lib/sectors'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+
+import { SidebarNav } from './SidebarNav'
+
+type TenantRow = {
+  brand_name: string
+  plan: string
+  sector: string
+  business_type: string | null
+}
+
+const MUTED = 'color-mix(in srgb, var(--color-text) 55%, transparent)'
+
+function initialsOf(value: string): string {
+  const local = value.split('@')[0] ?? value
+  const parts = local.split(/[._-]+/).filter(Boolean)
+  const [first, second] = parts
+  if (first && second) return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase()
+  return local.slice(0, 2).toUpperCase() || '?'
+}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   try {
@@ -14,51 +37,214 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/api/auth/logout?next=/login')
   }
 
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // RLS liefert nur den eigenen Tenant; kein .eq('user_id') nötig, es bleibt aber
+  // als Defense-in-Depth in den übrigen Abfragen bestehen.
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('brand_name, plan, sector, business_type')
+    .single<TenantRow>()
+
+  const { count: activeCount } = await supabase
+    .from('events')
+    .select('id', { count: 'exact', head: true })
+    .is('archived_at', null)
+
+  const { count: campaignCount } = await supabase
+    .from('events')
+    .select('id', { count: 'exact', head: true })
+
+  const plan = resolvePlan(tenant?.plan)
+  const planConfig = getPlanConfig(plan)
+  const activeEvents = activeCount ?? 0
+  const planPct = quotaPercent(activeEvents, planConfig.maxActiveEvents)
+
+  // Wie dieser Tenant seine Arbeitseinheit nennt — aus der Registry, nicht aus einer Fallunterscheidung.
+  const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
+
+  const email = user?.email ?? ''
+  const brandName = tenant?.brand_name ?? BRAND.name
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
-        <div className="px-5 py-5 border-b border-gray-100">
-          <span className="font-bold text-indigo-600 text-lg">GuestMatrix</span>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '232px 1fr',
+        minHeight: '100vh',
+        fontFamily: 'var(--font-body)',
+        color: 'var(--color-text)',
+      }}
+    >
+      {/* ═══ SIDEBAR ═══ */}
+      <aside
+        style={{
+          borderRight: '2px solid var(--color-divider)',
+          background: 'var(--color-bg)',
+          display: 'flex',
+          flexDirection: 'column',
+          paddingTop: 20,
+        }}
+      >
+        <div
+          style={{
+            padding: '4px 24px 22px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <span
+            style={{
+              width: 22,
+              height: 22,
+              background: 'var(--color-accent)',
+              display: 'inline-block',
+            }}
+          />
+          <span
+            style={{
+              font: '800 18px/1 var(--font-heading)',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {BRAND.name}
+          </span>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700
-                       rounded-lg hover:bg-gray-100 transition-colors"
+
+        <SidebarNav experiencesLabel={labels.experiences} experiencesCount={campaignCount ?? 0} />
+
+        <div
+          style={{
+            marginTop: 'auto',
+            padding: '20px 24px',
+            borderTop: '2px solid var(--color-divider)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: '.1em',
+              textTransform: 'uppercase',
+              color: MUTED,
+              marginBottom: 8,
+            }}
           >
-            <span>📊</span> Übersicht
-          </Link>
-          <Link
-            href="/dashboard/events/new"
-            className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700
-                       rounded-lg hover:bg-gray-100 transition-colors"
+            Tarif
+          </div>
+          <div style={{ font: '800 15px/1.2 var(--font-heading)', marginBottom: 4 }}>
+            {planConfig.label}
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: 'color-mix(in srgb, var(--color-text) 60%, transparent)',
+            }}
           >
-            <span>➕</span> Kampagne erstellen
-          </Link>
-          <Link
-            href="/dashboard/settings"
-            className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700
-                       rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <span>⚙️</span> Einstellungen
-          </Link>
-        </nav>
-        <div className="px-3 py-4 border-t border-gray-100">
-          <form action="/api/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-500
-                         rounded-lg hover:bg-gray-100 transition-colors text-left"
-            >
-              <span>🚪</span> Abmelden
-            </button>
-          </form>
+            {activeEvents} von {planConfig.maxActiveEvents} aktiven{' '}
+            {labels.experiences.toLowerCase()}
+          </div>
+          <div className="gs-bar" style={{ marginTop: 10 }}>
+            <i style={{ width: `${planPct}%` }} />
+          </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      {/* ═══ MAIN ═══ */}
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <header
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 18,
+            padding: '14px 32px',
+            borderBottom: '2px solid var(--color-divider)',
+            background: 'var(--color-bg)',
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 12,
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                font: '800 18px/1.15 var(--font-heading)',
+                letterSpacing: '-0.01em',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+              }}
+            >
+              {brandName}
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              paddingLeft: 14,
+              borderLeft: '1px solid var(--color-divider)',
+            }}
+          >
+            <div
+              className="gs-avatar"
+              style={{
+                width: 32,
+                height: 32,
+                background: 'var(--color-accent)',
+                color: 'var(--color-bg)',
+                border: 0,
+              }}
+            >
+              {initialsOf(email)}
+            </div>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}
+            >
+              <span
+                style={{
+                  font: '600 13px/1.15 var(--font-body)',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden',
+                  maxWidth: 200,
+                }}
+              >
+                {email}
+              </span>
+              <form action="/api/auth/logout" method="POST">
+                <button
+                  type="submit"
+                  style={{
+                    background: 'none',
+                    border: 0,
+                    padding: 0,
+                    font: '11px/1.2 var(--font-body)',
+                    color: MUTED,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Abmelden
+                </button>
+              </form>
+            </div>
+          </div>
+        </header>
+
+        <main style={{ minWidth: 0 }}>{children}</main>
+      </div>
     </div>
   )
 }
