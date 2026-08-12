@@ -14,7 +14,7 @@ import { parseAnswers, resolveQuestionCatalog } from '@/lib/dashboard/feedback-s
 import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-import { deleteFromDashboardAction, moderateAction } from '../actions'
+import { deleteFromDashboardAction, moderateAction, resolveAction } from '../actions'
 import { ConfirmSubmit } from '../ConfirmSubmit'
 
 export const metadata: Metadata = { title: `Gästeantworten – ${BRAND.name}` }
@@ -31,6 +31,7 @@ type SubmissionRow = {
   moderation_flag: boolean
   feedback_answers: unknown
   uploaded_at: string | null
+  resolved_at: string | null
 }
 
 type Props = {
@@ -51,6 +52,11 @@ const MEDIA_LABELS: Record<string, string> = {
   all: 'Mit und ohne Medien',
   with: 'Nur mit Medien',
   without: 'Nur ohne Medien',
+}
+const STATE_LABELS: Record<string, string> = {
+  all: 'Offen und erledigt',
+  open: 'Nur offen',
+  resolved: 'Nur erledigt',
 }
 const SORT_LABELS: Record<string, string> = {
   recent: 'Neueste zuerst',
@@ -140,7 +146,7 @@ export default async function FeedbackPage({ searchParams }: Props) {
   const { data: subsData } = await supabase
     .from('submissions')
     .select(
-      'id, event_id, rating, comment, guest_name, media_url, moderation_flag, feedback_answers, uploaded_at',
+      'id, event_id, rating, comment, guest_name, media_url, moderation_flag, feedback_answers, uploaded_at, resolved_at',
     )
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
@@ -161,6 +167,7 @@ export default async function FeedbackPage({ searchParams }: Props) {
     blocked: sub.moderation_flag,
     answers: parseAnswers(sub.feedback_answers),
     uploadedAt: sub.uploaded_at,
+    resolvedAt: sub.resolved_at,
   }))
 
   const visible = sortFeedback(applyFeedbackFilters(rows, filters), filters.sort)
@@ -232,6 +239,12 @@ export default async function FeedbackPage({ searchParams }: Props) {
           name="media"
           value={filters.media}
           options={Object.entries(MEDIA_LABELS).map(([value, label]) => ({ value, label }))}
+        />
+        <Field
+          label="Bearbeitung"
+          name="state"
+          value={filters.state}
+          options={Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label }))}
         />
         <Field
           label="Sortierung"
@@ -353,6 +366,7 @@ export default async function FeedbackPage({ searchParams }: Props) {
                   >
                     {row.hasMedia && <span className="tag tag-accent">Medien</span>}
                     {row.blocked && <span className="tag tag-outline">Gesperrt</span>}
+                    {row.resolvedAt !== null && <span className="tag tag-neutral">Erledigt</span>}
                     <Link
                       href={`/dashboard/events/${row.eventId}`}
                       style={{ fontSize: 12, color: 'var(--color-accent)' }}
@@ -360,9 +374,21 @@ export default async function FeedbackPage({ searchParams }: Props) {
                       Kampagne →
                     </Link>
 
-                    {/* Moderation und Löschung greifen auf dieselben Actions zu wie das
-                        Kampagnendetail; sie revalidieren /dashboard als Layout, damit Kennzahlen,
-                        Medien-Bibliothek und Berichte nicht mit alten Zahlen zurückbleiben. */}
+                    {/* Moderation, Bearbeitungsstand und Löschung greifen auf dieselben Actions zu
+                        wie das Kampagnendetail; sie revalidieren /dashboard als Layout, damit
+                        Kennzahlen, Medien-Bibliothek und Berichte nicht mit alten Zahlen
+                        zurückbleiben. */}
+                    <form
+                      action={async () => {
+                        'use server'
+                        await resolveAction(row.id, row.resolvedAt === null)
+                      }}
+                    >
+                      <button type="submit" style={{ ...ACTION_BUTTON, color: MUTED }}>
+                        {row.resolvedAt === null ? 'Erledigt' : 'Wieder öffnen'}
+                      </button>
+                    </form>
+
                     <form
                       action={async () => {
                         'use server'

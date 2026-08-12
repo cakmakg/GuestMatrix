@@ -96,6 +96,7 @@ export type Database = {
           media_url: string | null
           moderation_flag: boolean
           rating: number | null
+          resolved_at: string | null
           tenant_id: string
           uploaded_at: string | null
         }
@@ -113,6 +114,7 @@ export type Database = {
           media_url?: string | null
           moderation_flag?: boolean
           rating?: number | null
+          resolved_at?: string | null
           tenant_id: string
           uploaded_at?: string | null
         }
@@ -130,6 +132,7 @@ export type Database = {
           media_url?: string | null
           moderation_flag?: boolean
           rating?: number | null
+          resolved_at?: string | null
           tenant_id?: string
           uploaded_at?: string | null
         }

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
+import { needsAttention } from '@/lib/dashboard/feedback-filters'
 import {
   bucketCounts,
   deltaTone,
@@ -34,6 +35,7 @@ type SubmissionRow = {
   media_url: string | null
   moderation_flag: boolean
   uploaded_at: string | null
+  resolved_at: string | null
 }
 
 type TenantRow = { plan: string; sector: string; business_type: string | null }
@@ -222,7 +224,9 @@ export default async function DashboardPage() {
 
   const { data: subsData } = await supabase
     .from('submissions')
-    .select('event_id, rating, guest_name, comment, media_url, moderation_flag, uploaded_at')
+    .select(
+      'event_id, rating, guest_name, comment, media_url, moderation_flag, uploaded_at, resolved_at',
+    )
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
     .not('uploaded_at', 'is', null)
@@ -293,12 +297,13 @@ export default async function DashboardPage() {
     (s) => s.uploaded_at !== null && new Date(s.uploaded_at).getTime() >= now - 30 * DAY_MS,
   ).length
 
-  // ── Offene Punkte: kritische Bewertung ODER gesperrt ──────────────────────
-  // Vekil, solange es keinen echten Service-Recovery-Status gibt (Phase 2).
-  const needsAttention = subs.filter(
-    (s) => (s.rating !== null && s.rating <= 2) || s.moderation_flag,
+  // ── Offene Punkte: kritisch ODER gesperrt — und noch nicht bearbeitet ──────
+  // Die Regel liegt in lib/dashboard/feedback-filters (needsAttention), damit Übersicht und
+  // Antwortliste dieselbe Definition benutzen und sie ohne DB testbar bleibt.
+  const openItems = subs.filter((s) =>
+    needsAttention({ rating: s.rating, blocked: s.moderation_flag, resolvedAt: s.resolved_at }),
   )
-  const attentionTimes = needsAttention
+  const attentionTimes = openItems
     .map((s) => (s.uploaded_at ? new Date(s.uploaded_at).getTime() : null))
     .filter((t): t is number => t !== null)
   const attention30 = attentionTimes.filter((t) => t >= now - 30 * DAY_MS).length
@@ -350,7 +355,7 @@ export default async function DashboardPage() {
     },
     {
       label: 'Braucht Aufmerksamkeit',
-      value: formatNumber(needsAttention.length),
+      value: formatNumber(openItems.length),
       delta: formatPercentDelta(attentionDelta),
       tone: deltaTone(attentionDelta),
       series: bucketCounts(attentionTimes, now, SPARK_BUCKETS, WEEK_MS),

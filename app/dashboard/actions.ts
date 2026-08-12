@@ -62,6 +62,42 @@ export async function moderateAction(submissionId: string, flag: boolean): Promi
   revalidatePath('/dashboard', 'layout')
 }
 
+/**
+ * Service Recovery: einen Beitrag als bearbeitet markieren (oder wieder öffnen).
+ *
+ * `resolved_at` ist ein interner Betreiber-Vermerk — er ändert weder die Sichtbarkeit für Gäste
+ * noch den Moderationsstatus. Beides bleibt bewusst getrennt: „gesperrt" heißt, das Medium darf
+ * nicht in die Galerie; „erledigt" heißt, der Betreiber hat auf die Rückmeldung reagiert.
+ */
+export async function resolveAction(submissionId: string, resolved: boolean): Promise<void> {
+  const { tenantId } = await requireTenantAuth()
+
+  // Wie moderateAction: RLS-aktiv (tenant_select_submissions / tenant_update_submissions,
+  // beide über tenant_id = current_tenant_id()); die .eq('tenant_id')-Filter sind Defense-in-Depth.
+  const supabase = await createSupabaseServerClient()
+
+  const { data: sub } = await supabase
+    .from('submissions')
+    .select('id')
+    .eq('id', submissionId)
+    .eq('tenant_id', tenantId)
+    .is('deleted_at', null)
+    .single<{ id: string }>()
+
+  if (!sub) throw new NotFoundError('Submission')
+
+  const { error } = await supabase
+    .from('submissions')
+    .update({ resolved_at: resolved ? new Date().toISOString() : null })
+    .eq('id', submissionId)
+    .eq('tenant_id', tenantId)
+
+  if (error) throw error
+
+  logger.info('[dashboard] resolution set', { submissionId, resolved, tenantId })
+  revalidatePath('/dashboard', 'layout')
+}
+
 export async function deleteFromDashboardAction(submissionId: string): Promise<void> {
   await requireTenantAuth()
 

@@ -12,10 +12,13 @@ import { z } from 'zod'
 
 export const RATING_FILTER_TUPLE = ['all', 'critical', 'neutral', 'positive', 'unrated'] as const
 export const MEDIA_FILTER_TUPLE = ['all', 'with', 'without'] as const
+export const STATE_FILTER_TUPLE = ['all', 'open', 'resolved'] as const
 export const SORT_ORDER_TUPLE = ['recent', 'lowest', 'highest'] as const
 
 export type RatingFilter = (typeof RATING_FILTER_TUPLE)[number]
 export type MediaFilter = (typeof MEDIA_FILTER_TUPLE)[number]
+/** Bearbeitungsstand der Service Recovery (`submissions.resolved_at`, Migration 0020). */
+export type StateFilter = (typeof STATE_FILTER_TUPLE)[number]
 export type SortOrder = (typeof SORT_ORDER_TUPLE)[number]
 
 /** Ab wann eine Bewertung als kritisch gilt (inklusiv) — Einstieg in die Service Recovery. */
@@ -28,6 +31,7 @@ export const feedbackFilterSchema = z.object({
   campaign: z.string().uuid().optional().catch(undefined),
   rating: z.enum(RATING_FILTER_TUPLE).catch('all'),
   media: z.enum(MEDIA_FILTER_TUPLE).catch('all'),
+  state: z.enum(STATE_FILTER_TUPLE).catch('all'),
   sort: z.enum(SORT_ORDER_TUPLE).catch('recent'),
 })
 
@@ -37,6 +41,7 @@ export const DEFAULT_FILTERS: FeedbackFilters = {
   campaign: undefined,
   rating: 'all',
   media: 'all',
+  state: 'all',
   sort: 'recent',
 }
 
@@ -50,6 +55,7 @@ export function hasActiveFilters(filters: FeedbackFilters): boolean {
     filters.campaign !== undefined ||
     filters.rating !== 'all' ||
     filters.media !== 'all' ||
+    filters.state !== 'all' ||
     filters.sort !== 'recent'
   )
 }
@@ -60,6 +66,8 @@ export type FeedbackItemLike = {
   rating: number | null
   hasMedia: boolean
   uploadedAt: string | null
+  /** `submissions.resolved_at` — NULL = offen, gesetzt = bearbeitet. */
+  resolvedAt: string | null
 }
 
 export function matchesRating(rating: number | null, filter: RatingFilter): boolean {
@@ -82,6 +90,31 @@ export function matchesMedia(hasMedia: boolean, filter: MediaFilter): boolean {
   return filter === 'with' ? hasMedia : !hasMedia
 }
 
+export function matchesState(resolvedAt: string | null, filter: StateFilter): boolean {
+  if (filter === 'all') return true
+  return filter === 'open' ? resolvedAt === null : resolvedAt !== null
+}
+
+/** Die Mindestform für „offener Punkt". `blocked` = submissions.moderation_flag. */
+export type AttentionItemLike = {
+  rating: number | null
+  blocked: boolean
+  resolvedAt: string | null
+}
+
+/**
+ * Ein offener Punkt ist eine kritische Bewertung ODER ein gesperrter Beitrag — solange der
+ * Betreiber ihn nicht als bearbeitet markiert hat.
+ *
+ * Der `resolved_at`-Teil ist der Grund für Migration 0020: ohne ihn zählte die Übersicht die
+ * gesamte Historie statt der tatsächlichen Arbeitslast, und eine längst bearbeitete Beschwerde
+ * blieb für immer in der Zahl.
+ */
+export function needsAttention(item: AttentionItemLike): boolean {
+  const critical = item.rating !== null && item.rating <= CRITICAL_MAX
+  return (critical || item.blocked) && item.resolvedAt === null
+}
+
 export function applyFeedbackFilters<T extends FeedbackItemLike>(
   items: readonly T[],
   filters: FeedbackFilters,
@@ -90,7 +123,8 @@ export function applyFeedbackFilters<T extends FeedbackItemLike>(
     (item) =>
       (filters.campaign === undefined || item.eventId === filters.campaign) &&
       matchesRating(item.rating, filters.rating) &&
-      matchesMedia(item.hasMedia, filters.media),
+      matchesMedia(item.hasMedia, filters.media) &&
+      matchesState(item.resolvedAt, filters.state),
   )
 }
 

@@ -6,6 +6,8 @@ import {
   hasActiveFilters,
   matchesMedia,
   matchesRating,
+  matchesState,
+  needsAttention,
   parseFeedbackFilters,
   sortFeedback,
 } from '@/lib/dashboard/feedback-filters'
@@ -13,6 +15,7 @@ import type { FeedbackItemLike } from '@/lib/dashboard/feedback-filters'
 
 const EVENT_A = '11111111-1111-4111-8111-111111111111'
 const EVENT_B = '22222222-2222-4222-8222-222222222222'
+const RESOLVED_AT = '2026-08-05T09:00:00.000Z'
 
 function item(over: Partial<FeedbackItemLike> = {}): FeedbackItemLike {
   return {
@@ -20,6 +23,7 @@ function item(over: Partial<FeedbackItemLike> = {}): FeedbackItemLike {
     rating: 5,
     hasMedia: false,
     uploadedAt: '2026-08-01T10:00:00.000Z',
+    resolvedAt: null,
     ...over,
   }
 }
@@ -38,7 +42,13 @@ describe('parseFeedbackFilters', () => {
         media: 'with',
         sort: 'lowest',
       }),
-    ).toEqual({ campaign: EVENT_A, rating: 'critical', media: 'with', sort: 'lowest' })
+    ).toEqual({
+      campaign: EVENT_A,
+      rating: 'critical',
+      media: 'with',
+      state: 'all',
+      sort: 'lowest',
+    })
   })
 
   // Eine handeditierte URL darf keine Fehlerseite erzeugen.
@@ -68,6 +78,7 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...DEFAULT_FILTERS, rating: 'critical' })).toBe(true)
     expect(hasActiveFilters({ ...DEFAULT_FILTERS, campaign: EVENT_A })).toBe(true)
     expect(hasActiveFilters({ ...DEFAULT_FILTERS, media: 'without' })).toBe(true)
+    expect(hasActiveFilters({ ...DEFAULT_FILTERS, state: 'open' })).toBe(true)
     expect(hasActiveFilters({ ...DEFAULT_FILTERS, sort: 'lowest' })).toBe(true)
   })
 })
@@ -101,6 +112,39 @@ describe('matchesMedia', () => {
   })
 })
 
+describe('matchesState', () => {
+  it('separates open from resolved entries', () => {
+    expect(matchesState(null, 'open')).toBe(true)
+    expect(matchesState(RESOLVED_AT, 'open')).toBe(false)
+    expect(matchesState(RESOLVED_AT, 'resolved')).toBe(true)
+    expect(matchesState(null, 'resolved')).toBe(false)
+  })
+
+  it('lets everything through on "all"', () => {
+    expect(matchesState(null, 'all')).toBe(true)
+    expect(matchesState(RESOLVED_AT, 'all')).toBe(true)
+  })
+})
+
+describe('needsAttention', () => {
+  it('counts a critical rating and a blocked entry', () => {
+    expect(needsAttention({ rating: 1, blocked: false, resolvedAt: null })).toBe(true)
+    expect(needsAttention({ rating: 2, blocked: false, resolvedAt: null })).toBe(true)
+    expect(needsAttention({ rating: 5, blocked: true, resolvedAt: null })).toBe(true)
+  })
+
+  it('ignores an unremarkable entry', () => {
+    expect(needsAttention({ rating: 4, blocked: false, resolvedAt: null })).toBe(false)
+    expect(needsAttention({ rating: null, blocked: false, resolvedAt: null })).toBe(false)
+  })
+
+  // Der Kern von Migration 0020: ohne resolved_at bliebe eine bearbeitete Beschwerde
+  // für immer in der Kennzahl und die Zahl zeigte die Historie statt der Arbeitslast.
+  it('drops out once the operator marked it as handled', () => {
+    expect(needsAttention({ rating: 1, blocked: true, resolvedAt: RESOLVED_AT })).toBe(false)
+  })
+})
+
 describe('applyFeedbackFilters', () => {
   const items = [
     item({ rating: 1, hasMedia: true }),
@@ -128,6 +172,19 @@ describe('applyFeedbackFilters', () => {
     const result = applyFeedbackFilters(items, { ...DEFAULT_FILTERS, campaign: EVENT_B })
     expect(result).toHaveLength(1)
     expect(result[0]?.eventId).toBe(EVENT_B)
+  })
+
+  it('narrows to the open work when the state filter is set', () => {
+    const mixed = [
+      item({ rating: 1 }),
+      item({ rating: 1, resolvedAt: RESOLVED_AT }),
+      item({ rating: 5 }),
+    ]
+    const open = applyFeedbackFilters(mixed, { ...DEFAULT_FILTERS, state: 'open' })
+    const resolved = applyFeedbackFilters(mixed, { ...DEFAULT_FILTERS, state: 'resolved' })
+    expect(open).toHaveLength(2)
+    expect(resolved).toHaveLength(1)
+    expect(resolved[0]?.resolvedAt).toBe(RESOLVED_AT)
   })
 
   it('can isolate unrated entries', () => {
