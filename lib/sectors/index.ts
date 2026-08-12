@@ -34,6 +34,7 @@ import type {
   CampaignCapabilities,
   CampaignType,
   CampaignTypeConfig,
+  DashboardCapabilities,
   DashboardLabels,
   FeedbackQuestion,
   FlowMode,
@@ -167,6 +168,74 @@ export function resolveDashboardLabels(
   }
 
   return DEFAULT_DASHBOARD_LABELS
+}
+
+// ─── Betreiber-Dashboard: Panels ──────────────────────────────────────────────
+
+/**
+ * Fällt zurück, wenn der Sektor unbekannt ist (defekte/zukünftige tenants-Zeile).
+ *
+ * Bewusst alles `true`: eine unbekannte Geschäftsart soll KEINE Panels verstecken. Das Ausblenden
+ * ist eine reine Darstellungsentscheidung — welche Daten ein Tenant sehen darf, entscheidet
+ * ausschließlich die RLS. Ein Fehlgriff hier darf also höchstens eine leere Kachel zeigen,
+ * niemals Daten verbergen, die jemand braucht.
+ */
+export const DEFAULT_DASHBOARD_CAPABILITIES: DashboardCapabilities = {
+  ratingEnabled: true,
+  galleryEnabled: true,
+  commentEnabled: true,
+  guestNameEnabled: true,
+}
+
+/** Die Flow-Modi, die ein Kampagnentyp annehmen kann (heute je genau einer). */
+export function flowModesForCampaignType(type: CampaignType): FlowMode[] {
+  const config = CAMPAIGN_TYPES[type]
+  if (!config) return []
+  return config.allowFlowModeChoice ? [...FLOW_MODE_TUPLE] : [config.defaultFlowMode]
+}
+
+/**
+ * Was das Dashboard dieses Tenants zeigen kann — die VEREINIGUNG über alle Kampagnentypen, die
+ * er anlegen darf, und deren Flow-Modi.
+ *
+ * Vereinigung (ODER), nicht Schnittmenge: kann auch nur eine seiner Kampagnen bewertet werden,
+ * gehört die Bewertungs-Kachel ins Dashboard — sonst verschwände sie, sobald ein Tenant einen
+ * zweiten Kampagnentyp bekommt.
+ *
+ * Zweiter Ableitungspunkt neben `resolveDashboardLabels`, nach demselben Muster: die Seiten
+ * verzweigen NICHT selbst über Sektor oder Geschäftsart.
+ */
+export function resolveDashboardCapabilities(
+  sector: string | null | undefined,
+  businessType: string | null | undefined,
+): DashboardCapabilities {
+  if (!sector || !isSector(sector)) return DEFAULT_DASHBOARD_CAPABILITIES
+
+  const resolvedBusinessType = businessType && isBusinessType(businessType) ? businessType : null
+  const types = allowedCampaignTypes(sector, resolvedBusinessType)
+
+  // Ein Tenant ohne erlaubte Kampagnentypen (deaktivierter Sektor) bekommt den Standard —
+  // dieselbe Haltung wie beim unbekannten Sektor: nichts verstecken.
+  if (types.length === 0) return DEFAULT_DASHBOARD_CAPABILITIES
+
+  const union: DashboardCapabilities = {
+    ratingEnabled: false,
+    galleryEnabled: false,
+    commentEnabled: false,
+    guestNameEnabled: false,
+  }
+
+  for (const type of types) {
+    for (const mode of flowModesForCampaignType(type)) {
+      const capabilities = getCapabilities(mode)
+      union.ratingEnabled ||= capabilities.ratingEnabled
+      union.galleryEnabled ||= capabilities.galleryEnabled
+      union.commentEnabled ||= capabilities.commentEnabled
+      union.guestNameEnabled ||= capabilities.guestNameEnabled
+    }
+  }
+
+  return union
 }
 
 export function isFlowModeAllowed(type: CampaignType, mode: FlowMode): boolean {

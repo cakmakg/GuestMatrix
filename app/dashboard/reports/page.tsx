@@ -21,7 +21,7 @@ import {
   parseReportFilters,
   rangeQuery,
 } from '@/lib/dashboard/report-filters'
-import { getCampaignConfig, isCampaignType } from '@/lib/sectors'
+import { getCampaignConfig, isCampaignType, resolveDashboardCapabilities } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: `Berichte – ${BRAND.name}` }
@@ -165,6 +165,8 @@ export default async function ReportsPage({ searchParams }: Props) {
   // kein Sonderfall-Code je Geschäftsart. Mehrere erlaubte Kampagnentypen werden vereinigt;
   // gleiche Frage-ID (z. B. `value`) erscheint dabei nur einmal.
   const questions = resolveQuestionCatalog(tenant?.sector, tenant?.business_type)
+  // Panels aus der Registry — dieselbe Ableitung wie Übersicht und Antwortliste.
+  const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
 
   const answerSets = subs.map((sub) => parseAnswers(sub.feedback_answers))
   const dimensions = summarizeDimensions(answerSets, questions)
@@ -270,123 +272,142 @@ export default async function ReportsPage({ searchParams }: Props) {
       </form>
 
       {/* ═══ Bereichs-Aufschlüsselung ═══ */}
-      <section className="gs-panel gs-rise" data-i="2">
-        <div>
-          <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Zufriedenheit nach Bereich</h3>
-          <div style={{ fontSize: 12, color: MUTED }}>
-            Skala 1–5 · {formatNumber(subs.length)} ausgewertete Beiträge
-          </div>
-        </div>
-
-        {dimensions.length === 0 ? (
-          <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
-            Für diese Geschäftsart ist kein Fragenkatalog hinterlegt.
-          </p>
-        ) : !hasAnswers ? (
-          <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
-            Noch keine Detailbewertungen. Sobald Gäste die Einzelfragen beantworten, erscheint hier
-            die Aufschlüsselung.
-          </p>
-        ) : (
-          <>
-            <div>
-              {dimensions.map((summary) => (
-                <DimensionRow key={summary.id} summary={summary} />
-              ))}
+      {/* Alle Panels dieser Seite außer „Medien" rechnen mit Noten. Ohne Bewertungen (Gästebuch)
+          zeigten sie dauerhaft Leerzustände und behaupteten, es fehlten Daten — dabei wird in
+          diesem Flow gar nichts bewertet. */}
+      {can.ratingEnabled && (
+        <section className="gs-panel gs-rise" data-i="2">
+          <div>
+            <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Zufriedenheit nach Bereich</h3>
+            <div style={{ fontSize: 12, color: MUTED }}>
+              Skala 1–5 · {formatNumber(subs.length)} ausgewertete Beiträge
             </div>
+          </div>
 
-            {weakest && weakest.average !== null && (
-              <div
-                style={{
-                  borderLeft: '3px solid var(--color-accent)',
-                  background: 'var(--color-accent-100)',
-                  color: 'var(--color-accent-800)',
-                  padding: '12px 14px',
-                  fontSize: 13,
-                }}
-              >
-                Schwächster Bereich: <strong>{weakest.prompt}</strong> mit{' '}
-                {formatNumber(weakest.average, 1)} aus {weakest.responses}{' '}
-                {weakest.responses === 1 ? 'Antwort' : 'Antworten'}.
+          {dimensions.length === 0 ? (
+            <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
+              Für diese Geschäftsart ist kein Fragenkatalog hinterlegt.
+            </p>
+          ) : !hasAnswers ? (
+            <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
+              Noch keine Detailbewertungen. Sobald Gäste die Einzelfragen beantworten, erscheint
+              hier die Aufschlüsselung.
+            </p>
+          ) : (
+            <>
+              <div>
+                {dimensions.map((summary) => (
+                  <DimensionRow key={summary.id} summary={summary} />
+                ))}
               </div>
-            )}
-          </>
-        )}
-      </section>
+
+              {weakest && weakest.average !== null && (
+                <div
+                  style={{
+                    borderLeft: '3px solid var(--color-accent)',
+                    background: 'var(--color-accent-100)',
+                    color: 'var(--color-accent-800)',
+                    padding: '12px 14px',
+                    fontSize: 13,
+                  }}
+                >
+                  Schwächster Bereich: <strong>{weakest.prompt}</strong> mit{' '}
+                  {formatNumber(weakest.average, 1)} aus {weakest.responses}{' '}
+                  {weakest.responses === 1 ? 'Antwort' : 'Antworten'}.
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {/* ═══ Gesamtbewertung + Medien ═══ */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)',
+          // Ohne Gesamtbewertung steht „Medien" allein — dann volle Breite statt einer
+          // leeren Spalte daneben.
+          gridTemplateColumns: can.ratingEnabled
+            ? 'minmax(0, 1.3fr) minmax(0, 1fr)'
+            : 'minmax(0, 1fr)',
           gap: 20,
           alignItems: 'start',
         }}
       >
-        <section className="gs-panel gs-rise" data-i="3">
-          <div>
-            <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Gesamtbewertung</h3>
-            <div style={{ fontSize: 12, color: MUTED }}>
-              {formatNumber(ratings.length)} {ratings.length === 1 ? 'Bewertung' : 'Bewertungen'}
-            </div>
-          </div>
-
-          {ratings.length === 0 ? (
-            <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Noch keine Bewertungen.</p>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <div style={{ font: '800 38px/1 var(--font-heading)', letterSpacing: '-0.025em' }}>
-                  {overall !== null ? formatNumber(overall, 1) : '—'}
-                </div>
-                <span style={{ fontSize: 14, color: MUTED }}>/ 5,0</span>
-                {critical !== null && (
-                  <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED }}>
-                    {formatNumber(critical, 1)} % kritisch (≤ 2)
-                  </span>
-                )}
+        {can.ratingEnabled && (
+          <section className="gs-panel gs-rise" data-i="3">
+            <div>
+              <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Gesamtbewertung</h3>
+              <div style={{ fontSize: 12, color: MUTED }}>
+                {formatNumber(ratings.length)} {ratings.length === 1 ? 'Bewertung' : 'Bewertungen'}
               </div>
+            </div>
 
-              <div>
-                {[5, 4, 3, 2, 1].map((star) => {
-                  const count = distribution[star - 1] ?? 0
-                  const pct = ratings.length > 0 ? (count / ratings.length) * 100 : 0
-                  return (
-                    <div
-                      key={star}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '34px 1fr 48px',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '6px 0',
-                      }}
-                    >
-                      <span style={{ fontSize: 13, color: MUTED }}>{star} ★</span>
-                      <div className="gs-bar">
-                        <i style={{ width: `${pct}%` }} />
-                      </div>
-                      <span
+            {ratings.length === 0 ? (
+              <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Noch keine Bewertungen.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <div
+                    style={{ font: '800 38px/1 var(--font-heading)', letterSpacing: '-0.025em' }}
+                  >
+                    {overall !== null ? formatNumber(overall, 1) : '—'}
+                  </div>
+                  <span style={{ fontSize: 14, color: MUTED }}>/ 5,0</span>
+                  {critical !== null && (
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: MUTED }}>
+                      {formatNumber(critical, 1)} % kritisch (≤ 2)
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  {[5, 4, 3, 2, 1].map((star) => {
+                    const count = distribution[star - 1] ?? 0
+                    const pct = ratings.length > 0 ? (count / ratings.length) * 100 : 0
+                    return (
+                      <div
+                        key={star}
                         style={{
-                          fontSize: 12,
-                          textAlign: 'right',
-                          fontVariantNumeric: 'tabular-nums',
+                          display: 'grid',
+                          gridTemplateColumns: '34px 1fr 48px',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '6px 0',
                         }}
                       >
-                        {formatNumber(count)}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </section>
+                        <span style={{ fontSize: 13, color: MUTED }}>{star} ★</span>
+                        <div className="gs-bar">
+                          <i style={{ width: `${pct}%` }} />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                          }}
+                        >
+                          {formatNumber(count)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         <section className="gs-panel gs-rise" data-i="4">
           <div>
-            <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Medien &amp; Freigabe</h3>
-            <div style={{ fontSize: 12, color: MUTED }}>Was du im Marketing einsetzen kannst</div>
+            <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Medien</h3>
+            <div style={{ fontSize: 12, color: MUTED }}>
+              {/* Ohne Galerie gibt es keine Freigabe für die Öffentlichkeit — die Medien bleiben
+                  beim Veranstalter. Dann ist „Marketing" das falsche Versprechen. */}
+              {can.galleryEnabled
+                ? 'Was du im Marketing einsetzen kannst'
+                : 'Was deine Gäste beigetragen haben'}
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -427,78 +448,81 @@ export default async function ReportsPage({ searchParams }: Props) {
       </div>
 
       {/* ═══ Kampagnen-Vergleich ═══ */}
-      <section className="gs-panel gs-rise" data-i="5">
-        <div>
-          <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Kampagnen im Vergleich</h3>
-          <div style={{ fontSize: 12, color: MUTED }}>
-            Nur Kampagnen mit mindestens einer Bewertung
-          </div>
-        </div>
-
-        {perCampaign.length === 0 ? (
-          <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Noch keine bewertete Kampagne.</p>
-        ) : (
+      {/* Verglichen wird über Durchschnittsnoten — ohne Noten gibt es nichts zu vergleichen. */}
+      {can.ratingEnabled && (
+        <section className="gs-panel gs-rise" data-i="5">
           <div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) 130px 92px 1fr 60px',
-                gap: 16,
-                padding: '0 2px 8px',
-                fontSize: 10,
-                letterSpacing: '.1em',
-                textTransform: 'uppercase',
-                color: MUTED,
-              }}
-            >
-              <div>Kampagne</div>
-              <div>Typ</div>
-              <div>Antworten</div>
-              <div>Bewertung</div>
-              <div style={{ textAlign: 'right' }}>Ø</div>
+            <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Kampagnen im Vergleich</h3>
+            <div style={{ fontSize: 12, color: MUTED }}>
+              Nur Kampagnen mit mindestens einer Bewertung
             </div>
+          </div>
 
-            {perCampaign.map((row) => (
+          {perCampaign.length === 0 ? (
+            <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Noch keine bewertete Kampagne.</p>
+          ) : (
+            <div>
               <div
-                key={row.id}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'minmax(0, 1fr) 130px 92px 1fr 60px',
-                  alignItems: 'center',
                   gap: 16,
-                  padding: '11px 2px',
-                  borderTop: '1px solid var(--color-divider)',
+                  padding: '0 2px 8px',
+                  fontSize: 10,
+                  letterSpacing: '.1em',
+                  textTransform: 'uppercase',
+                  color: MUTED,
                 }}
               >
-                <div style={{ minWidth: 0, font: '600 14px/1.3 var(--font-body)' }}>
-                  {row.name}
-                  {row.archived && (
-                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: MUTED }}>
-                      archiviert
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 13 }}>{row.label}</div>
-                <div style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
-                  {formatNumber(row.responses)}
-                </div>
-                <div className="gs-bar">
-                  <i style={{ width: `${((row.average ?? 0) / 5) * 100}%` }} />
-                </div>
+                <div>Kampagne</div>
+                <div>Typ</div>
+                <div>Antworten</div>
+                <div>Bewertung</div>
+                <div style={{ textAlign: 'right' }}>Ø</div>
+              </div>
+
+              {perCampaign.map((row) => (
                 <div
+                  key={row.id}
                   style={{
-                    font: '800 16px/1 var(--font-heading)',
-                    textAlign: 'right',
-                    fontVariantNumeric: 'tabular-nums',
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) 130px 92px 1fr 60px',
+                    alignItems: 'center',
+                    gap: 16,
+                    padding: '11px 2px',
+                    borderTop: '1px solid var(--color-divider)',
                   }}
                 >
-                  {row.average !== null ? formatNumber(row.average, 1) : '—'}
+                  <div style={{ minWidth: 0, font: '600 14px/1.3 var(--font-body)' }}>
+                    {row.name}
+                    {row.archived && (
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: MUTED }}>
+                        archiviert
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13 }}>{row.label}</div>
+                  <div style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                    {formatNumber(row.responses)}
+                  </div>
+                  <div className="gs-bar">
+                    <i style={{ width: `${((row.average ?? 0) / 5) * 100}%` }} />
+                  </div>
+                  <div
+                    style={{
+                      font: '800 16px/1 var(--font-heading)',
+                      textAlign: 'right',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {row.average !== null ? formatNumber(row.average, 1) : '—'}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   )
 }

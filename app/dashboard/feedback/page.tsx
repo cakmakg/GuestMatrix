@@ -10,8 +10,13 @@ import {
   parseFeedbackFilters,
   sortFeedback,
 } from '@/lib/dashboard/feedback-filters'
-import { parseAnswers, resolveQuestionCatalog } from '@/lib/dashboard/feedback-summary'
+import {
+  answeredQuestions,
+  parseAnswers,
+  resolveQuestionCatalog,
+} from '@/lib/dashboard/feedback-summary'
 import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
+import { resolveDashboardCapabilities } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { deleteFromDashboardAction, moderateAction, resolveAction } from '../actions'
@@ -155,6 +160,8 @@ export default async function FeedbackPage({ searchParams }: Props) {
   const events = (eventsData as EventRow[]) ?? []
   const subs = (subsData as SubmissionRow[]) ?? []
   const questions = resolveQuestionCatalog(tenant?.sector, tenant?.business_type)
+  // Panels aus der Registry: ein Gästebuch kennt keine Noten, dafür einen Absender.
+  const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
   const eventNameById = new Map(events.map((event) => [event.id, event.name]))
 
   const rows = subs.map((sub) => ({
@@ -208,7 +215,11 @@ export default async function FeedbackPage({ searchParams }: Props) {
         >
           {rows.length === 0
             ? 'Sobald Gäste antworten, sammeln sich ihre Rückmeldungen hier — kampagnenübergreifend.'
-            : `${formatNumber(rows.length)} Rückmeldungen aus ${formatNumber(events.length)} Kampagnen · ${formatNumber(criticalTotal)} kritisch.`}
+            : // „kritisch" ist eine Aussage über Noten — ohne Noten wäre sie immer 0 und damit
+              // eine Behauptung über etwas, das gar nicht erhoben wurde.
+              `${formatNumber(rows.length)} Rückmeldungen aus ${formatNumber(events.length)} Kampagnen${
+                can.ratingEnabled ? ` · ${formatNumber(criticalTotal)} kritisch` : ''
+              }.`}
         </div>
       </div>
 
@@ -228,12 +239,15 @@ export default async function FeedbackPage({ searchParams }: Props) {
             ...events.map((event) => ({ value: event.id, label: event.name })),
           ]}
         />
-        <Field
-          label="Bewertung"
-          name="rating"
-          value={filters.rating}
-          options={Object.entries(RATING_LABELS).map(([value, label]) => ({ value, label }))}
-        />
+        {/* Ein Bewertungsfilter ohne Bewertungen böte nur Optionen an, die nie etwas treffen. */}
+        {can.ratingEnabled && (
+          <Field
+            label="Bewertung"
+            name="rating"
+            value={filters.rating}
+            options={Object.entries(RATING_LABELS).map(([value, label]) => ({ value, label }))}
+          />
+        )}
         <Field
           label="Medien"
           name="media"
@@ -293,16 +307,17 @@ export default async function FeedbackPage({ searchParams }: Props) {
         ) : (
           <div>
             {visible.map((row) => {
-              const answered = questions.filter(
-                (question) => typeof row.answers[question.id] === 'number',
-              )
+              const answered = answeredQuestions(row.answers, questions)
 
               return (
                 <div
                   key={row.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '58px minmax(0, 1fr) 104px',
+                    // Ohne Bewertungen entfällt die Noten-Spalte; der Gruß rückt nach vorn.
+                    gridTemplateColumns: can.ratingEnabled
+                      ? '58px minmax(0, 1fr) 104px'
+                      : 'minmax(0, 1fr) 104px',
                     gap: 16,
                     alignItems: 'start',
                     padding: '14px 2px',
@@ -310,26 +325,35 @@ export default async function FeedbackPage({ searchParams }: Props) {
                   }}
                 >
                   {/* Note */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div
-                      style={{
-                        font: '800 22px/1 var(--font-heading)',
-                        fontVariantNumeric: 'tabular-nums',
-                        color:
-                          row.rating !== null && row.rating <= 2
-                            ? 'var(--color-accent)'
-                            : 'var(--color-text)',
-                      }}
-                    >
-                      {row.rating ?? '—'}
+                  {can.ratingEnabled && (
+                    <div style={{ textAlign: 'center' }}>
+                      <div
+                        style={{
+                          font: '800 22px/1 var(--font-heading)',
+                          fontVariantNumeric: 'tabular-nums',
+                          color:
+                            row.rating !== null && row.rating <= 2
+                              ? 'var(--color-accent)'
+                              : 'var(--color-text)',
+                        }}
+                      >
+                        {row.rating ?? '—'}
+                      </div>
+                      <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
+                        {row.rating !== null ? '★' : 'ohne'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
-                      {row.rating !== null ? '★' : 'ohne'}
-                    </div>
-                  </div>
+                  )}
 
                   {/* Inhalt */}
                   <div style={{ minWidth: 0 }}>
+                    {/* Im Gästebuch ist der Absender die Überschrift, nicht eine Randnotiz. */}
+                    {can.guestNameEnabled && (
+                      <div style={{ font: '600 14px/1.3 var(--font-body)', marginBottom: 3 }}>
+                        {row.guestName && row.guestName.trim() !== '' ? row.guestName : 'Anonym'}
+                      </div>
+                    )}
+
                     {row.comment && row.comment.trim() !== '' ? (
                       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45 }}>{row.comment}</p>
                     ) : (
@@ -339,7 +363,13 @@ export default async function FeedbackPage({ searchParams }: Props) {
                     )}
 
                     <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
-                      {row.guestName && row.guestName.trim() !== '' ? row.guestName : 'Anonym'} ·{' '}
+                      {/* Steht der Name schon als Überschrift, wäre er hier eine Dopplung. */}
+                      {!can.guestNameEnabled && (
+                        <>
+                          {row.guestName && row.guestName.trim() !== '' ? row.guestName : 'Anonym'}{' '}
+                          ·{' '}
+                        </>
+                      )}
                       {eventNameById.get(row.eventId) ?? 'Kampagne'} ·{' '}
                       {formatRelative(row.uploadedAt, now)}
                     </div>

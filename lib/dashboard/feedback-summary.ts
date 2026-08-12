@@ -67,6 +67,28 @@ export function parseAnswers(value: unknown): AnswerSet {
 }
 
 /**
+ * Die Fragen, auf die dieser Beitrag tatsächlich geantwortet hat — in Katalog-Reihenfolge.
+ *
+ * „Beantwortet" heißt: ein Wert liegt vor, gleich welchen Typs. Die Antwortliste prüfte früher
+ * auf `typeof === 'number'` und verschluckte damit JEDE Text-Antwort — im Gästebuch also die
+ * einzige strukturierte Frage („Beschreibt die Feier in drei Worten"). Sie stand in der DB und
+ * war im Dashboard unsichtbar.
+ *
+ * Leere Strings zählen nicht als Antwort: sie entstehen, wenn ein Gast das Feld anfasst und
+ * wieder leert, und ergäben ein Etikett ohne Inhalt.
+ */
+export function answeredQuestions(
+  answers: AnswerSet,
+  questions: readonly FeedbackQuestion[],
+): FeedbackQuestion[] {
+  return questions.filter((question) => {
+    const value = answers[question.id]
+    if (typeof value === 'string') return value.trim() !== ''
+    return typeof value === 'number'
+  })
+}
+
+/**
  * Mittelwert je Rating-Frage. `text`-Fragen (z. B. Hochzeit „drei Worte") haben keinen
  * Mittelwert und bleiben draußen.
  */

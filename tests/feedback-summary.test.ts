@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  answeredQuestions,
   average,
   negativeShare,
   parseAnswers,
@@ -169,5 +170,36 @@ describe('registry wiring for the report', () => {
       expect(questions.length).toBeGreaterThan(0)
       expect(questions.every((q) => q.type === 'rating')).toBe(true)
     }
+  })
+})
+
+describe('answeredQuestions', () => {
+  const CATALOG = [
+    { id: 'cleanliness', prompt: 'Sauberkeit', type: 'rating' as const },
+    { id: 'three_words', prompt: 'Drei Worte', type: 'text' as const, maxLength: 60 },
+  ]
+
+  // Regression: die Antwortliste filterte auf `typeof === 'number'` und verschluckte damit die
+  // einzige strukturierte Frage des Hochzeits-Gästebuchs.
+  it('keeps text answers, not just numeric ones', () => {
+    const answered = answeredQuestions({ three_words: 'laut, schön, lang' }, CATALOG)
+    expect(answered.map((q) => q.id)).toEqual(['three_words'])
+  })
+
+  it('keeps numeric answers', () => {
+    expect(answeredQuestions({ cleanliness: 5 }, CATALOG).map((q) => q.id)).toEqual(['cleanliness'])
+  })
+
+  it('preserves catalog order regardless of answer order', () => {
+    const answered = answeredQuestions({ three_words: 'a b c', cleanliness: 4 }, CATALOG)
+    expect(answered.map((q) => q.id)).toEqual(['cleanliness', 'three_words'])
+  })
+
+  it('treats a blank text answer as unanswered', () => {
+    expect(answeredQuestions({ three_words: '   ' }, CATALOG)).toEqual([])
+  })
+
+  it('ignores answers whose key is not in the catalog', () => {
+    expect(answeredQuestions({ vanished_key: 3 }, CATALOG)).toEqual([])
   })
 })

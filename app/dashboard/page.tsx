@@ -14,7 +14,7 @@ import {
   sparklinePath,
 } from '@/lib/dashboard/metrics'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
-import { resolveDashboardLabels } from '@/lib/sectors'
+import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 type EventRow = {
@@ -244,6 +244,9 @@ export default async function DashboardPage() {
   const planConfig = getPlanConfig(resolvePlan(tenant?.plan))
   // Benennung aus der Registry — die Seite verzweigt nicht selbst über die Geschaeftsart.
   const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
+  // Ebenso die Panels: ein Gästebuch-Tenant (Hochzeit) kann weder bewerten noch eine Galerie
+  // veröffentlichen — Kacheln dafür blieben dauerhaft leer und läsen sich wie ein Datenfehler.
+  const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
 
   const uploadTimes = subs
     .map((s) => (s.uploaded_at ? new Date(s.uploaded_at).getTime() : null))
@@ -297,6 +300,14 @@ export default async function DashboardPage() {
     (s) => s.uploaded_at !== null && new Date(s.uploaded_at).getTime() >= now - 30 * DAY_MS,
   ).length
 
+  // Ohne Galerie zählt nicht die Freigabe, sondern der Bestand — im Gästebuch bleiben alle
+  // Medien privat beim Veranstalter, „freigegeben" hätte dort keinen Adressaten.
+  const mediaTimes = withMedia
+    .map((s) => (s.uploaded_at ? new Date(s.uploaded_at).getTime() : null))
+    .filter((t): t is number => t !== null)
+  const mediaWeekly = bucketCounts(mediaTimes, now, SPARK_BUCKETS, WEEK_MS)
+  const mediaLast30 = mediaTimes.filter((t) => t >= now - 30 * DAY_MS).length
+
   // ── Offene Punkte: kritisch ODER gesperrt — und noch nicht bearbeitet ──────
   // Die Regel liegt in lib/dashboard/feedback-filters (needsAttention), damit Übersicht und
   // Antwortliste dieselbe Definition benutzen und sie ohne DB testbar bleibt.
@@ -311,6 +322,21 @@ export default async function DashboardPage() {
     (t) => t >= now - 60 * DAY_MS && t < now - 30 * DAY_MS,
   ).length
   const attentionDelta = percentDelta(attention30, attentionPrior30)
+
+  // Eigene Konstante statt eines Inline-Objekts im Spread: so bleibt `tone` der Literal-Typ aus
+  // Kpi und braucht keine Typzusicherung.
+  const ratingKpi: Kpi = {
+    label: 'Ø Bewertung',
+    value: avgRating !== null ? formatNumber(avgRating, 1) : '—',
+    unit: avgRating !== null ? '/ 5,0' : undefined,
+    delta:
+      ratingDelta === null
+        ? 'Neu'
+        : `${ratingDelta >= 0 ? '+' : '−'}${formatNumber(Math.abs(ratingDelta), 1)}`,
+    tone: ratingDelta === null ? 'new' : ratingDelta > 0 ? 'up' : ratingDelta < 0 ? 'down' : 'flat',
+    series: weekly.map(() => (avgRating ?? 0) * 20),
+    href: '/dashboard/reports',
+  }
 
   const kpis: Kpi[] = [
     {
@@ -329,37 +355,44 @@ export default async function DashboardPage() {
       series: runningTotal(weekly, olderThanWindow),
       href: '/dashboard/feedback',
     },
-    {
-      label: 'Ø Bewertung',
-      value: avgRating !== null ? formatNumber(avgRating, 1) : '—',
-      unit: avgRating !== null ? '/ 5,0' : undefined,
-      delta:
-        ratingDelta === null
-          ? 'Neu'
-          : `${ratingDelta >= 0 ? '+' : '−'}${formatNumber(Math.abs(ratingDelta), 1)}`,
-      tone:
-        ratingDelta === null ? 'new' : ratingDelta > 0 ? 'up' : ratingDelta < 0 ? 'down' : 'flat',
-      series: weekly.map(() => (avgRating ?? 0) * 20),
-      href: '/dashboard/reports',
-    },
-    {
-      label: 'UGC freigegeben',
-      value: formatNumber(released.length),
-      delta: released30 === 0 ? '±0' : `+${released30}`,
-      tone: released30 > 0 ? 'up' : 'flat',
-      series: runningTotal(
-        releasedWeekly,
-        released.length - releasedWeekly.reduce((a, b) => a + b, 0),
-      ),
-      href: '/dashboard/media?state=released',
-    },
+    // Ohne Bewertungen (Gästebuch) gäbe es hier dauerhaft „—" — die Kachel entfällt ganz.
+    ...(can.ratingEnabled ? [ratingKpi] : []),
+    // Dieselben Medien, andere Bedeutung: mit Galerie zählt, was VERÖFFENTLICHT werden darf;
+    // im geschlossenen Gästebuch gibt es nichts zu veröffentlichen — dort zählt der Bestand.
+    can.galleryEnabled
+      ? {
+          label: 'UGC freigegeben',
+          value: formatNumber(released.length),
+          delta: released30 === 0 ? '±0' : `+${released30}`,
+          tone: released30 > 0 ? 'up' : 'flat',
+          series: runningTotal(
+            releasedWeekly,
+            released.length - releasedWeekly.reduce((a, b) => a + b, 0),
+          ),
+          href: '/dashboard/media?state=released',
+        }
+      : {
+          label: 'Fotos & Videos',
+          value: formatNumber(withMedia.length),
+          delta: mediaLast30 === 0 ? '±0' : `+${mediaLast30}`,
+          tone: mediaLast30 > 0 ? 'up' : 'flat',
+          series: runningTotal(
+            mediaWeekly,
+            withMedia.length - mediaWeekly.reduce((a, b) => a + b, 0),
+          ),
+          href: '/dashboard/media',
+        },
     {
       label: 'Braucht Aufmerksamkeit',
       value: formatNumber(openItems.length),
       delta: formatPercentDelta(attentionDelta),
       tone: deltaTone(attentionDelta),
       series: bucketCounts(attentionTimes, now, SPARK_BUCKETS, WEEK_MS),
-      href: '/dashboard/feedback?rating=critical',
+      // Ohne Bewertungen bleiben nur gesperrte Beiträge offen — der Kritisch-Filter träfe nie zu
+      // und der Link öffnete garantiert eine leere Liste.
+      href: can.ratingEnabled
+        ? '/dashboard/feedback?rating=critical'
+        : '/dashboard/feedback?state=open',
       // Mehr offene Punkte ist keine Verbesserung.
       higherIsBetter: false,
     },

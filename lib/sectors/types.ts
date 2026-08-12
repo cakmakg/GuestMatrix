@@ -173,6 +173,23 @@ export type DashboardLabels = {
   activeExperiences: string
 }
 
+/**
+ * Welche Panels das Betreiber-Dashboard für diesen Tenant überhaupt zeigen darf.
+ *
+ * Bewusst eine Teilmenge von `CampaignCapabilities` statt eines zweiten, parallel gepflegten
+ * Typs: die Wahrheit steht weiterhin in FLOW_MODE_CAPABILITIES. `mediaRequired` und
+ * `reciprocityEnabled` sind reine Gäste-Flow-Belange und fehlen hier deshalb.
+ *
+ * Ohne diese Ableitung zeigt das Dashboard einem Gästebuch-Tenant (Hochzeit) Kacheln, die es
+ * nie füllen kann — „Ø Bewertung" bleibt „—", und der Link „kritische Bewertungen" öffnet
+ * garantiert eine leere Liste. Das ist schlimmer als eine fehlende Kachel: es sieht aus wie
+ * ein Datenfehler.
+ */
+export type DashboardCapabilities = Pick<
+  CampaignCapabilities,
+  'ratingEnabled' | 'galleryEnabled' | 'commentEnabled' | 'guestNameEnabled'
+>
+
 // Eine business_type-Unterrolle bündelt die Kampagnentypen eines Geschäftsmodells. `campaignTypes`
 // ist die Allowlist, die die DB-Grenze (current_tenant_allows_campaign, Migration 0017) spiegelt —
 // aktuell je genau ein Typ (hotel→stay, agency→agency), das Array lässt aber mehrere zu.

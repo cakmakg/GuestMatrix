@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   BUSINESS_TYPES,
   CAMPAIGN_TYPES,
+  DEFAULT_DASHBOARD_CAPABILITIES,
   DEFAULT_DASHBOARD_LABELS,
   SECTORS,
   SIGNUP_OPTIONS,
+  flowModesForCampaignType,
+  resolveDashboardCapabilities,
   resolveDashboardLabels,
   allowedCampaignTypes,
   businessTypesForSector,
@@ -388,5 +391,67 @@ describe('dashboard labels resolve from the registry', () => {
     for (const [id, config] of Object.entries(BUSINESS_TYPES)) {
       expect(config?.dashboardLabels, `${id} has no dashboardLabels`).toBeDefined()
     }
+  })
+})
+
+describe('flowModesForCampaignType', () => {
+  it('returns exactly the default mode while no type offers a choice', () => {
+    expect(flowModesForCampaignType('agency')).toEqual(['gallery'])
+    expect(flowModesForCampaignType('stay')).toEqual(['feedback'])
+    expect(flowModesForCampaignType('wedding')).toEqual(['guestbook'])
+  })
+
+  it('returns nothing for a dormant type', () => {
+    expect(flowModesForCampaignType('property')).toEqual([])
+  })
+})
+
+describe('resolveDashboardCapabilities', () => {
+  it('gives a hotel the rating panels', () => {
+    const can = resolveDashboardCapabilities('tourism', 'hotel')
+    expect(can.ratingEnabled).toBe(true)
+    expect(can.commentEnabled).toBe(true)
+    // Aufenthalts-Feedback ist privat — es gibt keine Gäste-Galerie.
+    expect(can.galleryEnabled).toBe(false)
+    expect(can.guestNameEnabled).toBe(false)
+  })
+
+  it('gives an agency the gallery panels', () => {
+    const can = resolveDashboardCapabilities('tourism', 'agency')
+    expect(can.galleryEnabled).toBe(true)
+    expect(can.ratingEnabled).toBe(true)
+  })
+
+  // Der Kern: das Gästebuch kennt weder Noten noch eine Galerie, dafür einen Absender.
+  it('denies rating and gallery for a wedding tenant but keeps the guest name', () => {
+    const can = resolveDashboardCapabilities('event', null)
+    expect(can.ratingEnabled).toBe(false)
+    expect(can.galleryEnabled).toBe(false)
+    expect(can.guestNameEnabled).toBe(true)
+    expect(can.commentEnabled).toBe(true)
+  })
+
+  it('unions across campaign types instead of intersecting them', () => {
+    // Ein Tenant ohne business_type im tourism-Sektor darf agency (gallery) UND stay (feedback):
+    // die Galerie-Kachel muss bleiben, obwohl stay sie nicht mitbringt.
+    const can = resolveDashboardCapabilities('tourism', null)
+    expect(can.galleryEnabled).toBe(true)
+    expect(can.ratingEnabled).toBe(true)
+  })
+
+  it('hides nothing when the sector is unknown or dormant', () => {
+    expect(resolveDashboardCapabilities(null, null)).toEqual(DEFAULT_DASHBOARD_CAPABILITIES)
+    expect(resolveDashboardCapabilities('nonsense', 'nonsense')).toEqual(
+      DEFAULT_DASHBOARD_CAPABILITIES,
+    )
+    expect(resolveDashboardCapabilities('real_estate', null)).toEqual(
+      DEFAULT_DASHBOARD_CAPABILITIES,
+    )
+  })
+
+  it('stays consistent with the flow-mode capabilities it is derived from', () => {
+    expect(resolveDashboardCapabilities('event', null).ratingEnabled).toBe(
+      getCapabilities('guestbook').ratingEnabled,
+    )
   })
 })
