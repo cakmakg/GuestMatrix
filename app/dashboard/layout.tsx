@@ -115,7 +115,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </span>
         </div>
 
-        <SidebarNav experiencesLabel={labels.experiences} experiencesCount={campaignCount ?? 0} />
+        <SidebarNav labels={labels} experiencesCount={campaignCount ?? 0} />
 
         <div
           style={{

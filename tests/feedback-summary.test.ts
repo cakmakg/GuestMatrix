@@ -7,7 +7,9 @@ import {
   parseAnswers,
   ratingDistribution,
   summarizeDimensions,
+  summarizeTextAnswers,
   weakestDimension,
+  wordFrequency,
 } from '@/lib/dashboard/feedback-summary'
 import type { FeedbackQuestion } from '@/lib/sectors'
 import { allowedCampaignTypes, getFeedbackQuestions } from '@/lib/sectors'
@@ -201,5 +203,74 @@ describe('answeredQuestions', () => {
 
   it('ignores answers whose key is not in the catalog', () => {
     expect(answeredQuestions({ vanished_key: 3 }, CATALOG)).toEqual([])
+  })
+})
+
+describe('summarizeTextAnswers', () => {
+  const CATALOG: FeedbackQuestion[] = [
+    { id: 'cleanliness', prompt: 'Sauberkeit', type: 'rating' },
+    { id: 'three_words', prompt: 'Drei Worte', type: 'text', maxLength: 60 },
+  ]
+
+  it('collects only the text questions', () => {
+    const summaries = summarizeTextAnswers([{ cleanliness: 5, three_words: 'schön' }], CATALOG)
+    expect(summaries.map((s) => s.id)).toEqual(['three_words'])
+    expect(summaries[0]?.answers).toEqual(['schön'])
+  })
+
+  // Eine unbeantwortete Frage soll sichtbar leer bleiben statt aus dem Bericht zu verschwinden.
+  it('keeps a text question without answers', () => {
+    const summaries = summarizeTextAnswers([{ cleanliness: 4 }], CATALOG)
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]?.answers).toEqual([])
+  })
+
+  it('trims and drops blank answers', () => {
+    const summaries = summarizeTextAnswers(
+      [{ three_words: '  laut, schön  ' }, { three_words: '   ' }],
+      CATALOG,
+    )
+    expect(summaries[0]?.answers).toEqual(['laut, schön'])
+  })
+
+  it('ignores a numeric value under a text key', () => {
+    expect(summarizeTextAnswers([{ three_words: 42 }], CATALOG)[0]?.answers).toEqual([])
+  })
+})
+
+describe('wordFrequency', () => {
+  it('counts across answers, most frequent first', () => {
+    const words = wordFrequency(['schön laut', 'schön lang', 'schön'])
+    expect(words[0]).toEqual({ word: 'schön', count: 3 })
+  })
+
+  it('normalises case and punctuation but keeps umlauts distinct', () => {
+    const words = wordFrequency(['Schön, schön!', 'schon'])
+    const byWord = new Map(words.map((w) => [w.word, w.count]))
+    // „schön" und „schon" sind verschiedene Wörter — Umlaute werden nicht plattgemacht.
+    expect(byWord.get('schön')).toBe(1)
+    expect(byWord.get('schon')).toBe(1)
+  })
+
+  // Ein Gast, der dasselbe Wort dreimal schreibt, ist trotzdem eine Stimme.
+  it('counts a repeated word once per answer', () => {
+    expect(wordFrequency(['schön schön schön'])[0]).toEqual({ word: 'schön', count: 1 })
+  })
+
+  it('skips words shorter than three letters', () => {
+    expect(wordFrequency(['ein zu und ja']).map((w) => w.word)).toEqual(['ein', 'und'])
+  })
+
+  it('breaks ties alphabetically so the order is stable', () => {
+    expect(wordFrequency(['beta alpha']).map((w) => w.word)).toEqual(['alpha', 'beta'])
+    expect(wordFrequency(['alpha beta']).map((w) => w.word)).toEqual(['alpha', 'beta'])
+  })
+
+  it('respects the limit', () => {
+    expect(wordFrequency(['eins zwei drei vier'], 2)).toHaveLength(2)
+  })
+
+  it('returns nothing for empty input', () => {
+    expect(wordFrequency([])).toEqual([])
   })
 })

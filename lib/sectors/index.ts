@@ -146,28 +146,32 @@ export const DEFAULT_DASHBOARD_LABELS: DashboardLabels = {
   experiences: 'Kampagnen',
   experience: 'Kampagne',
   activeExperiences: 'Aktive Kampagnen',
+  responses: 'Gästeantworten',
+  response: 'Rückmeldung',
+  media: 'Medien',
 }
 
 /**
- * Wie das Dashboard dieses Tenants seine Arbeitseinheit nennt. Reihenfolge: business_type
- * (feinste Auflösung) → Sektor → neutraler Standard. Einziger Ableitungspunkt; die Seiten
- * verzweigen NICHT selbst über die Geschäftsart.
+ * Wie das Dashboard dieses Tenants seine Arbeitseinheit nennt. Geschichtet: neutraler Standard →
+ * Sektor → business_type (die feinste Auflösung gewinnt je Wort). Einziger Ableitungspunkt; die
+ * Seiten verzweigen NICHT selbst über die Geschäftsart.
+ *
+ * Geschichtet und nicht „der erste Treffer gewinnt": ein Modul überschreibt nur die Wörter, die
+ * bei ihm anders heißen. Ein Hotel verwaltet „Aufenthalte", sammelt aber gewöhnliche
+ * „Gästeantworten" — ohne die Schichtung müsste es jeden Standardtext wiederholen, und ein
+ * später ergänztes Wort bliebe bei ihm undefiniert.
  */
 export function resolveDashboardLabels(
   sector: string | null | undefined,
   businessType: string | null | undefined,
 ): DashboardLabels {
-  if (businessType && isBusinessType(businessType)) {
-    const fromBusinessType = BUSINESS_TYPES[businessType]?.dashboardLabels
-    if (fromBusinessType) return fromBusinessType
-  }
+  const fromSector = sector && isSector(sector) ? SECTORS[sector]?.dashboardLabels : undefined
+  const fromBusinessType =
+    businessType && isBusinessType(businessType)
+      ? BUSINESS_TYPES[businessType]?.dashboardLabels
+      : undefined
 
-  if (sector && isSector(sector)) {
-    const fromSector = SECTORS[sector]?.dashboardLabels
-    if (fromSector) return fromSector
-  }
-
-  return DEFAULT_DASHBOARD_LABELS
+  return { ...DEFAULT_DASHBOARD_LABELS, ...fromSector, ...fromBusinessType }
 }
 
 // ─── Betreiber-Dashboard: Panels ──────────────────────────────────────────────

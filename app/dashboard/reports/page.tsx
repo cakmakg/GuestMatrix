@@ -11,7 +11,9 @@ import {
   ratingDistribution,
   resolveQuestionCatalog,
   summarizeDimensions,
+  summarizeTextAnswers,
   weakestDimension,
+  wordFrequency,
 } from '@/lib/dashboard/feedback-summary'
 import type { DimensionSummary } from '@/lib/dashboard/feedback-summary'
 import { formatNumber } from '@/lib/dashboard/metrics'
@@ -170,6 +172,8 @@ export default async function ReportsPage({ searchParams }: Props) {
 
   const answerSets = subs.map((sub) => parseAnswers(sub.feedback_answers))
   const dimensions = summarizeDimensions(answerSets, questions)
+  // Freie Kurzantworten: im Gästebuch das eigentliche Ergebnis der Feier, sonst eine Ergänzung.
+  const textAnswers = summarizeTextAnswers(answerSets, questions)
   const weakest = weakestDimension(dimensions)
 
   const ratings = subs.map((s) => s.rating).filter((r): r is number => r !== null)
@@ -271,8 +275,74 @@ export default async function ReportsPage({ searchParams }: Props) {
         </a>
       </form>
 
+      {/* ═══ Freie Kurzantworten (z. B. „drei Worte") ═══ */}
+      {/* Nicht an ratingEnabled gehängt, sondern am Katalog: sobald ein Kampagnentyp eine
+          text-Frage mitbringt, gehört sie in den Bericht — auch neben Noten. */}
+      {textAnswers.map((summary, index) => {
+        const words = wordFrequency(summary.answers)
+        const maxCount = words[0]?.count ?? 0
+
+        return (
+          <section key={summary.id} className="gs-panel gs-rise" data-i={2 + index}>
+            <div>
+              <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>{summary.prompt}</h3>
+              <div style={{ fontSize: 12, color: MUTED }}>
+                {formatNumber(summary.answers.length)}{' '}
+                {summary.answers.length === 1 ? 'Antwort' : 'Antworten'}
+              </div>
+            </div>
+
+            {summary.answers.length === 0 ? (
+              <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
+                Noch keine Antwort auf diese Frage.
+              </p>
+            ) : (
+              <>
+                {/* Häufigkeit über die Schriftgröße statt über einen Balken: bei drei Worten je
+                    Gast sind die Zahlen klein, ein Balkendiagramm suggerierte Genauigkeit. */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px 12px',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  {words.map(({ word, count }) => (
+                    <span
+                      key={word}
+                      title={`${count}×`}
+                      style={{
+                        fontSize: 13 + (maxCount > 1 ? Math.round((count / maxCount) * 13) : 0),
+                        lineHeight: 1.2,
+                        color: count === maxCount ? 'var(--color-accent)' : 'var(--color-text)',
+                      }}
+                    >
+                      {word}
+                    </span>
+                  ))}
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 10 }}>
+                  <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>
+                    Zuletzt geschrieben
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {summary.answers.slice(-12).map((answer, i) => (
+                      <span key={`${answer}-${i}`} className="tag tag-neutral">
+                        {answer}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        )
+      })}
+
       {/* ═══ Bereichs-Aufschlüsselung ═══ */}
-      {/* Alle Panels dieser Seite außer „Medien" rechnen mit Noten. Ohne Bewertungen (Gästebuch)
+      {/* Alle folgenden Panels außer „Medien" rechnen mit Noten. Ohne Bewertungen (Gästebuch)
           zeigten sie dauerhaft Leerzustände und behaupteten, es fehlten Daten — dabei wird in
           diesem Flow gar nichts bewertet. */}
       {can.ratingEnabled && (

@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import type { DashboardLabels } from '@/lib/sectors'
+
 /**
  * Nur Routen, die es wirklich gibt. Der Entwurf zeigt zusätzlich „Berichte"-Nachbarn wie
  * „Team" — die sind hier bewusst weggelassen, statt tote Links auszuliefern.
@@ -54,24 +56,24 @@ const ICONS = {
 } as const
 
 type Props = {
-  /** Aus `resolveDashboardLabels` — „Aufenthalte" / „Reisen" / „Feiern". */
-  experiencesLabel: string
+  /** Der aufgelöste Satz aus `resolveDashboardLabels` — „Aufenthalte" / „Reisen" / „Feiern". */
+  labels: DashboardLabels
   experiencesCount: number
 }
 
-export function SidebarNav({ experiencesLabel, experiencesCount }: Props): React.ReactElement {
+export function SidebarNav({ labels, experiencesCount }: Props): React.ReactElement {
   const pathname = usePathname()
 
   const items = [
     { href: '/dashboard', label: 'Übersicht', icon: ICONS.overview },
     {
       href: '/dashboard/experiences',
-      label: experiencesLabel,
+      label: labels.experiences,
       icon: ICONS.experiences,
       count: experiencesCount,
     },
-    { href: '/dashboard/feedback', label: 'Gästeantworten', icon: ICONS.feedback },
-    { href: '/dashboard/media', label: 'Medien', icon: ICONS.media },
+    { href: '/dashboard/feedback', label: labels.responses, icon: ICONS.feedback },
+    { href: '/dashboard/media', label: labels.media, icon: ICONS.media },
     { href: '/dashboard/reports', label: 'Berichte', icon: ICONS.reports },
     { href: '/dashboard/settings', label: 'Einstellungen', icon: ICONS.settings },
   ]

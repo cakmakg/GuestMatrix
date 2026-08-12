@@ -30,6 +30,7 @@ type EventRow = {
 type SubmissionRow = {
   event_id: string
   rating: number | null
+  guest_user_id: string
   guest_name: string | null
   comment: string | null
   media_url: string | null
@@ -225,7 +226,7 @@ export default async function DashboardPage() {
   const { data: subsData } = await supabase
     .from('submissions')
     .select(
-      'event_id, rating, guest_name, comment, media_url, moderation_flag, uploaded_at, resolved_at',
+      'event_id, rating, guest_user_id, guest_name, comment, media_url, moderation_flag, uploaded_at, resolved_at',
     )
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
@@ -323,6 +324,28 @@ export default async function DashboardPage() {
   ).length
   const attentionDelta = percentDelta(attention30, attentionPrior30)
 
+  // Wie viele Gäste überhaupt etwas hinterlassen haben — im Gästebuch eine andere Aussage als die
+  // Zahl der Grüße, weil ein Gast mehrfach schreiben darf. Gezählt wird die Gast-Identität
+  // (guest_user_id), nicht der Name: zwei „Familie Müller" wären sonst eine Person. Wer die
+  // Sitzung wechselt, zählt allerdings erneut — eine Untergrenze, keine exakte Kopfzahl.
+  const contributors = new Set(subs.map((s) => s.guest_user_id)).size
+  const contributors30 = new Set(
+    subs
+      .filter(
+        (s) => s.uploaded_at !== null && new Date(s.uploaded_at).getTime() >= now - 30 * DAY_MS,
+      )
+      .map((s) => s.guest_user_id),
+  ).size
+
+  const contributorsKpi: Kpi = {
+    label: 'Gäste',
+    value: formatNumber(contributors),
+    delta: contributors30 === 0 ? '±0' : `+${contributors30}`,
+    tone: contributors30 > 0 ? 'up' : 'flat',
+    series: weekly,
+    href: '/dashboard/feedback',
+  }
+
   // Eigene Konstante statt eines Inline-Objekts im Spread: so bleibt `tone` der Literal-Typ aus
   // Kpi und braucht keine Typzusicherung.
   const ratingKpi: Kpi = {
@@ -348,7 +371,7 @@ export default async function DashboardPage() {
       href: '/dashboard/experiences',
     },
     {
-      label: 'Gästeantworten',
+      label: labels.responses,
       value: formatNumber(totalUploads),
       delta: formatPercentDelta(uploadDelta),
       tone: deltaTone(uploadDelta),
@@ -356,7 +379,8 @@ export default async function DashboardPage() {
       href: '/dashboard/feedback',
     },
     // Ohne Bewertungen (Gästebuch) gäbe es hier dauerhaft „—" — die Kachel entfällt ganz.
-    ...(can.ratingEnabled ? [ratingKpi] : []),
+    // An ihrer Stelle steht dort, wo Namen erhoben werden, die Zahl der beitragenden Gäste.
+    ...(can.ratingEnabled ? [ratingKpi] : can.guestNameEnabled ? [contributorsKpi] : []),
     // Dieselben Medien, andere Bedeutung: mit Galerie zählt, was VERÖFFENTLICHT werden darf;
     // im geschlossenen Gästebuch gibt es nichts zu veröffentlichen — dort zählt der Bestand.
     can.galleryEnabled
@@ -372,7 +396,7 @@ export default async function DashboardPage() {
           href: '/dashboard/media?state=released',
         }
       : {
-          label: 'Fotos & Videos',
+          label: labels.media,
           value: formatNumber(withMedia.length),
           delta: mediaLast30 === 0 ? '±0' : `+${mediaLast30}`,
           tone: mediaLast30 > 0 ? 'up' : 'flat',

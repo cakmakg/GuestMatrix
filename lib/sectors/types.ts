@@ -171,7 +171,23 @@ export type DashboardLabels = {
   experience: string
   /** Kennzahl auf der Übersicht. */
   activeExperiences: string
+  /** Plural der Gästebeiträge — Navigation, Seitentitel, Kennzahl („Glückwünsche"). */
+  responses: string
+  /** Singular eines Gästebeitrags — Zähler und Leerzustände („Glückwunsch"). */
+  response: string
+  /** Medien-Bibliothek („Fotos & Videos"). */
+  media: string
 }
+
+/**
+ * Was ein Sektor oder eine business_type an Benennung MITBRINGT — jedes Feld optional.
+ *
+ * Getrennt von `DashboardLabels` (dem aufgelösten, vollständigen Satz), damit ein Modul nur die
+ * Wörter überschreibt, die bei ihm wirklich anders heißen. Ein Hotel verwaltet „Aufenthalte",
+ * sammelt aber ganz normale „Gästeantworten" — es soll deshalb nicht gezwungen sein, den
+ * Standardtext zu wiederholen (und ihn beim nächsten Umformulieren zu vergessen).
+ */
+export type DashboardLabelOverrides = Partial<DashboardLabels>
 
 /**
  * Welche Panels das Betreiber-Dashboard für diesen Tenant überhaupt zeigen darf.
@@ -197,7 +213,7 @@ export type BusinessTypeConfig = {
   label: string
   campaignTypes: CampaignType[]
   // Fehlt sie, greift die Benennung des Sektors, sonst der neutrale Standard.
-  dashboardLabels?: DashboardLabels
+  dashboardLabels?: DashboardLabelOverrides
 }
 
 /** Eine vom Betreiber entwickelte Sektor-Einheit (ein Ordner unter `lib/sectors/<id>/`). */
@@ -209,12 +225,12 @@ export type SectorModule = {
   // hat der Sektor keine business_type (Spalte bleibt NULL) — z. B. die dormanten Sektoren.
   businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
   // Benennung für Sektoren ohne business_type (z. B. event). Eine business_type darf sie überschreiben.
-  dashboardLabels?: DashboardLabels
+  dashboardLabels?: DashboardLabelOverrides
 }
 
 export type SectorConfig = {
   label: string
   campaignTypes: CampaignType[]
   businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
-  dashboardLabels?: DashboardLabels
+  dashboardLabels?: DashboardLabelOverrides
 }

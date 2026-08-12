@@ -10,10 +10,15 @@ export const event = {
   id: 'event',
   label: 'Hochzeit / Event',
   // Kein business_type in diesem Sektor — die Benennung hängt hier am Sektor selbst.
+  // Nur die Wörter, die im Gästebuch anders heißen; alles Übrige kommt aus dem Standard.
+  // Ein Brautpaar sammelt keine „Rückmeldungen", sondern Glückwünsche.
   dashboardLabels: {
     experiences: 'Feiern',
     experience: 'Feier',
     activeExperiences: 'Aktive Feiern',
+    responses: 'Glückwünsche',
+    response: 'Glückwunsch',
+    media: 'Fotos & Videos',
   },
   campaignTypes: {
     wedding: {

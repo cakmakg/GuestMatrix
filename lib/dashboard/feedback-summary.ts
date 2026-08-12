@@ -112,6 +112,76 @@ export function summarizeDimensions(
     })
 }
 
+// ─── Text-Antworten (z. B. Hochzeit „drei Worte") ─────────────────────────────
+
+export type TextAnswerSummary = {
+  id: string
+  prompt: string
+  /** Die Antworten in Eingabereihenfolge, leere/nur-Leerzeichen sind bereits entfernt. */
+  answers: string[]
+}
+
+/**
+ * Sammelt die freien Kurzantworten je `text`-Frage.
+ *
+ * Gegenstück zu summarizeDimensions: dort wird gemittelt, hier gibt es nichts zu mitteln — der
+ * Wert dieser Frage liegt im Wortlaut. Der Katalog bestimmt (wie dort) Auswahl und Reihenfolge,
+ * damit eine unbeantwortete Frage sichtbar leer bleibt statt still zu verschwinden.
+ */
+export function summarizeTextAnswers(
+  answerSets: readonly AnswerSet[],
+  questions: readonly FeedbackQuestion[],
+): TextAnswerSummary[] {
+  return questions
+    .filter((question) => question.type === 'text')
+    .map((question) => ({
+      id: question.id,
+      prompt: question.prompt,
+      answers: answerSets
+        .map((set) => set[question.id])
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter((value) => value !== ''),
+    }))
+}
+
+export type WordCount = { word: string; count: number }
+
+/** Ein Wort muss mindestens so lang sein, um gezählt zu werden — filtert „&", „u.", „zu". */
+const MIN_WORD_LENGTH = 3
+
+/**
+ * Häufigste Wörter über alle Antworten — das „drei Worte"-Bild einer Feier.
+ *
+ * Normalisiert wird auf Kleinschreibung ohne Satzzeichen; Umlaute und ß bleiben erhalten
+ * (sonst würden „schön" und „schon" zusammenfallen). Gezählt wird pro Antwort nur EINMAL je
+ * Wort: schreibt ein Gast „schön, schön, schön", soll das nicht wie drei Stimmen wirken.
+ *
+ * Sortierung: Häufigkeit absteigend, bei Gleichstand alphabetisch — ohne den zweiten Schlüssel
+ * hinge die Reihenfolge gleich häufiger Wörter an der Eingabereihenfolge und wechselte
+ * scheinbar zufällig zwischen zwei Aufrufen.
+ */
+export function wordFrequency(answers: readonly string[], limit = 24): WordCount[] {
+  const counts = new Map<string, number>()
+
+  for (const answer of answers) {
+    const words = new Set(
+      answer
+        .toLowerCase()
+        .split(/[^\p{Letter}\p{Number}]+/u)
+        .filter((word) => word.length >= MIN_WORD_LENGTH),
+    )
+    for (const word of words) {
+      counts.set(word, (counts.get(word) ?? 0) + 1)
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word, 'de'))
+    .slice(0, limit)
+}
+
 /** Verteilung auf 1–5 Sterne. Index 0 = 1 Stern. Werte außerhalb 1–5 werden ignoriert. */
 export function ratingDistribution(ratings: readonly number[]): number[] {
   const buckets = [0, 0, 0, 0, 0]

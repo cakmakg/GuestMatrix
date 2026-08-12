@@ -455,3 +455,37 @@ describe('resolveDashboardCapabilities', () => {
     )
   })
 })
+
+describe('dashboard labels are layered, not all-or-nothing', () => {
+  it('a hotel keeps its own experience words and inherits the neutral rest', () => {
+    const labels = resolveDashboardLabels('tourism', 'hotel')
+    expect(labels.experiences).toBe('Aufenthalte')
+    // Ein Hotel sammelt gewöhnliche Gästeantworten — es muss den Standardtext nicht wiederholen.
+    expect(labels.responses).toBe(DEFAULT_DASHBOARD_LABELS.responses)
+    expect(labels.media).toBe(DEFAULT_DASHBOARD_LABELS.media)
+  })
+
+  it('a wedding tenant renames the guest contributions', () => {
+    const labels = resolveDashboardLabels('event', null)
+    expect(labels.experiences).toBe('Feiern')
+    expect(labels.responses).toBe('Glückwünsche')
+    expect(labels.response).toBe('Glückwunsch')
+    expect(labels.media).toBe('Fotos & Videos')
+  })
+
+  it('every field stays renderable for every active combination', () => {
+    const cases = [
+      resolveDashboardLabels('tourism', 'hotel'),
+      resolveDashboardLabels('tourism', 'agency'),
+      resolveDashboardLabels('event', null),
+      resolveDashboardLabels(null, null),
+      resolveDashboardLabels('nonsense', 'nonsense'),
+    ]
+    for (const labels of cases) {
+      for (const [field, value] of Object.entries(labels)) {
+        expect(typeof value, `${field} is not a string`).toBe('string')
+        expect(value.length, `${field} is empty`).toBeGreaterThan(0)
+      }
+    }
+  })
+})

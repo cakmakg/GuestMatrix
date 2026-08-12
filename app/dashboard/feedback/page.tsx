@@ -16,7 +16,7 @@ import {
   resolveQuestionCatalog,
 } from '@/lib/dashboard/feedback-summary'
 import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
-import { resolveDashboardCapabilities } from '@/lib/sectors'
+import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { deleteFromDashboardAction, moderateAction, resolveAction } from '../actions'
@@ -162,6 +162,7 @@ export default async function FeedbackPage({ searchParams }: Props) {
   const questions = resolveQuestionCatalog(tenant?.sector, tenant?.business_type)
   // Panels aus der Registry: ein Gästebuch kennt keine Noten, dafür einen Absender.
   const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
+  const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
   const eventNameById = new Map(events.map((event) => [event.id, event.name]))
 
   const rows = subs.map((sub) => ({
@@ -201,10 +202,10 @@ export default async function FeedbackPage({ searchParams }: Props) {
             marginBottom: 6,
           }}
         >
-          Gästeantworten
+          {labels.responses}
         </div>
         <h1 style={{ fontSize: 40, margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-          Alle Rückmeldungen
+          Alle {labels.responses}
         </h1>
         <div
           style={{
@@ -214,10 +215,10 @@ export default async function FeedbackPage({ searchParams }: Props) {
           }}
         >
           {rows.length === 0
-            ? 'Sobald Gäste antworten, sammeln sich ihre Rückmeldungen hier — kampagnenübergreifend.'
+            ? `Sobald Gäste antworten, sammeln sich ihre ${labels.responses} hier — kampagnenübergreifend.`
             : // „kritisch" ist eine Aussage über Noten — ohne Noten wäre sie immer 0 und damit
               // eine Behauptung über etwas, das gar nicht erhoben wurde.
-              `${formatNumber(rows.length)} Rückmeldungen aus ${formatNumber(events.length)} Kampagnen${
+              `${formatNumber(rows.length)} ${labels.responses} aus ${formatNumber(events.length)} ${labels.experiences}${
                 can.ratingEnabled ? ` · ${formatNumber(criticalTotal)} kritisch` : ''
               }.`}
         </div>
@@ -289,7 +290,8 @@ export default async function FeedbackPage({ searchParams }: Props) {
           }}
         >
           <h3 style={{ fontSize: 20, margin: 0 }}>
-            {formatNumber(visible.length)} {visible.length === 1 ? 'Rückmeldung' : 'Rückmeldungen'}
+            {formatNumber(visible.length)}{' '}
+            {visible.length === 1 ? labels.response : labels.responses}
           </h3>
           {visible.length !== rows.length && (
             <span style={{ fontSize: 12, color: MUTED }}>
@@ -301,8 +303,10 @@ export default async function FeedbackPage({ searchParams }: Props) {
         {visible.length === 0 ? (
           <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>
             {rows.length === 0
-              ? 'Noch keine Rückmeldungen.'
-              : 'Keine Rückmeldung passt zu diesen Filtern.'}
+              ? // Genusfrei formuliert: das Label-Set führt kein Geschlecht, „Kein Glückwunsch"
+                // und „Keine Rückmeldung" ließen sich daraus nicht beide korrekt bilden.
+                `Noch keine ${labels.responses}.`
+              : `Nichts passt zu diesen Filtern.`}
           </p>
         ) : (
           <div>
