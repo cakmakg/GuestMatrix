@@ -26,6 +26,18 @@ export const event = {
       label: 'Hochzeit / Event',
       defaultFlowMode: 'guestbook',
       allowFlowModeChoice: false,
+      // NOCH NICHT anbieten (bewusst false, nicht entfernt):
+      //
+      // Die Sichtbarkeitsachse existiert vollständig in der DB (Migration 0021: Spalte, CHECK,
+      // `public_guestbook_select`, Proof 11/11). Was fehlt, ist der Bildschirm, auf dem ein Gast
+      // die Beiträge der anderen SIEHT — das ist Dilim C und zurückgestellt.
+      //
+      // Böte man die Wahl trotzdem an, verspräche der Einwilligungstext bei `shared`/`moderated`
+      // („ALLEN Gästen dieser Feier gezeigt") etwas, das kein Bildschirm einlöst. Ein Versprechen
+      // an den Gast, das die Software nicht hält, ist schlimmer als eine fehlende Option.
+      //
+      // Wieder aufmachen = diese Zeile auf `true` setzen; Datenpfad und Texte sind fertig.
+      allowVisibilityChoice: false,
       labels: {
         landingHeadline: 'Hinterlasst dem Brautpaar eure Glückwünsche und schönsten Fotos!',
         ratingPrompt: 'Wie war die Feier für dich?',

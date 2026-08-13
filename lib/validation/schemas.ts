@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { CAMPAIGN_TYPE_TUPLE, FLOW_MODE_TUPLE, isSignupChoice } from '@/lib/sectors'
+import {
+  CAMPAIGN_TYPE_TUPLE,
+  EVENT_VISIBILITY_TUPLE,
+  FLOW_MODE_TUPLE,
+  isSignupChoice,
+} from '@/lib/sectors'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -73,14 +78,38 @@ export const resetPasswordSchema = z
 // ─── Events ───────────────────────────────────────────────────────────────────
 
 export const createEventSchema = z.object({
-  name: z.string().min(1, 'Name is required.').max(100).trim(),
+  // trim() VOR min(1) — sonst zählt „   " als drei Zeichen und eine Kampagne ohne Namen kommt
+  // durch (dieselbe Reihenfolge wie beim guestName oben).
+  name: z.string().trim().min(1, 'Name is required.').max(100),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format.'),
+  // Optionaler Ort (0022) — Hochzeit: Location, Agentur: Reiseziel, Hotel: Haus.
+  venue: z.string().max(120).trim().optional(),
   description: z.string().max(500).trim().optional(),
   campaignType: z.enum(CAMPAIGN_TYPE_TUPLE, {
     errorMap: () => ({ message: 'Invalid campaign type.' }),
   }),
   // Only honoured when the campaign type allows a choice (real estate); ignored otherwise.
   flowMode: z.enum(FLOW_MODE_TUPLE).optional(),
+  // Only honoured when the campaign type allows a choice (wedding, 0021); ignored otherwise.
+  visibility: z.enum(EVENT_VISIBILITY_TUPLE).optional(),
+})
+
+/**
+ * Nachträgliches Bearbeiten einer Kampagne.
+ *
+ * Bewusst OHNE `campaignType`, `flowMode` und `visibility`: die drei bestimmen, was der Gast sieht
+ * und wozu er eingewilligt hat. `visibility` ist zusätzlich DB-seitig festgenagelt (0021,
+ * `tenant_update_own_events` WITH CHECK) — täte diese Route es doch, würde Postgres den UPDATE
+ * ablehnen. Das Schema bildet diese Grenze ab, statt sie erst an der DB scheitern zu lassen.
+ *
+ * Leerer String ist gültig und bedeutet „Feld leeren" (→ NULL); deshalb hier kein `.min(1)` auf
+ * den optionalen Feldern.
+ */
+export const updateEventSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required.').max(100),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format.'),
+  venue: z.string().max(120).trim(),
+  description: z.string().max(500).trim(),
 })
 
 // ─── Submissions ──────────────────────────────────────────────────────────────

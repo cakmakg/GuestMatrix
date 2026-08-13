@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createEventSchema,
+  updateEventSchema,
   feedbackSchema,
   guestbookMessageSchema,
   loginSchema,
@@ -108,6 +109,9 @@ describe('createEventSchema', () => {
 
   it('rejects empty name', () => {
     expect(createEventSchema.safeParse({ ...validBase, name: '' }).success).toBe(false)
+    // Nur Leerzeichen ist genauso leer: trim() muss VOR min(1) laufen, sonst zählt „   "
+    // als drei Zeichen und die Kampagne bekommt einen unsichtbaren Namen.
+    expect(createEventSchema.safeParse({ ...validBase, name: '   ' }).success).toBe(false)
   })
 
   it('rejects invalid date format', () => {
@@ -134,6 +138,76 @@ describe('createEventSchema', () => {
   it('accepts an optional flow mode', () => {
     expect(createEventSchema.safeParse({ ...validBase, flowMode: 'feedback' }).success).toBe(true)
     expect(createEventSchema.safeParse({ ...validBase, flowMode: 'invalid' }).success).toBe(false)
+  })
+
+  it('accepts an optional visibility (0021)', () => {
+    expect(createEventSchema.safeParse({ ...validBase, visibility: 'private' }).success).toBe(true)
+    expect(createEventSchema.safeParse({ ...validBase, visibility: 'shared' }).success).toBe(true)
+    expect(createEventSchema.safeParse({ ...validBase, visibility: 'moderated' }).success).toBe(
+      true,
+    )
+  })
+
+  it('rejects an unknown visibility', () => {
+    expect(createEventSchema.safeParse({ ...validBase, visibility: 'public' }).success).toBe(false)
+  })
+})
+
+describe('updateEventSchema (0022)', () => {
+  const validBase = {
+    name: 'Hochzeit Schmidt',
+    date: '2026-08-15',
+    venue: 'Villa Sole',
+    description: 'Willkommen!',
+  }
+
+  it('accepts the editable fields', () => {
+    expect(updateEventSchema.safeParse(validBase).success).toBe(true)
+  })
+
+  it('treats empty venue and description as valid (clearing the field)', () => {
+    const result = updateEventSchema.safeParse({ ...validBase, venue: '', description: '' })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.venue).toBe('')
+      expect(result.data.description).toBe('')
+    }
+  })
+
+  it('still requires a name and a well-formed date', () => {
+    expect(updateEventSchema.safeParse({ ...validBase, name: '' }).success).toBe(false)
+    expect(updateEventSchema.safeParse({ ...validBase, name: '   ' }).success).toBe(false)
+    expect(updateEventSchema.safeParse({ ...validBase, date: '15.08.2026' }).success).toBe(false)
+  })
+
+  it('trims venue and description', () => {
+    const result = updateEventSchema.safeParse({
+      ...validBase,
+      venue: '  Villa Sole  ',
+      description: '  Hallo  ',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.venue).toBe('Villa Sole')
+      expect(result.data.description).toBe('Hallo')
+    }
+  })
+
+  it('ignores campaign type, flow mode and visibility — they are not editable', () => {
+    const result = updateEventSchema.safeParse({
+      ...validBase,
+      campaignType: 'wedding',
+      flowMode: 'gallery',
+      visibility: 'shared',
+    })
+    expect(result.success).toBe(true)
+    // Wichtig: die drei dürfen nicht durchgereicht werden. `visibility` würde sonst in den
+    // UPDATE wandern und dort erst an der RLS-WITH-CHECK (0021) scheitern.
+    if (result.success) {
+      expect(result.data).not.toHaveProperty('visibility')
+      expect(result.data).not.toHaveProperty('flowMode')
+      expect(result.data).not.toHaveProperty('campaignType')
+    }
   })
 })
 

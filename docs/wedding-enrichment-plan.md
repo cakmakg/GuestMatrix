@@ -65,23 +65,39 @@ sind automatisch als letzte Verteidigungslinie abgedeckt (Defense-in-Depth, json
 
 ---
 
-## NÄCHSTE SCHEIBEN — Sichtbarkeitsachse `events.visibility` (B/C/D)
+## DİLİM B (erledigt, Auswahl aber ABGESCHALTET) — Sichtbarkeitsachse `events.visibility`
 
-> Getrennte PRs. Öffnen bewusst gast-sichtbare Lesepfade → jede Scheibe mit RLS-Audit im Muster 0018.
+**Gebaut und bewiesen** (Migration `0021`): Spalte `visibility` (`private` Default = das bisherige
+geschlossene Modell / `shared` / `moderated`) + CHECK (nur `guestbook` darf ≠ private sein),
+SECURITY-DEFINER-Helfer `is_shared_guestbook_event`, gast-sichtbare Policy
+`public_guestbook_select` (ohne Reciprocity-Gate) und **Unveränderlichkeit nach dem Anlegen**
+(`tenant_update_own_events` WITH CHECK gegen `stored_event_visibility`).
+Proof `supabase/tests/event_visibility_rls_proof.sql`: **11/11**, inkl. private-Regression,
+moderated-Gating über `moderation_flag` und abgelehntem visibility-UPDATE.
 
-**Dilim B — `visibility`-Achse + sichtbarkeits-bewusste RLS (Architektur-Kern, sicherheitslastig)**
+**Die Auswahl wird dem Kunden aber NICHT angeboten** (`event.wedding.allowVisibilityChoice =
+false`, 2026-08-13):
 
-- Migration: `events.visibility` (`private` Default = heutiges geschlossenes Modell / `shared` /
-  `moderated`) + CHECK; Auswahl im Dashboard `events/new` für Hochzeit.
-- **RLS-Neu-Audit (PFLICHT):** der gast-sichtbare Lesepfad wird `visibility`-bewusst (neuer Helfer).
-  `private` nie öffentlich; `shared` geöffnet; `moderated` nur, wenn freigegeben. Wie `0018`
-  **atomar in derselben Migration** ein neuer Proof (private Regression + shared/moderated-Öffnung).
-- **Consent-Text `visibility`-abhängig (rechtlich):** wer „nur das Brautpaar sieht" zustimmt, darf
-  nicht öffentlich erscheinen → `visibility` bei Event-Erstellung gesetzt und nach der ersten
-  Einreichung **nicht in die offenere Richtung änderbar** (oder Consent je Einreichung).
+Der Lesepfad ist offen, aber **kein Bildschirm liest ihn** — eine Suche nach
+`public_guestbook_select` / `is_shared_guestbook_event` im Anwendungscode liefert null Treffer.
+Der Bildschirm, auf dem ein Gast fremde Beiträge sieht, IST Dilim C. Böte man die Wahl trotzdem an,
+verspräche der Einwilligungstext bei `shared`/`moderated` („ALLEN Gästen dieser Feier gezeigt")
+etwas, das nichts einlöst — ein gebrochenes Versprechen gegenüber dem Gast wiegt schwerer als eine
+fehlende Option.
+
+**Wieder aufmachen:** die eine Zeile in `lib/sectors/event/index.ts` auf `true` setzen. Datenpfad,
+Consent-Texte (`GUESTBOOK_VISIBILITY_CONSENT_TEXT`), Formular-Block und Proof sind fertig; der Test
+`tests/sectors.test.ts` erwartet heute bewusst `false` und ist dann anzupassen.
+
+## ZURÜCKGESTELLT — C und D (2026-08-13)
+
+Beide sind **Produkterweiterungen, keine Voraussetzungen**. Das Produkt, wie es beschrieben ist —
+QR am Tisch → Name + Glückwunsch + Fotos/Videos → sichere Ablage → Panel für das Brautpaar —
+kommt ohne sie aus; es braucht nur `private`, und das gab es schon vor `0021`.
 
 **Dilim C — Geteilte Galerie für Gäste (UI)** — bei `shared`/`moderated` sehen Gäste die
-freigegebenen Beiträge (GalleryFlow-Muster auf Gästebuch-Inhalt).
+freigegebenen Beiträge (GalleryFlow-Muster auf Gästebuch-Inhalt). Voraussetzung dafür, die
+Sichtbarkeitswahl überhaupt anbieten zu dürfen (siehe oben).
 
 **Dilim D — Moderierte Live-Fotowand** — öffentliche `/e/[eventId]/wall` (Großbildschirm,
 Realtime/Polling), nur freigegebene Medien; `moderated` = Freigabe-vor-Anzeige (Umkehr der heutigen

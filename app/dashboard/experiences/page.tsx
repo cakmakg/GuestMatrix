@@ -16,6 +16,7 @@ import { getCampaignConfig, isCampaignType, resolveDashboardLabels } from '@/lib
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { setEventArchivedAction } from '../actions'
+import { rowCols } from '../row-cols'
 
 export const metadata: Metadata = { title: `Kampagnen – ${BRAND.name}` }
 
@@ -141,48 +142,12 @@ export default async function ExperiencesPage({ searchParams }: Props) {
   const now = Date.now()
 
   return (
-    <div
-      style={{
-        padding: '28px 32px 40px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-        minWidth: 0,
-      }}
-    >
-      <div
-        className="gs-rise"
-        data-i="0"
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 24,
-          flexWrap: 'wrap',
-        }}
-      >
+    <div className="gs-page">
+      <div className="gs-page-head gs-rise" data-i="0">
         <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: '.12em',
-              textTransform: 'uppercase',
-              color: 'var(--color-accent)',
-              marginBottom: 6,
-            }}
-          >
-            {labels.experiences}
-          </div>
-          <h1 style={{ fontSize: 40, margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-            {labels.experiences}
-          </h1>
-          <div
-            style={{
-              fontSize: 14,
-              color: 'color-mix(in srgb, var(--color-text) 65%, transparent)',
-              maxWidth: 640,
-            }}
-          >
+          <div className="gs-kicker">{labels.experiences}</div>
+          <h1>{labels.experiences}</h1>
+          <div className="gs-page-lead">
             {activeCount} von {planConfig.maxActiveEvents} aktiven{' '}
             {labels.experiences.toLowerCase()} im Tarif {planConfig.label}.
           </div>
@@ -199,12 +164,7 @@ export default async function ExperiencesPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      <form
-        method="GET"
-        className="gs-panel gs-rise"
-        data-i="1"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14 }}
-      >
+      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
         <Field
           label="Status"
           name="state"
@@ -278,10 +238,12 @@ export default async function ExperiencesPage({ searchParams }: Props) {
           </p>
         ) : (
           <div>
+            {/* Spaltenüberschriften ergeben nur Sinn, solange es Spalten gibt — auf dem Telefon
+                stapeln die Zeilen, dann wäre diese Leiste eine Beschriftung für nichts. */}
             <div
+              className="gs-row-head"
               style={{
-                display: 'grid',
-                gridTemplateColumns: GRID,
+                ...rowCols(GRID),
                 gap: 16,
                 padding: '0 4px 8px',
                 fontSize: 10,
@@ -301,7 +263,7 @@ export default async function ExperiencesPage({ searchParams }: Props) {
               const pct = quotaPercent(row.responses, planConfig.maxUploadsPerEvent)
 
               return (
-                <div key={row.id} className="gs-row" style={{ gridTemplateColumns: GRID }}>
+                <div key={row.id} className="gs-row" style={rowCols(GRID)}>
                   <div style={{ minWidth: 0 }}>
                     <div className="name">{row.name}</div>
                     <div className="kind">

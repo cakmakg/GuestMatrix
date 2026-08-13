@@ -512,10 +512,14 @@ textarea.input {
   gap: 14px;
 }
 
-/* — campaign row — */
+/* — campaign row —
+   Die Spalten kommen als Custom Property von der Seite (`--gs-row-cols`), NICHT als
+   `style={{ gridTemplateColumns }}`. Der Unterschied ist der ganze Punkt: eine Inline-
+   Deklaration von `grid-template-columns` schlägt jede Media Query, eine Custom Property
+   nicht — unten kann die Telefonregel die Spalten deshalb überhaupt erst überschreiben. */
 .gs-row {
   display: grid;
-  grid-template-columns: 1fr 140px 90px 120px 24px;
+  grid-template-columns: var(--gs-row-cols, 1fr 140px 90px 120px 24px);
   align-items: center;
   gap: 16px;
   padding: 14px 4px;
@@ -532,6 +536,12 @@ textarea.input {
   font-size: 12px;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
   margin-top: 2px;
+}
+
+/* Spaltenüberschriften einer Tabelle aus `.gs-row`-Zeilen. Teilt sich deren Spaltenquelle. */
+.gs-row-head {
+  display: grid;
+  grid-template-columns: var(--gs-row-cols, 1fr);
 }
 
 .gs-bar {
@@ -614,5 +624,293 @@ textarea.input {
   .gs-nav-item,
   .gs-row {
     transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD-GERÜST + RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════
+   Bis hierher lag das Layout des Dashboards in `style={{}}`-Objekten. Inline-Stile
+   können keine Media Query tragen UND schlagen jede Regel aus dieser Datei — mobil
+   war damit nicht nachrüstbar, sondern nur ersetzbar. Diese Sektion ist der Ersatz.
+
+   Zwei Haltepunkte, absichtlich per `max-width` (nicht mobile-first): das bestehende
+   Desktop-Layout bleibt die Grundregel und wird nach unten hin verengt. Ein Fehler in
+   dieser Sektion kann dadurch höchstens das Telefon treffen, nie den Desktop.
+     ≤ 1024px  Gerüst: Seitenleiste weg, untere Leiste da
+     ≤  640px  Inhalt: Spalten stapeln, Zahlen zweispaltig, Beiwerk aus
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* — Gerüst — */
+.gs-shell {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--color-text);
+}
+
+.gs-sidebar {
+  border-right: 2px solid var(--color-divider);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+}
+
+.gs-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gs-topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 32px;
+  border-bottom: 2px solid var(--color-divider);
+  background: var(--color-bg);
+  min-width: 0;
+}
+
+.gs-page {
+  padding: 28px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* Seitenkopf: Titel links, Handlung rechts — auf schmalem Schirm untereinander. */
+.gs-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.gs-page-head h1 {
+  font-size: clamp(26px, 6vw, 40px);
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+.gs-page-lead {
+  font-size: 14px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  max-width: 640px;
+}
+.gs-kicker {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 6px;
+}
+
+/* — Raster — */
+.gs-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: 20px;
+}
+
+/* Zweispaltiger Block (Liste + Nebenspalte). */
+.gs-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+/* Filterleiste: waagerecht, auf dem Telefon gestapelt und in einem <details> versteckt. */
+.gs-filters {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+/* — Kampagnen-Hero (Ein-Kampagnen-Übersicht) — */
+.gs-hero-name {
+  font: 800 clamp(28px, 8vw, 44px) / 1.05 var(--font-heading);
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.gs-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.gs-hero-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Drei Zahlen nebeneinander, mit geteilten Kanten statt Abständen. */
+.gs-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--color-divider);
+}
+.gs-hero-stats > * {
+  padding: 18px 16px;
+  border-left: 1px solid var(--color-divider);
+  min-width: 0;
+}
+.gs-hero-stats > *:first-child {
+  border-left: 0;
+}
+.gs-hero-stat-value {
+  font: 800 clamp(26px, 7vw, 36px) / 1 var(--font-heading);
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.gs-hero-stat-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  margin-top: 6px;
+}
+
+/* — Untere Leiste (nur Telefon/Tablet) — */
+.gs-bottom-nav {
+  display: none;
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  background: var(--color-bg);
+  border-top: 2px solid var(--color-divider);
+  /* Home-Indikator auf iOS: sonst liegt die letzte Zeile unter der Wischleiste. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.gs-bottom-nav ul {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gs-bottom-nav a {
+  /* 56px: die Trefferfläche aus dem mobilen Smoke-Test (≥44px) mit Luft für zwei Zeilen. */
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  text-decoration: none;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
+}
+.gs-bottom-nav a[aria-current='page'] {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.gs-bottom-nav .gs-icn {
+  width: 21px;
+  height: 21px;
+}
+
+/* ── ≤1024px: Gerüst auf eine Spalte, Navigation nach unten ────────────────── */
+@media (max-width: 1024px) {
+  .gs-shell {
+    grid-template-columns: 1fr;
+  }
+  .gs-sidebar {
+    display: none;
+  }
+  .gs-bottom-nav {
+    display: block;
+  }
+  .gs-topbar {
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .gs-page {
+    /* 88px unten: Höhe der Leiste plus Luft, damit der letzte Eintrag erreichbar bleibt. */
+    padding: 20px 16px 88px;
+    gap: 18px;
+  }
+}
+
+/* ── ≤640px: Inhalt stapeln ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .gs-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .gs-kpi {
+    padding: 14px 14px 12px;
+  }
+  /* Verlauf und Vormonats-Vergleich sind Nebentext: auf 375px kostet beides die
+     Lesbarkeit der Zahl, um die es geht. Auf dem Desktop bleiben sie. */
+  .gs-kpi .gs-spark,
+  .gs-kpi .gs-kpi-delta {
+    display: none;
+  }
+
+  .gs-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  /* Der eigentliche Gewinn der Custom Property: hier greift die Regel, obwohl die
+     Seite eigene Spalten mitgibt. */
+  .gs-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 12px 2px;
+  }
+
+  /* Ohne Spalten keine Spaltenüberschriften. */
+  .gs-row-head {
+    display: none;
+  }
+
+  .gs-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .gs-filters .input,
+  .gs-filters .btn {
+    width: 100%;
+  }
+
+  .gs-panel {
+    padding: 16px 14px 14px;
+  }
+
+  .gs-page-head {
+    align-items: flex-start;
+    gap: 14px;
+  }
+  /* Die Haupthandlung soll auf dem Telefon nicht neben dem Titel klemmen. */
+  .gs-page-head > .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .gs-hero-stats > * {
+    padding: 14px 10px;
+  }
+
+  /* Die Adresse ist auf 375px die breiteste Einzelzeile der Kopfleiste und verdrängt den
+     Markennamen. Das Kürzel im Avatar sagt bereits, wer angemeldet ist; „Abmelden" bleibt. */
+  .gs-topbar-email {
+    display: none;
   }
 }

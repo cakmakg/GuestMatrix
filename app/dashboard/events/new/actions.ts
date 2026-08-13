@@ -2,7 +2,13 @@
 
 import { redirect } from 'next/navigation'
 
-import { allowedCampaignTypes, isBusinessType, isSector, resolveFlowMode } from '@/lib/sectors'
+import {
+  allowedCampaignTypes,
+  isBusinessType,
+  isSector,
+  resolveFlowMode,
+  resolveVisibility,
+} from '@/lib/sectors'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -14,9 +20,11 @@ export async function createEventAction(formData: FormData): Promise<void> {
   const parsed = createEventSchema.safeParse({
     name: formData.get('name'),
     date: formData.get('date'),
+    venue: formData.get('venue') || undefined,
     description: formData.get('description') || undefined,
     campaignType: formData.get('campaignType'),
     flowMode: formData.get('flowMode') || undefined,
+    visibility: formData.get('visibility') || undefined,
   })
 
   if (!parsed.success) {
@@ -63,6 +71,7 @@ export async function createEventAction(formData: FormData): Promise<void> {
   }
 
   const flowMode = resolveFlowMode(parsed.data.campaignType, parsed.data.flowMode ?? null)
+  const visibility = resolveVisibility(parsed.data.campaignType, parsed.data.visibility ?? null)
 
   const { data, error } = await supabase
     .from('events')
@@ -70,9 +79,11 @@ export async function createEventAction(formData: FormData): Promise<void> {
       tenant_id: tenantId,
       name: parsed.data.name,
       date: parsed.data.date,
+      venue: parsed.data.venue ?? null,
       description: parsed.data.description ?? null,
       campaign_type: parsed.data.campaignType,
       flow_mode: flowMode,
+      visibility,
     })
     .select('id')
     .single<{ id: string }>()

@@ -26,6 +26,11 @@ import {
 import { getCampaignConfig, isCampaignType, resolveDashboardCapabilities } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+import { rowCols } from '../row-cols'
+
+/** Spalten der Kampagnen-Vergleichstabelle — Kopf und Zeilen teilen sie sich. */
+const CAMPAIGN_GRID = 'minmax(0, 1fr) 130px 92px 1fr 60px'
+
 export const metadata: Metadata = { title: `Berichte – ${BRAND.name}` }
 
 type TenantRow = { sector: string; business_type: string | null }
@@ -88,16 +93,7 @@ function DimensionRow({ summary }: { summary: DimensionSummary }): React.ReactEl
   const pct = summary.average === null ? 0 : (summary.average / 5) * 100
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 1fr 76px',
-        alignItems: 'center',
-        gap: 16,
-        padding: '11px 2px',
-        borderTop: '1px solid var(--color-divider)',
-      }}
-    >
+    <div className="gs-row" style={rowCols('minmax(0, 1fr) 1fr 76px')}>
       <div style={{ minWidth: 0 }}>
         <div style={{ font: '600 14px/1.3 var(--font-body)' }}>{summary.prompt}</div>
         <div style={{ fontSize: 12, color: MUTED }}>
@@ -139,6 +135,14 @@ export default async function ReportsPage({ searchParams }: Props) {
     .from('tenants')
     .select('sector, business_type')
     .single<TenantRow>()
+
+  // Wer keine Auswertung hat (Gästebuch), bekommt „Berichte" nicht in der Navigation — die Route
+  // muss aber auch direkt aufgerufen zu sein: sonst stünde hier eine Seite voller Leerzustände,
+  // die aussieht, als fehlten Daten. Kein Datenschutz-, sondern ein Ehrlichkeitsgrund; über den
+  // Zugriff entscheidet weiterhin die RLS.
+  if (!resolveDashboardCapabilities(tenant?.sector, tenant?.business_type).reportsEnabled) {
+    redirect('/dashboard')
+  }
 
   const { data: eventsData } = await supabase
     .from('events')
@@ -209,49 +213,20 @@ export default async function ReportsPage({ searchParams }: Props) {
   const hasAnswers = answerSets.some((set) => Object.keys(set).length > 0)
 
   return (
-    <div
-      style={{
-        padding: '28px 32px 40px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-        minWidth: 0,
-      }}
-    >
-      <div className="gs-rise" data-i="0">
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
-            color: 'var(--color-accent)',
-            marginBottom: 6,
-          }}
-        >
-          Berichte
-        </div>
-        <h1 style={{ fontSize: 40, margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-          Zufriedenheit im Detail
-        </h1>
-        <div
-          style={{
-            fontSize: 14,
-            color: 'color-mix(in srgb, var(--color-text) 65%, transparent)',
-            maxWidth: 640,
-          }}
-        >
-          Wo die Gesamtnote herkommt — aufgeschlüsselt nach den Bereichen, die deine Gäste einzeln
-          bewerten.
+    <div className="gs-page">
+      <div className="gs-page-head gs-rise" data-i="0">
+        <div>
+          <div className="gs-kicker">Berichte</div>
+          <h1>Zufriedenheit im Detail</h1>
+          <div className="gs-page-lead">
+            Wo die Gesamtnote herkommt — aufgeschlüsselt nach den Bereichen, die deine Gäste einzeln
+            bewerten.
+          </div>
         </div>
       </div>
 
       {/* ═══ Zeitraum (GET, ohne Client-JavaScript) + Export ═══ */}
-      <form
-        method="GET"
-        className="gs-panel gs-rise"
-        data-i="1"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14 }}
-      >
+      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
         <DateField label="Von" name="from" value={filters.from ?? ''} />
         <DateField label="Bis" name="to" value={filters.to ?? ''} />
 
@@ -392,17 +367,11 @@ export default async function ReportsPage({ searchParams }: Props) {
       )}
 
       {/* ═══ Gesamtbewertung + Medien ═══ */}
+      {/* Ohne Gesamtbewertung steht „Medien" allein — dann volle Breite statt einer
+          leeren Spalte daneben. */}
       <div
-        style={{
-          display: 'grid',
-          // Ohne Gesamtbewertung steht „Medien" allein — dann volle Breite statt einer
-          // leeren Spalte daneben.
-          gridTemplateColumns: can.ratingEnabled
-            ? 'minmax(0, 1.3fr) minmax(0, 1fr)'
-            : 'minmax(0, 1fr)',
-          gap: 20,
-          alignItems: 'start',
-        }}
+        className={can.ratingEnabled ? 'gs-split' : undefined}
+        style={can.ratingEnabled ? undefined : { display: 'grid', gap: 20, alignItems: 'start' }}
       >
         {can.ratingEnabled && (
           <section className="gs-panel gs-rise" data-i="3">
@@ -533,9 +502,9 @@ export default async function ReportsPage({ searchParams }: Props) {
           ) : (
             <div>
               <div
+                className="gs-row-head"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1fr) 130px 92px 1fr 60px',
+                  ...rowCols(CAMPAIGN_GRID),
                   gap: 16,
                   padding: '0 2px 8px',
                   fontSize: 10,
@@ -552,17 +521,7 @@ export default async function ReportsPage({ searchParams }: Props) {
               </div>
 
               {perCampaign.map((row) => (
-                <div
-                  key={row.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr) 130px 92px 1fr 60px',
-                    alignItems: 'center',
-                    gap: 16,
-                    padding: '11px 2px',
-                    borderTop: '1px solid var(--color-divider)',
-                  }}
-                >
+                <div key={row.id} className="gs-row" style={rowCols(CAMPAIGN_GRID)}>
                   <div style={{ minWidth: 0, font: '600 14px/1.3 var(--font-body)' }}>
                     {row.name}
                     {row.archived && (

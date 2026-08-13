@@ -26,10 +26,13 @@ import {
   isFlowModeAllowed,
   isSector,
   isSignupChoice,
+  isEventVisibility,
   isValidCampaignForBusinessType,
   isValidCampaignForSector,
+  resolveConsentText,
   resolveFlowMode,
   resolveLabels,
+  resolveVisibility,
   unknownAnswerKeys,
 } from '@/lib/sectors'
 import { event } from '@/lib/sectors/event'
@@ -487,5 +490,52 @@ describe('dashboard labels are layered, not all-or-nothing', () => {
         expect(value.length, `${field} is empty`).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+describe('event visibility (0021, Dilim B): private/shared/moderated axis, wedding only', () => {
+  // Die Achse ist in der DB fertig (0021), wird aber NOCH NICHT angeboten: der Bildschirm, auf
+  // dem ein Gast fremde Beiträge sieht, ist Dilim C und zurückgestellt. Solange er fehlt, würde
+  // `shared`/`moderated` im Einwilligungstext etwas versprechen, das nichts einlöst.
+  it('no campaign type offers the choice yet — everything resolves to private', () => {
+    for (const chosen of ['private', 'shared', 'moderated'] as const) {
+      expect(resolveVisibility('wedding', chosen)).toBe('private')
+      expect(resolveVisibility('agency', chosen)).toBe('private')
+      expect(resolveVisibility('stay', chosen)).toBe('private')
+    }
+    expect(resolveVisibility('wedding')).toBe('private')
+  })
+
+  // Festhalten, dass das Abschalten eine bewusste EINZELNE Zeile ist und nicht aus Versehen
+  // geschieht: sobald Dilim C existiert, wird hier `true` erwartet.
+  it('wedding declares the choice as switched off, not as absent', () => {
+    expect(CAMPAIGN_TYPES.wedding?.allowVisibilityChoice).toBe(false)
+  })
+
+  it('consentText is staged by visibility for guestbook only', () => {
+    const privateText = resolveConsentText('guestbook', 'private')
+    const sharedText = resolveConsentText('guestbook', 'shared')
+    const moderatedText = resolveConsentText('guestbook', 'moderated')
+    expect(privateText).not.toBe(sharedText)
+    expect(privateText).not.toBe(moderatedText)
+    expect(sharedText).not.toBe(moderatedText)
+    // Unverändertes Verhalten für Nicht-guestbook-Modi — visibility bleibt dort per CHECK 'private'.
+    expect(resolveConsentText('gallery', 'shared')).toBe(resolveConsentText('gallery', 'private'))
+    expect(resolveConsentText('feedback', 'shared')).toBe(resolveConsentText('feedback', 'private'))
+  })
+
+  it('resolveLabels defaults to private and threads visibility into consentText', () => {
+    const defaulted = resolveLabels('wedding', 'guestbook')
+    const shared = resolveLabels('wedding', 'guestbook', 'shared')
+    expect(defaulted.consentText).toBe(resolveConsentText('guestbook', 'private'))
+    expect(shared.consentText).toBe(resolveConsentText('guestbook', 'shared'))
+  })
+
+  it('isEventVisibility narrows only the three active values', () => {
+    expect(isEventVisibility('private')).toBe(true)
+    expect(isEventVisibility('shared')).toBe(true)
+    expect(isEventVisibility('moderated')).toBe(true)
+    expect(isEventVisibility('public')).toBe(false)
+    expect(isEventVisibility('')).toBe(false)
   })
 })

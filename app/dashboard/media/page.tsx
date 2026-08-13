@@ -13,6 +13,7 @@ import {
 } from '@/lib/dashboard/media-filters'
 import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
 import { SIGNED_URL_EXPIRY, createSignedUrls } from '@/lib/storage/signed-url'
+import { resolveDashboardLabels } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { deleteFromDashboardAction, moderateAction } from '../actions'
@@ -106,6 +107,13 @@ export default async function MediaPage({ searchParams }: Props) {
   const filters = parseMediaFilters(await searchParams)
   const supabase = await createSupabaseServerClient()
 
+  // Wie dieser Tenant seine Medien nennt — ein Brautpaar sammelt „Fotos & Videos", kein „Medien".
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('sector, business_type')
+    .single<{ sector: string; business_type: string | null }>()
+  const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
+
   const { data: eventsData } = await supabase
     .from('events')
     .select('id, name')
@@ -146,48 +154,21 @@ export default async function MediaPage({ searchParams }: Props) {
   const now = Date.now()
 
   return (
-    <div
-      style={{
-        padding: '28px 32px 40px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-        minWidth: 0,
-      }}
-    >
-      <div className="gs-rise" data-i="0">
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
-            color: 'var(--color-accent)',
-            marginBottom: 6,
-          }}
-        >
-          Medien
-        </div>
-        <h1 style={{ fontSize: 40, margin: '0 0 6px', letterSpacing: '-0.02em' }}>Gästeinhalte</h1>
-        <div
-          style={{
-            fontSize: 14,
-            color: 'color-mix(in srgb, var(--color-text) 65%, transparent)',
-            maxWidth: 640,
-          }}
-        >
-          {rows.length === 0
-            ? 'Sobald Gäste Fotos oder Videos hochladen, sammeln sie sich hier — kampagnenübergreifend.'
-            : `${formatNumber(rows.length)} Dateien aus ${formatNumber(events.length)} Kampagnen · ${formatNumber(blockedTotal)} gesperrt.`}
+    <div className="gs-page">
+      <div className="gs-page-head gs-rise" data-i="0">
+        <div>
+          <div className="gs-kicker">{labels.media}</div>
+          <h1>Gästeinhalte</h1>
+          <div className="gs-page-lead">
+            {rows.length === 0
+              ? 'Sobald Gäste Fotos oder Videos hochladen, sammeln sie sich hier — kampagnenübergreifend.'
+              : `${formatNumber(rows.length)} Dateien aus ${formatNumber(events.length)} Kampagnen · ${formatNumber(blockedTotal)} gesperrt.`}
+          </div>
         </div>
       </div>
 
       {/* ═══ Filter (GET, ohne Client-JavaScript) ═══ */}
-      <form
-        method="GET"
-        className="gs-panel gs-rise"
-        data-i="1"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14 }}
-      >
+      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
         <Field
           label="Kampagne"
           name="campaign"

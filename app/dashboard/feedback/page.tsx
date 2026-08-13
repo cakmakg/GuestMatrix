@@ -21,6 +21,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { deleteFromDashboardAction, moderateAction, resolveAction } from '../actions'
 import { ConfirmSubmit } from '../ConfirmSubmit'
+import { rowCols } from '../row-cols'
 
 export const metadata: Metadata = { title: `Gästeantworten – ${BRAND.name}` }
 
@@ -183,54 +184,25 @@ export default async function FeedbackPage({ searchParams }: Props) {
   const now = Date.now()
 
   return (
-    <div
-      style={{
-        padding: '28px 32px 40px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-        minWidth: 0,
-      }}
-    >
-      <div className="gs-rise" data-i="0">
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
-            color: 'var(--color-accent)',
-            marginBottom: 6,
-          }}
-        >
-          {labels.responses}
-        </div>
-        <h1 style={{ fontSize: 40, margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-          Alle {labels.responses}
-        </h1>
-        <div
-          style={{
-            fontSize: 14,
-            color: 'color-mix(in srgb, var(--color-text) 65%, transparent)',
-            maxWidth: 640,
-          }}
-        >
-          {rows.length === 0
-            ? `Sobald Gäste antworten, sammeln sich ihre ${labels.responses} hier — kampagnenübergreifend.`
-            : // „kritisch" ist eine Aussage über Noten — ohne Noten wäre sie immer 0 und damit
-              // eine Behauptung über etwas, das gar nicht erhoben wurde.
-              `${formatNumber(rows.length)} ${labels.responses} aus ${formatNumber(events.length)} ${labels.experiences}${
-                can.ratingEnabled ? ` · ${formatNumber(criticalTotal)} kritisch` : ''
-              }.`}
+    <div className="gs-page">
+      <div className="gs-page-head gs-rise" data-i="0">
+        <div>
+          <div className="gs-kicker">{labels.responses}</div>
+          <h1>Alle {labels.responses}</h1>
+          <div className="gs-page-lead">
+            {rows.length === 0
+              ? `Sobald Gäste antworten, sammeln sich ihre ${labels.responses} hier — kampagnenübergreifend.`
+              : // „kritisch" ist eine Aussage über Noten — ohne Noten wäre sie immer 0 und damit
+                // eine Behauptung über etwas, das gar nicht erhoben wurde.
+                `${formatNumber(rows.length)} ${labels.responses} aus ${formatNumber(events.length)} ${labels.experiences}${
+                  can.ratingEnabled ? ` · ${formatNumber(criticalTotal)} kritisch` : ''
+                }.`}
+          </div>
         </div>
       </div>
 
       {/* ═══ Filter (GET, ohne Client-JavaScript) ═══ */}
-      <form
-        method="GET"
-        className="gs-panel gs-rise"
-        data-i="1"
-        style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 14 }}
-      >
+      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
         <Field
           label="Kampagne"
           name="campaign"
@@ -316,16 +288,13 @@ export default async function FeedbackPage({ searchParams }: Props) {
               return (
                 <div
                   key={row.id}
+                  className="gs-row"
                   style={{
-                    display: 'grid',
                     // Ohne Bewertungen entfällt die Noten-Spalte; der Gruß rückt nach vorn.
-                    gridTemplateColumns: can.ratingEnabled
-                      ? '58px minmax(0, 1fr) 104px'
-                      : 'minmax(0, 1fr) 104px',
-                    gap: 16,
+                    ...rowCols(
+                      can.ratingEnabled ? '58px minmax(0, 1fr) 104px' : 'minmax(0, 1fr) 104px',
+                    ),
                     alignItems: 'start',
-                    padding: '14px 2px',
-                    borderTop: '1px solid var(--color-divider)',
                   }}
                 >
                   {/* Note */}

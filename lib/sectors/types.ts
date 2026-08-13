@@ -16,6 +16,12 @@ export const SECTOR_TUPLE = ['tourism', 'real_estate', 'event', 'agency'] as con
 export const CAMPAIGN_TYPE_TUPLE = ['agency', 'stay', 'property', 'wedding', 'trip'] as const
 export const FLOW_MODE_TUPLE = ['gallery', 'feedback', 'guestbook'] as const
 
+// Sichtbarkeitsachse eines Events, orthogonal zu flow_mode (0021). 'private' (Default) ist das
+// bisherige geschlossene Modell; 'shared'/'moderated' öffnen den Gäste-Lesepfad — nur für
+// flow_mode='guestbook' zulässig (events_visibility_check). Nach dem Anlegen unveränderlich
+// (tenant_update_own_events, 0021).
+export const EVENT_VISIBILITY_TUPLE = ['private', 'shared', 'moderated'] as const
+
 // Unterrolle eines Tenants innerhalb eines Sektors (`tenants.business_type`). Sie partitioniert die
 // Kampagnentypen des Sektors in Geschäftsmodelle und wird bei der Registrierung fest gewählt
 // (unveränderlich). Aktiv: tourism → hotel|agency. Sektoren ohne business_type lassen die Spalte
@@ -26,6 +32,7 @@ export type Sector = (typeof SECTOR_TUPLE)[number]
 export type CampaignType = (typeof CAMPAIGN_TYPE_TUPLE)[number]
 export type FlowMode = (typeof FLOW_MODE_TUPLE)[number]
 export type BusinessType = (typeof BUSINESS_TYPE_TUPLE)[number]
+export type EventVisibility = (typeof EVENT_VISIBILITY_TUPLE)[number]
 
 // ─── Fähigkeiten je Flow-Modus ────────────────────────────────────────────────
 
@@ -37,6 +44,15 @@ export type CampaignCapabilities = {
   commentEnabled: boolean
   // Erfasst zusätzlich den Gastnamen (z. B. Gästebuch-Gruß). Nur im guestbook-Modus.
   guestNameEnabled: boolean
+  // Service Recovery: ein Beitrag kann als bearbeitet markiert werden (`submissions.resolved_at`,
+  // Migration 0020). Ein Beschwerde-Abarbeitungslauf — im Gästebuch gibt es nichts abzuarbeiten:
+  // ein Glückwunsch ist kein offener Punkt.
+  serviceRecoveryEnabled: boolean
+  // Auswertungen über den Zeitraum (Berichte). Betriebs-/Marketingwerkzeug; ein Brautpaar wertet
+  // seine Feier nicht aus.
+  reportsEnabled: boolean
+  // CSV-Export der Gästeantworten. Wie `reportsEnabled` ein Betriebswerkzeug.
+  exportEnabled: boolean
 }
 
 export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
@@ -48,6 +64,9 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     // Öffentliche Beschreibung/Caption zum Foto (für reziproke Gäste in der Galerie sichtbar).
     commentEnabled: true,
     guestNameEnabled: false,
+    serviceRecoveryEnabled: true,
+    reportsEnabled: true,
+    exportEnabled: true,
   },
   feedback: {
     mediaRequired: false,
@@ -56,9 +75,14 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     ratingEnabled: true,
     commentEnabled: true,
     guestNameEnabled: false,
+    serviceRecoveryEnabled: true,
+    reportsEnabled: true,
+    exportEnabled: true,
   },
   // Privates Gästebuch: Name + Gruß + optionale Medien, nur für den Veranstalter
-  // sichtbar (keine geteilte Galerie, keine Reciprocity, kein Rating).
+  // sichtbar (keine geteilte Galerie, keine Reciprocity, kein Rating). Ebenso wenig
+  // Service Recovery / Berichte / Export — das sind Betriebswerkzeuge ohne Adressaten
+  // auf einer Feier.
   guestbook: {
     mediaRequired: false,
     galleryEnabled: false,
@@ -66,6 +90,9 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     ratingEnabled: false,
     commentEnabled: true,
     guestNameEnabled: true,
+    serviceRecoveryEnabled: false,
+    reportsEnabled: false,
+    exportEnabled: false,
   },
 }
 
@@ -92,6 +119,22 @@ export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successTe
       'widerrufen und meine Daten löschen lassen.',
     successText: 'Danke für eure lieben Worte!',
   },
+}
+
+// Consent-Text für das Gästebuch, ZUSÄTZLICH nach `events.visibility` gestaffelt (0021, rechtlich
+// nötig: wer „nur das Brautpaar sieht" zustimmt, darf nicht öffentlich erscheinen). `private`
+// übernimmt wortgleich FLOW_MODE_LABELS.guestbook.consentText. Nur für flow_mode='guestbook'
+// relevant — andere Modi bleiben bei FLOW_MODE_LABELS (siehe resolveConsentText).
+export const GUESTBOOK_VISIBILITY_CONSENT_TEXT: Record<EventVisibility, string> = {
+  private: FLOW_MODE_LABELS.guestbook.consentText,
+  shared:
+    'Ich stimme zu, dass mein Name, meine Nachricht und meine Fotos/Videos gespeichert und ' +
+    'ALLEN Gästen dieser Feier gezeigt werden (nicht nur dem Brautpaar). Ich kann meine ' +
+    'Einwilligung jederzeit widerrufen und meine Daten löschen lassen.',
+  moderated:
+    'Ich stimme zu, dass mein Name, meine Nachricht und meine Fotos/Videos gespeichert und ' +
+    'nach Prüfung durch den Veranstalter allen Gästen dieser Feier gezeigt werden. Ich kann ' +
+    'meine Einwilligung jederzeit widerrufen und meine Daten löschen lassen.',
 }
 
 // ─── Strukturiertes Feedback (Feedback-Anreicherung) ──────────────────────────
@@ -152,6 +195,10 @@ export type CampaignTypeConfig = {
   // Optionaler Katalog strukturierter Feedback-Fragen. Fehlt → nur Gesamt-Rating/Kommentar
   // (leichter tour-Flow). Der DB-Speicher (feedback_answers) ist generisch; kein Sonderfall-Code.
   questions?: readonly FeedbackQuestion[]
+  // Darf der Betreiber beim Anlegen die Sichtbarkeit wählen (private/shared/moderated, 0021)?
+  // Fehlt/false → immer 'private' (resolveVisibility). Nur für guestbook-Kampagnentypen sinnvoll
+  // (events_visibility_check erzwingt das DB-seitig).
+  allowVisibilityChoice?: boolean
 }
 
 // ─── Betreiber-Dashboard: Benennung je Geschäftsmodell ────────────────────────
@@ -203,7 +250,13 @@ export type DashboardLabelOverrides = Partial<DashboardLabels>
  */
 export type DashboardCapabilities = Pick<
   CampaignCapabilities,
-  'ratingEnabled' | 'galleryEnabled' | 'commentEnabled' | 'guestNameEnabled'
+  | 'ratingEnabled'
+  | 'galleryEnabled'
+  | 'commentEnabled'
+  | 'guestNameEnabled'
+  | 'serviceRecoveryEnabled'
+  | 'reportsEnabled'
+  | 'exportEnabled'
 >
 
 // Eine business_type-Unterrolle bündelt die Kampagnentypen eines Geschäftsmodells. `campaignTypes`

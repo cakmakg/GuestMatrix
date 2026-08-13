@@ -36,13 +36,20 @@ import type {
   CampaignTypeConfig,
   DashboardCapabilities,
   DashboardLabels,
+  EventVisibility,
   FeedbackQuestion,
   FlowMode,
   GuestFlowLabels,
   Sector,
   SectorConfig,
 } from './types'
-import { FLOW_MODE_CAPABILITIES, FLOW_MODE_LABELS, FLOW_MODE_TUPLE } from './types'
+import {
+  EVENT_VISIBILITY_TUPLE,
+  FLOW_MODE_CAPABILITIES,
+  FLOW_MODE_LABELS,
+  FLOW_MODE_TUPLE,
+  GUESTBOOK_VISIBILITY_CONSENT_TEXT,
+} from './types'
 import { event } from './event'
 import { tourism } from './tourism'
 
@@ -189,6 +196,9 @@ export const DEFAULT_DASHBOARD_CAPABILITIES: DashboardCapabilities = {
   galleryEnabled: true,
   commentEnabled: true,
   guestNameEnabled: true,
+  serviceRecoveryEnabled: true,
+  reportsEnabled: true,
+  exportEnabled: true,
 }
 
 /** Die Flow-Modi, die ein Kampagnentyp annehmen kann (heute je genau einer). */
@@ -227,6 +237,9 @@ export function resolveDashboardCapabilities(
     galleryEnabled: false,
     commentEnabled: false,
     guestNameEnabled: false,
+    serviceRecoveryEnabled: false,
+    reportsEnabled: false,
+    exportEnabled: false,
   }
 
   for (const type of types) {
@@ -236,6 +249,9 @@ export function resolveDashboardCapabilities(
       union.galleryEnabled ||= capabilities.galleryEnabled
       union.commentEnabled ||= capabilities.commentEnabled
       union.guestNameEnabled ||= capabilities.guestNameEnabled
+      union.serviceRecoveryEnabled ||= capabilities.serviceRecoveryEnabled
+      union.reportsEnabled ||= capabilities.reportsEnabled
+      union.exportEnabled ||= capabilities.exportEnabled
     }
   }
 
@@ -266,13 +282,42 @@ export function getCapabilities(mode: FlowMode): CampaignCapabilities {
   return FLOW_MODE_CAPABILITIES[mode]
 }
 
+/**
+ * Löst die effektive Sichtbarkeit auf (Muster resolveFlowMode) — der einzige Dispatch-Punkt für
+ * `events.visibility`. Wahl des Operators nur, wenn der Kampagnentyp sie erlaubt
+ * (`allowVisibilityChoice`, 0021); sonst immer `'private'`. Die harte Grenze bleibt der
+ * DB-CHECK (`events_visibility_check`).
+ */
+export function resolveVisibility(
+  type: CampaignType,
+  chosen?: EventVisibility | null,
+): EventVisibility {
+  const config = CAMPAIGN_TYPES[type]
+  if (config?.allowVisibilityChoice && chosen) return chosen
+  return 'private'
+}
+
+/**
+ * Consent-Text für den Gäste-Flow — für `guestbook` gestaffelt nach `visibility` (0021,
+ * rechtlich: wer „nur das Brautpaar sieht" zustimmt, darf nicht öffentlich erscheinen), sonst
+ * unverändert der modus-abhängige Text (visibility ist dort per CHECK immer `'private'`).
+ */
+export function resolveConsentText(mode: FlowMode, visibility: EventVisibility): string {
+  if (mode === 'guestbook') return GUESTBOOK_VISIBILITY_CONSENT_TEXT[visibility]
+  return FLOW_MODE_LABELS[mode].consentText
+}
+
 /** Kombiniert typ- und modus-abhängige Texte zu einem flachen Objekt für den Gäste-Flow. */
-export function resolveLabels(type: CampaignType, mode: FlowMode): GuestFlowLabels {
+export function resolveLabels(
+  type: CampaignType,
+  mode: FlowMode,
+  visibility: EventVisibility = 'private',
+): GuestFlowLabels {
   const typeLabels = CAMPAIGN_TYPES[type]?.labels
   const modeLabels = FLOW_MODE_LABELS[mode]
   return {
     landingHeadline: typeLabels?.landingHeadline ?? '',
-    consentText: modeLabels.consentText,
+    consentText: resolveConsentText(mode, visibility),
     ratingPrompt: typeLabels?.ratingPrompt ?? '',
     commentPrompt: typeLabels?.commentPrompt ?? '',
     commentPlaceholder: typeLabels?.commentPlaceholder ?? '',
@@ -339,6 +384,10 @@ export function isBusinessType(value: string): value is BusinessType {
 
 export function isFlowMode(value: string): value is FlowMode {
   return (FLOW_MODE_TUPLE as readonly string[]).includes(value)
+}
+
+export function isEventVisibility(value: string): value is EventVisibility {
+  return (EVENT_VISIBILITY_TUPLE as readonly string[]).includes(value)
 }
 
 // ─── Signup-Auswahl (registry-getrieben, sektor-transparent) ───────────────────

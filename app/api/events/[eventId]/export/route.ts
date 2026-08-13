@@ -1,13 +1,18 @@
 import type { NextRequest } from 'next/server'
 
-import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
+import {
+  AuthorizationError,
+  handleRouteError,
+  NotFoundError,
+  ValidationError,
+} from '@/lib/auth/errors'
 import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
 import {
   buildEventFeedbackCsv,
   buildExportFilename,
   type ExportSubmissionRow,
 } from '@/lib/export/csv'
-import { getFeedbackQuestions, isCampaignType } from '@/lib/sectors'
+import { getCapabilities, getFeedbackQuestions, isCampaignType, isFlowMode } from '@/lib/sectors'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { eventIdParam } from '@/lib/validation/schemas'
@@ -32,12 +37,25 @@ export async function GET(
 
     const { data: event } = await supabase
       .from('events')
-      .select('id, name, date, campaign_type')
+      .select('id, name, date, campaign_type, flow_mode')
       .eq('id', eventId)
       .eq('tenant_id', tenantId)
-      .single<{ id: string; name: string; date: string; campaign_type: string }>()
+      .single<{
+        id: string
+        name: string
+        date: string
+        campaign_type: string
+        flow_mode: string
+      }>()
 
     if (!event) throw new NotFoundError('Event')
+
+    // Der Export ist ein Betriebswerkzeug und hängt am Flow-Modus DIESER Kampagne (nicht am
+    // Tenant): ein Gästebuch gibt seine Grüße nicht als Tabelle heraus. Die Oberfläche blendet
+    // den Knopf bereits aus — diese Prüfung gilt dem direkten Aufruf.
+    if (isFlowMode(event.flow_mode) && !getCapabilities(event.flow_mode).exportEnabled) {
+      throw new AuthorizationError('Export is not available for this campaign.')
+    }
 
     const { data, error } = await supabase
       .from('submissions')

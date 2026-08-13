@@ -1,12 +1,14 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
 import { NotFoundError } from '@/lib/auth/errors'
 import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
 import { logger } from '@/lib/logger'
 import { deleteSubmission } from '@/lib/submissions/delete-submission'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { updateEventSchema } from '@/lib/validation/schemas'
 
 /**
  * Gemeinsame Dashboard-Mutationen. Sie liegen hier statt in einem Routen-Ordner, weil
@@ -30,6 +32,57 @@ export async function setEventArchivedAction(eventId: string, archived: boolean)
     .eq('tenant_id', tenantId)
 
   revalidatePath('/dashboard', 'layout')
+}
+
+/**
+ * Stammdaten einer Kampagne ändern: Name, Datum, Ort, Begrüßung.
+ *
+ * NICHT änderbar sind Kampagnentyp, Ablauf und Sichtbarkeit — sie bestimmen, was der Gast sieht
+ * und worin er eingewilligt hat. Für `visibility` erzwingt das zusätzlich die DB
+ * (`tenant_update_own_events` WITH CHECK, 0021); das Schema lässt das Feld gar nicht erst zu.
+ *
+ * `description` ist der Text, den der Gast beim Scannen liest — die Änderung wirkt deshalb auch
+ * auf den öffentlichen Gäste-Pfad, der ihn zwischenspeichert.
+ */
+export async function updateEventAction(eventId: string, formData: FormData): Promise<void> {
+  const { tenantId } = await requireTenantAuth()
+  await requireEventOwnership(tenantId, eventId)
+
+  const parsed = updateEventSchema.safeParse({
+    name: formData.get('name') ?? '',
+    date: formData.get('date') ?? '',
+    venue: formData.get('venue') ?? '',
+    description: formData.get('description') ?? '',
+  })
+
+  if (!parsed.success) {
+    const message = encodeURIComponent(parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.')
+    redirect(`/dashboard/events/${eventId}?error=${message}`)
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const { error } = await supabase
+    .from('events')
+    .update({
+      name: parsed.data.name,
+      date: parsed.data.date,
+      // Leeres Feld heißt „kein Ort/keine Begrüßung" — als NULL, nicht als leerer String, damit
+      // die Anzeige nur eine Prüfung braucht.
+      venue: parsed.data.venue === '' ? null : parsed.data.venue,
+      description: parsed.data.description === '' ? null : parsed.data.description,
+    })
+    .eq('id', eventId)
+    .eq('tenant_id', tenantId)
+
+  if (error) {
+    logger.error('updateEventAction failed', { eventId, error: error.message })
+    redirect(`/dashboard/events/${eventId}?error=Speichern+fehlgeschlagen.`)
+  }
+
+  revalidatePath('/dashboard', 'layout')
+  // Der Gäste-Pfad zeigt Name und Begrüßung; ohne diese Zeile liefe er bis zu 60s alt weiter.
+  revalidatePath(`/e/${eventId}`)
+  redirect(`/dashboard/events/${eventId}?saved=1`)
 }
 
 export async function moderateAction(submissionId: string, flag: boolean): Promise<void> {

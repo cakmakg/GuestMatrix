@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import QRCode from 'qrcode'
 
 import { requireTenantAuth } from '@/lib/auth/session'
 import { needsAttention } from '@/lib/dashboard/feedback-filters'
@@ -13,14 +14,24 @@ import {
   percentDelta,
   sparklinePath,
 } from '@/lib/dashboard/metrics'
+import type { HeroStat } from '@/lib/dashboard/overview'
+import { heroStats } from '@/lib/dashboard/overview'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
-import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
+import {
+  getCampaignConfig,
+  isCampaignType,
+  resolveDashboardCapabilities,
+  resolveDashboardLabels,
+} from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+
+import { rowCols } from './row-cols'
 
 type EventRow = {
   id: string
   name: string
   date: string
+  venue: string | null
   campaign_type: string
   flow_mode: string
   archived_at: string | null
@@ -156,6 +167,7 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }): React.ReactElemen
       </div>
 
       <div
+        className="gs-kpi-delta"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -204,6 +216,87 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }): React.ReactElemen
   )
 }
 
+const ICON_CALENDAR = (
+  <svg viewBox="0 0 24 24">
+    <rect x="3" y="5" width="18" height="16" />
+    <path d="M8 3v4M16 3v4M3 10h18" />
+  </svg>
+)
+const ICON_PIN = (
+  <svg viewBox="0 0 24 24">
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+)
+
+/**
+ * Der Kopf der Ein-Kampagnen-Übersicht: Name groß, darunter Datum und Ort, darunter drei Zahlen.
+ *
+ * Diese Ansicht ersetzt die Kachelwand, sobald genau EINE Kampagne läuft — im Free-Tarif ist das
+ * immer der Fall (`maxActiveEvents: 1`). Der Umweg „Liste → Detail" hat dort nichts zu sortieren
+ * und kostet nur einen Fingertipp.
+ */
+function CampaignHero({
+  event,
+  typeLabel,
+  stats,
+}: {
+  event: EventRow
+  typeLabel: string
+  stats: HeroStat[]
+}): React.ReactElement {
+  const date = new Date(event.date).toLocaleDateString('de-DE', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+
+  return (
+    <section
+      className="gs-rise"
+      data-i="1"
+      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
+    >
+      <div>
+        <div className="gs-kicker">{typeLabel}</div>
+        <h1 className="gs-hero-name">{event.name}</h1>
+        <div className="gs-hero-meta">
+          <span>
+            <span className="gs-icn" style={{ width: 14, height: 14 }}>
+              {ICON_CALENDAR}
+            </span>
+            {date}
+          </span>
+          {event.venue && event.venue.trim() !== '' && (
+            <span>
+              <span className="gs-icn" style={{ width: 14, height: 14 }}>
+                {ICON_PIN}
+              </span>
+              {event.venue}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="gs-hero-stats">
+        {stats.map((stat) => (
+          <Link
+            key={stat.id}
+            href={stat.href}
+            style={{ color: 'inherit', textDecoration: 'none', display: 'block' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span className="gs-hero-stat-value">{stat.value}</span>
+              {stat.unit && <span style={{ fontSize: 12, color: MUTED }}>{stat.unit}</span>}
+            </div>
+            <div className="gs-hero-stat-label">{stat.label}</div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default async function DashboardPage() {
   let tenantId: string
   try {
@@ -219,7 +312,7 @@ export default async function DashboardPage() {
   // .eq('tenant_id')-Filter bleiben als Defense-in-Depth über RLS.
   const { data: eventsData } = await supabase
     .from('events')
-    .select('id, name, date, campaign_type, flow_mode, archived_at, created_at')
+    .select('id, name, date, venue, campaign_type, flow_mode, archived_at, created_at')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
 
@@ -439,171 +532,163 @@ export default async function DashboardPage() {
       ? `Noch keine aktive ${labels.experience}. Erstelle die erste, um Gästebeiträge zu sammeln.`
       : `${activeEvents.length} ${singular ? labels.experience : labels.experiences} ${singular ? 'sammelt' : 'sammeln'} gerade Beiträge deiner Gäste.`
 
+  // ── Ein-Kampagnen-Fall: die Übersicht IST die Kampagne ────────────────────
+  // Genau eine laufende Kampagne (im Free-Tarif immer, `maxActiveEvents: 1`) braucht weder eine
+  // Liste noch eine Kachelwand — sie braucht ihre eigenen Zahlen. Die Entscheidung hängt an den
+  // Daten, nicht am Sektor: ein Hotel mit einem Aufenthalt sieht dasselbe wie ein Brautpaar.
+  const soleEvent = activeEvents.length === 1 ? activeEvents[0] : undefined
+
+  const soleStats = soleEvent
+    ? heroStats(
+        {
+          responses: subs.filter((s) => s.event_id === soleEvent.id).length,
+          media: withMedia.filter((s) => s.event_id === soleEvent.id).length,
+          guests: new Set(
+            subs.filter((s) => s.event_id === soleEvent.id).map((s) => s.guest_user_id),
+          ).size,
+          openItems: openItems.filter((s) => s.event_id === soleEvent.id).length,
+          averageRating: avgOf(
+            subs.filter((s) => s.event_id === soleEvent.id && s.rating !== null),
+          ),
+        },
+        labels,
+        can,
+      )
+    : []
+
+  const soleTypeLabel =
+    soleEvent && isCampaignType(soleEvent.campaign_type)
+      ? (getCampaignConfig(soleEvent.campaign_type)?.label ?? labels.experience)
+      : labels.experience
+
+  const soleQrDataUrl = soleEvent
+    ? await QRCode.toDataURL(
+        `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${soleEvent.id}`,
+        { width: 300, margin: 2 },
+      )
+    : null
+
   return (
-    <div
-      style={{
-        padding: '28px 32px 40px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-        minWidth: 0,
-      }}
-    >
-      {/* ═══ Seitenkopf ═══ */}
-      <div
-        className="gs-rise"
-        data-i="0"
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 24,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: '.12em',
-              textTransform: 'uppercase',
-              color: 'var(--color-accent)',
-              marginBottom: 6,
-            }}
-          >
-            Dashboard · {formatToday(new Date())}
-          </div>
-          <h1 style={{ fontSize: 40, margin: '0 0 6px', letterSpacing: '-0.02em' }}>Übersicht</h1>
-          <div
-            style={{
-              fontSize: 14,
-              color: 'color-mix(in srgb, var(--color-text) 65%, transparent)',
-              maxWidth: 640,
-            }}
-          >
-            {subtitle}
-          </div>
-        </div>
-
-        <Link className="btn btn-primary" href="/dashboard/events/new">
-          <span className="gs-icn" style={{ width: 14, height: 14 }}>
-            <svg viewBox="0 0 24 24">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-          </span>
-          Neue Kampagne erstellen
-        </Link>
-      </div>
-
-      {/* ═══ Kennzahlen ═══ */}
-      {/* auto-fit statt fester Spaltenzahl: fünf Karten passen nebeneinander, brechen aber
-          auf schmalen Fenstern sauber um, statt zu Zahlenbrei zusammenzuschrumpfen. */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(196px, 1fr))',
-          gap: 20,
-        }}
-      >
-        {kpis.map((kpi, i) => (
-          <KpiCard key={kpi.label} kpi={kpi} index={i} />
-        ))}
-      </div>
-
-      {/* ═══ Kampagnen + Aktivität ═══ */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.7fr) minmax(0, 1fr)',
-          gap: 20,
-          alignItems: 'start',
-        }}
-      >
-        {/* Experiences — Kurzfassung; die vollständige Liste lebt unter /dashboard/experiences */}
-        <section className="gs-panel gs-rise" data-i="4">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
+    <div className="gs-page">
+      {soleEvent ? (
+        /* ═══ Eine Kampagne: Kopf = Kampagne ═══ */
+        <CampaignHero event={soleEvent} typeLabel={soleTypeLabel} stats={soleStats} />
+      ) : (
+        <>
+          {/* ═══ Seitenkopf ═══ */}
+          <div className="gs-page-head gs-rise" data-i="0">
             <div>
-              <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>{labels.experiences}</h3>
-              <div style={{ fontSize: 12, color: MUTED }}>
-                {activeEvents.length} laufend · {events.length - activeEvents.length} archiviert
-              </div>
+              <div className="gs-kicker">Dashboard · {formatToday(new Date())}</div>
+              <h1>Übersicht</h1>
+              <div className="gs-page-lead">{subtitle}</div>
             </div>
-            <Link
-              className="btn btn-ghost"
-              href="/dashboard/experiences"
-              style={{ padding: '6px 8px' }}
-            >
-              Alle ansehen
-              <span className="gs-icn" style={{ width: 12, height: 12 }}>
+
+            <Link className="btn btn-primary" href="/dashboard/events/new">
+              <span className="gs-icn" style={{ width: 14, height: 14 }}>
                 <svg viewBox="0 0 24 24">
+                  <path d="M12 5v14" />
                   <path d="M5 12h14" />
-                  <path d="M13 5l7 7-7 7" />
                 </svg>
               </span>
+              Neue Kampagne erstellen
             </Link>
           </div>
 
-          {events.length === 0 ? (
+          {/* ═══ Kennzahlen ═══ */}
+          {/* auto-fit statt fester Spaltenzahl: fünf Karten passen nebeneinander, brechen aber
+              auf schmalen Fenstern sauber um, statt zu Zahlenbrei zusammenzuschrumpfen. */}
+          <div className="gs-kpi-grid">
+            {kpis.map((kpi, i) => (
+              <KpiCard key={kpi.label} kpi={kpi} index={i} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ═══ Kampagnen + Aktivität ═══ */}
+      <div className="gs-split">
+        {/* Experiences — Kurzfassung; die vollständige Liste lebt unter /dashboard/experiences.
+            Bei genau EINER laufenden Kampagne entfällt sie: eine Liste mit einem Eintrag, der
+            schon als Überschrift über der Seite steht, ist nur eine zweite Schaltfläche. */}
+        {!soleEvent && (
+          <section className="gs-panel gs-rise" data-i="4">
             <div
               style={{
-                border: '1px dashed var(--color-divider)',
-                padding: '40px 20px',
-                textAlign: 'center',
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 12,
               }}
             >
-              <p style={{ color: MUTED, marginBottom: 16 }}>
-                Noch keine {labels.experiences.toLowerCase()}. Erstelle die erste!
-              </p>
-              <Link className="btn btn-primary" href="/dashboard/events/new">
-                {labels.experience} erstellen
+              <div>
+                <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>{labels.experiences}</h3>
+                <div style={{ fontSize: 12, color: MUTED }}>
+                  {activeEvents.length} laufend · {events.length - activeEvents.length} archiviert
+                </div>
+              </div>
+              <Link
+                className="btn btn-ghost"
+                href="/dashboard/experiences"
+                style={{ padding: '6px 8px' }}
+              >
+                Alle ansehen
+                <span className="gs-icn" style={{ width: 12, height: 12 }}>
+                  <svg viewBox="0 0 24 24">
+                    <path d="M5 12h14" />
+                    <path d="M13 5l7 7-7 7" />
+                  </svg>
+                </span>
               </Link>
             </div>
-          ) : (
-            <div>
-              {recentEvents.map((event) => (
-                <div
-                  key={event.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr) 92px 72px',
-                    alignItems: 'center',
-                    gap: 16,
-                    padding: '12px 2px',
-                    borderTop: '1px solid var(--color-divider)',
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ font: '600 14px/1.3 var(--font-body)' }}>{event.name}</div>
-                    <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
-                      {uploadsByEvent.get(event.id) ?? 0} Antworten
-                    </div>
-                  </div>
-                  <div>
-                    <span
-                      className={`tag ${event.archived_at !== null ? 'tag-neutral' : 'tag-accent'}`}
-                    >
-                      {event.archived_at !== null ? 'Archiviert' : 'Aktiv'}
-                    </span>
-                  </div>
-                  <Link
-                    href={`/dashboard/events/${event.id}`}
-                    style={{ fontSize: 12, color: 'var(--color-accent)', textAlign: 'right' }}
+
+            {events.length === 0 ? (
+              <div
+                style={{
+                  border: '1px dashed var(--color-divider)',
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                }}
+              >
+                <p style={{ color: MUTED, marginBottom: 16 }}>
+                  Noch keine {labels.experiences.toLowerCase()}. Erstelle die erste!
+                </p>
+                <Link className="btn btn-primary" href="/dashboard/events/new">
+                  {labels.experience} erstellen
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {recentEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="gs-row"
+                    style={rowCols('minmax(0, 1fr) 92px 72px')}
                   >
-                    Detail →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ font: '600 14px/1.3 var(--font-body)' }}>{event.name}</div>
+                      <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+                        {uploadsByEvent.get(event.id) ?? 0} Antworten
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        className={`tag ${event.archived_at !== null ? 'tag-neutral' : 'tag-accent'}`}
+                      >
+                        {event.archived_at !== null ? 'Archiviert' : 'Aktiv'}
+                      </span>
+                    </div>
+                    <Link
+                      href={`/dashboard/events/${event.id}`}
+                      style={{ fontSize: 12, color: 'var(--color-accent)', textAlign: 'right' }}
+                    >
+                      Detail →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Aktivität */}
         <section className="gs-panel gs-rise" data-i="5">
@@ -619,6 +704,19 @@ export default async function DashboardPage() {
               <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Letzte Aktivität</h3>
               <div style={{ fontSize: 12, color: MUTED }}>Neueste Gästebeiträge</div>
             </div>
+            <Link
+              className="btn btn-ghost"
+              href="/dashboard/feedback"
+              style={{ padding: '6px 8px' }}
+            >
+              Alle ansehen
+              <span className="gs-icn" style={{ width: 12, height: 12 }}>
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 12h14" />
+                  <path d="M13 5l7 7-7 7" />
+                </svg>
+              </span>
+            </Link>
           </div>
 
           {activities.length === 0 ? (
@@ -652,6 +750,27 @@ export default async function DashboardPage() {
             </div>
           )}
         </section>
+
+        {/* QR — nur im Ein-Kampagnen-Fall. Er ist dort die häufigste Handlung überhaupt
+            (den Gästen zeigen) und läge sonst zwei Tipps tief in der Detailseite. */}
+        {soleEvent && soleQrDataUrl && (
+          <section className="gs-panel gs-rise" data-i="6" style={{ alignItems: 'center' }}>
+            <h3 style={{ fontSize: 20, margin: 0, alignSelf: 'flex-start' }}>QR-Code</h3>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={soleQrDataUrl}
+              alt={`QR-Code für ${soleEvent.name}`}
+              style={{ width: '100%', maxWidth: 200, height: 'auto', display: 'block' }}
+            />
+            <Link
+              className="btn btn-secondary"
+              href={`/dashboard/events/${soleEvent.id}`}
+              style={{ width: '100%', justifyContent: 'center', minHeight: 44 }}
+            >
+              Teilen &amp; verwalten
+            </Link>
+          </section>
+        )}
       </div>
 
       {/* ═══ Fußzeile ═══ */}
@@ -662,6 +781,8 @@ export default async function DashboardPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 8,
           paddingTop: 6,
           fontSize: 12,
           color: MUTED,

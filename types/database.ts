@@ -46,6 +46,8 @@ export type Database = {
           name: string
           tenant_id: string
           updated_at: string
+          venue: string | null
+          visibility: string
         }
         Insert: {
           archived_at?: string | null
@@ -58,6 +60,8 @@ export type Database = {
           name: string
           tenant_id: string
           updated_at?: string
+          venue?: string | null
+          visibility?: string
         }
         Update: {
           archived_at?: string | null
@@ -70,6 +74,8 @@ export type Database = {
           name?: string
           tenant_id?: string
           updated_at?: string
+          venue?: string | null
+          visibility?: string
         }
         Relationships: [
           {
@@ -212,6 +218,10 @@ export type Database = {
       current_tenant_sector: { Args: never; Returns: string }
       has_completed_upload: { Args: { p_event_id: string }; Returns: boolean }
       is_gallery_event: { Args: { p_event_id: string }; Returns: boolean }
+      is_shared_guestbook_event: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
       owned_submission_media: {
         Args: { p_submission_id: string }
         Returns: {
@@ -222,6 +232,7 @@ export type Database = {
         Args: { p_submission_id: string }
         Returns: string
       }
+      stored_event_visibility: { Args: { p_event_id: string }; Returns: string }
       validate_feedback_answers: {
         Args: { p_answers: Json; p_campaign_type: string }
         Returns: undefined

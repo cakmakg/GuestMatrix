@@ -4,9 +4,10 @@ import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import { quotaPercent } from '@/lib/dashboard/metrics'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
-import { resolveDashboardLabels } from '@/lib/sectors'
+import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+import { BottomNav } from './BottomNav'
 import { SidebarNav } from './SidebarNav'
 
 type TenantRow = {
@@ -65,30 +66,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Wie dieser Tenant seine Arbeitseinheit nennt — aus der Registry, nicht aus einer Fallunterscheidung.
   const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
+  // Ebenso der Umfang der Navigation: „Berichte" existiert nur, wo es etwas auszuwerten gibt.
+  const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
 
   const email = user?.email ?? ''
   const brandName = tenant?.brand_name ?? BRAND.name
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '232px 1fr',
-        minHeight: '100vh',
-        fontFamily: 'var(--font-body)',
-        color: 'var(--color-text)',
-      }}
-    >
-      {/* ═══ SIDEBAR ═══ */}
-      <aside
-        style={{
-          borderRight: '2px solid var(--color-divider)',
-          background: 'var(--color-bg)',
-          display: 'flex',
-          flexDirection: 'column',
-          paddingTop: 20,
-        }}
-      >
+    <div className="gs-shell">
+      {/* ═══ SIDEBAR (ab 1024px; darunter übernimmt BottomNav) ═══ */}
+      <aside className="gs-sidebar">
         <div
           style={{
             padding: '4px 24px 22px',
@@ -115,7 +102,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </span>
         </div>
 
-        <SidebarNav labels={labels} experiencesCount={campaignCount ?? 0} />
+        <SidebarNav labels={labels} can={can} experiencesCount={campaignCount ?? 0} />
 
         <div
           style={{
@@ -154,18 +141,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </aside>
 
       {/* ═══ MAIN ═══ */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 18,
-            padding: '14px 32px',
-            borderBottom: '2px solid var(--color-divider)',
-            background: 'var(--color-bg)',
-            minWidth: 0,
-          }}
-        >
+      <div className="gs-main">
+        <header className="gs-topbar">
           <div
             style={{
               display: 'flex',
@@ -214,6 +191,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}
             >
               <span
+                className="gs-topbar-email"
                 style={{
                   font: '600 13px/1.15 var(--font-body)',
                   whiteSpace: 'nowrap',
@@ -245,6 +223,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
         <main style={{ minWidth: 0 }}>{children}</main>
       </div>
+
+      {/* Nur unter 1024px sichtbar; ersetzt dort die ausgeblendete Seitenleiste. */}
+      <BottomNav labels={labels} />
     </div>
   )
 }

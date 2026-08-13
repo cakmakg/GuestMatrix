@@ -1,7 +1,13 @@
 import type { NextRequest } from 'next/server'
 
-import { handleRouteError, NotFoundError, ValidationError } from '@/lib/auth/errors'
+import {
+  AuthorizationError,
+  handleRouteError,
+  NotFoundError,
+  ValidationError,
+} from '@/lib/auth/errors'
 import { requireTenantAuth } from '@/lib/auth/session'
+import { resolveDashboardCapabilities } from '@/lib/sectors'
 import { applyDateRange, reportFilterSchema } from '@/lib/dashboard/report-filters'
 import { resolveQuestionCatalog } from '@/lib/dashboard/feedback-summary'
 import { buildExportFilename, buildTenantFeedbackCsv, type TenantExportRow } from '@/lib/export/csv'
@@ -36,6 +42,12 @@ export async function GET(request: NextRequest): Promise<Response> {
       .from('tenants')
       .select('sector, business_type')
       .single<TenantRow>()
+
+    // Der Export ist ein Betriebswerkzeug; Flow-Modi ohne Auswertung (Gästebuch) bieten ihn nicht
+    // an. Die Oberfläche blendet ihn bereits aus — diese Prüfung gilt dem direkten Aufruf.
+    if (!resolveDashboardCapabilities(tenant?.sector, tenant?.business_type).exportEnabled) {
+      throw new AuthorizationError('Export is not available for this account.')
+    }
 
     const { data: eventsData } = await supabase
       .from('events')
