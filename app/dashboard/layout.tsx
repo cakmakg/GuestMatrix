@@ -1,14 +1,40 @@
+import { Playfair_Display } from 'next/font/google'
 import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import { quotaPercent } from '@/lib/dashboard/metrics'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
-import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
+import {
+  resolveDashboardCapabilities,
+  resolveDashboardLabels,
+  resolveDashboardTheme,
+} from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { BottomNav } from './BottomNav'
 import { SidebarNav } from './SidebarNav'
+
+/**
+ * Anzeigeschrift des Album-Themas. Wie Archivo selbst gehostet über next/font — ein @import von
+ * fonts.googleapis.com scheiterte an der CSP (`font-src 'self'`, next.config.ts).
+ *
+ * `preload: false`, weil nur EIN Thema sie benutzt: mit Vorladen holte jede Dashboard-Route die
+ * Dateien, auch bei Tenants, die sie nie zu sehen bekommen. Die Klasse hängt unten entsprechend
+ * nur am Album-Thema; ohne sie bleibt `--font-display` ungesetzt und die Serifenregeln greifen
+ * gar nicht erst.
+ */
+const display = Playfair_Display({
+  // latin-ext wegen der türkischen Zeichen in Gäste- und Kampagnennamen (ş, ğ, ı, İ, ö, ü, ç):
+  // ohne den Subset fällt genau dort die Ersatzschrift ein, und ein Name wie „Gülşen" bräche
+  // mitten im Wort auf zwei Schriften.
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600'],
+  style: ['normal', 'italic'],
+  variable: '--font-display',
+  display: 'swap',
+  preload: false,
+})
 
 type TenantRow = {
   brand_name: string
@@ -68,12 +94,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
   // Ebenso der Umfang der Navigation: „Berichte" existiert nur, wo es etwas auszuwerten gibt.
   const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
+  // Und ebenso der Ton: die Tokens liegen in globals.css unter [data-theme='…'], die Auswahl
+  // in der Registry. Hier wird nur zugewiesen — keine Seite verzweigt selbst über den Sektor.
+  const theme = resolveDashboardTheme(tenant?.sector, tenant?.business_type)
 
   const email = user?.email ?? ''
   const brandName = tenant?.brand_name ?? BRAND.name
 
   return (
-    <div className="gs-shell">
+    <div
+      className={theme === 'album' ? `gs-shell ${display.variable}` : 'gs-shell'}
+      data-theme={theme}
+    >
       {/* ═══ SIDEBAR (ab 1024px; darunter übernimmt BottomNav) ═══ */}
       <aside className="gs-sidebar">
         <div
@@ -94,7 +126,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           />
           <span
             style={{
-              font: '800 18px/1 var(--font-heading)',
+              font: 'var(--font-heading-weight) 18px/1 var(--font-heading)',
               letterSpacing: '-0.01em',
             }}
           >
@@ -122,7 +154,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           >
             Tarif
           </div>
-          <div style={{ font: '800 15px/1.2 var(--font-heading)', marginBottom: 4 }}>
+          <div
+            style={{
+              font: 'var(--font-heading-weight) 15px/1.2 var(--font-heading)',
+              marginBottom: 4,
+            }}
+          >
             {planConfig.label}
           </div>
           <div
@@ -154,7 +191,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           >
             <div
               style={{
-                font: '800 18px/1.15 var(--font-heading)',
+                font: 'var(--font-heading-weight) 18px/1.15 var(--font-heading)',
                 letterSpacing: '-0.01em',
                 whiteSpace: 'nowrap',
                 textOverflow: 'ellipsis',
@@ -225,7 +262,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
 
       {/* Nur unter 1024px sichtbar; ersetzt dort die ausgeblendete Seitenleiste. */}
-      <BottomNav labels={labels} />
+      <BottomNav labels={labels} can={can} />
     </div>
   )
 }

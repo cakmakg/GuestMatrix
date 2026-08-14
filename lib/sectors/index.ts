@@ -36,6 +36,7 @@ import type {
   CampaignTypeConfig,
   DashboardCapabilities,
   DashboardLabels,
+  DashboardTheme,
   EventVisibility,
   FeedbackQuestion,
   FlowMode,
@@ -69,6 +70,7 @@ export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
     label: event.label,
     campaignTypes: ['wedding'],
     dashboardLabels: event.dashboardLabels,
+    dashboardTheme: event.dashboardTheme,
   },
 }
 
@@ -181,6 +183,39 @@ export function resolveDashboardLabels(
   return { ...DEFAULT_DASHBOARD_LABELS, ...fromSector, ...fromBusinessType }
 }
 
+// ─── Betreiber-Dashboard: Erscheinungsbild ────────────────────────────────────
+
+/**
+ * Rückfall für Sektoren, die kein Thema mitbringen — und für die unbekannte/defekte tenants-Zeile.
+ *
+ * `modernist` ist hier kein „Standard-Look", den ein Sektor erst abwählen müsste, sondern das
+ * einzige Thema, von dem sicher ist, dass jede Seite darin schon einmal gebaut wurde. Ein
+ * unbekannter Sektor bekommt deshalb das erprobte, nicht das schönste.
+ */
+export const DEFAULT_DASHBOARD_THEME: DashboardTheme = 'modernist'
+
+/**
+ * Welches Erscheinungsbild das Dashboard dieses Tenants trägt. Dritter Ableitungspunkt neben
+ * `resolveDashboardLabels` und `resolveDashboardCapabilities`, nach demselben Muster: die Seiten
+ * verzweigen NICHT selbst über Sektor oder Geschäftsart.
+ *
+ * Anders als bei den Beschriftungen gewinnt hier der FEINSTE Treffer ganz (kein Merge): ein Thema
+ * ist ein zusammenhängender Satz aus Farbe, Schrift und Kante. Halb Album, halb Modernist ergäbe
+ * kein drittes Thema, sondern einen Fehler, der wie ein Ladefehler aussieht.
+ */
+export function resolveDashboardTheme(
+  sector: string | null | undefined,
+  businessType: string | null | undefined,
+): DashboardTheme {
+  const fromBusinessType =
+    businessType && isBusinessType(businessType)
+      ? BUSINESS_TYPES[businessType]?.dashboardTheme
+      : undefined
+  const fromSector = sector && isSector(sector) ? SECTORS[sector]?.dashboardTheme : undefined
+
+  return fromBusinessType ?? fromSector ?? DEFAULT_DASHBOARD_THEME
+}
+
 // ─── Betreiber-Dashboard: Panels ──────────────────────────────────────────────
 
 /**
@@ -199,6 +234,9 @@ export const DEFAULT_DASHBOARD_CAPABILITIES: DashboardCapabilities = {
   serviceRecoveryEnabled: true,
   reportsEnabled: true,
   exportEnabled: true,
+  // Der Rückfall zeigt das vollständige Panel — und das ist das Betriebs-Panel, nicht das
+  // reduzierte. Ein unbekannter Sektor soll nichts verstecken.
+  contributionCentric: false,
 }
 
 /** Die Flow-Modi, die ein Kampagnentyp annehmen kann (heute je genau einer). */
@@ -240,6 +278,8 @@ export function resolveDashboardCapabilities(
     serviceRecoveryEnabled: false,
     reportsEnabled: false,
     exportEnabled: false,
+    // Startwert true, weil hier ausnahmsweise UND gilt — Begründung unten.
+    contributionCentric: true,
   }
 
   for (const type of types) {
@@ -252,6 +292,11 @@ export function resolveDashboardCapabilities(
       union.serviceRecoveryEnabled ||= capabilities.serviceRecoveryEnabled
       union.reportsEnabled ||= capabilities.reportsEnabled
       union.exportEnabled ||= capabilities.exportEnabled
+      // UND statt ODER: die übrigen Felder sagen „kann etwas" — da gewinnt jedes Ja. Dieses Feld
+      // sagt „braucht KEIN Back-Office", also eine Aussage über ALLE Kampagnen des Tenants.
+      // Mit ODER bekäme ein Tenant mit einem Gästebuch UND einem Hotel-Aufenthalt das reduzierte
+      // Panel, obwohl reportsEnabled gleichzeitig true wäre — ein Widerspruch in sich.
+      union.contributionCentric &&= capabilities.contributionCentric
     }
   }
 

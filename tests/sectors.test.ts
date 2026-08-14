@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest'
 import {
   BUSINESS_TYPES,
   CAMPAIGN_TYPES,
+  DASHBOARD_THEME_TUPLE,
   DEFAULT_DASHBOARD_CAPABILITIES,
   DEFAULT_DASHBOARD_LABELS,
+  DEFAULT_DASHBOARD_THEME,
   SECTORS,
   SIGNUP_OPTIONS,
   flowModesForCampaignType,
   resolveDashboardCapabilities,
   resolveDashboardLabels,
+  resolveDashboardTheme,
   allowedCampaignTypes,
   businessTypesForSector,
   campaignTypesForBusinessType,
@@ -374,6 +377,33 @@ describe('dashboard labels resolve from the registry', () => {
     expect(resolveDashboardLabels(null, null)).toEqual(DEFAULT_DASHBOARD_LABELS)
     expect(resolveDashboardLabels('real_estate', null)).toEqual(DEFAULT_DASHBOARD_LABELS)
     expect(resolveDashboardLabels('nonsense', 'nonsense')).toEqual(DEFAULT_DASHBOARD_LABELS)
+  })
+
+  it('resolves the appearance from the registry, finest match wins whole', () => {
+    // Das Gästebuch blättert in Erinnerungen — es bekommt das Album-Thema aus lib/sectors/event.
+    expect(resolveDashboardTheme('event', null)).toBe('album')
+    // Der Betriebspfad bleibt beim erprobten Standardsatz.
+    expect(resolveDashboardTheme('tourism', 'hotel')).toBe('modernist')
+    expect(resolveDashboardTheme('tourism', 'agency')).toBe('modernist')
+  })
+
+  it('falls back to the neutral theme for unknown, deactivated or missing input', () => {
+    // Wie bei den Panels: ein unbekannter Sektor bekommt das Erprobte, nicht das Schönste.
+    expect(resolveDashboardTheme(null, null)).toBe(DEFAULT_DASHBOARD_THEME)
+    expect(resolveDashboardTheme('real_estate', null)).toBe(DEFAULT_DASHBOARD_THEME)
+    expect(resolveDashboardTheme('nonsense', 'nonsense')).toBe(DEFAULT_DASHBOARD_THEME)
+  })
+
+  it('only ever resolves to a declared theme — a token block exists for each', () => {
+    const cases = [
+      resolveDashboardTheme('event', null),
+      resolveDashboardTheme('tourism', 'hotel'),
+      resolveDashboardTheme('tourism', 'agency'),
+      resolveDashboardTheme(null, null),
+    ]
+    for (const theme of cases) {
+      expect(DASHBOARD_THEME_TUPLE).toContain(theme)
+    }
   })
 
   it('never returns an empty string — every field is renderable', () => {

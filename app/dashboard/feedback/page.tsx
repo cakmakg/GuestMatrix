@@ -302,7 +302,7 @@ export default async function FeedbackPage({ searchParams }: Props) {
                     <div style={{ textAlign: 'center' }}>
                       <div
                         style={{
-                          font: '800 22px/1 var(--font-heading)',
+                          font: 'var(--font-heading-weight) 22px/1 var(--font-heading)',
                           fontVariantNumeric: 'tabular-nums',
                           color:
                             row.rating !== null && row.rating <= 2

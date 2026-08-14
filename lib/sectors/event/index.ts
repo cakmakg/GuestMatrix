@@ -20,6 +20,10 @@ export const event = {
     response: 'Glückwunsch',
     media: 'Fotos & Videos',
   },
+  // Ein Brautpaar blättert in Erinnerungen, es verwaltet keinen Bestand. Das Album-Thema tauscht
+  // dafür nur die Tokens (Papierton, Serifenschrift, weiche Kante) — Panels, Daten und Layout
+  // bleiben dieselben wie überall sonst. Siehe DashboardTheme in ../types.
+  dashboardTheme: 'album',
   campaignTypes: {
     wedding: {
       sector: 'event',

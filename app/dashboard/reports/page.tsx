@@ -107,7 +107,7 @@ function DimensionRow({ summary }: { summary: DimensionSummary }): React.ReactEl
 
       <div
         style={{
-          font: '800 16px/1 var(--font-heading)',
+          font: 'var(--font-heading-weight) 16px/1 var(--font-heading)',
           textAlign: 'right',
           fontVariantNumeric: 'tabular-nums',
           color: summary.average === null ? MUTED : 'var(--color-text)',
@@ -388,7 +388,10 @@ export default async function ReportsPage({ searchParams }: Props) {
               <>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                   <div
-                    style={{ font: '800 38px/1 var(--font-heading)', letterSpacing: '-0.025em' }}
+                    style={{
+                      font: 'var(--font-heading-weight) 38px/1 var(--font-heading)',
+                      letterSpacing: '-0.025em',
+                    }}
                   >
                     {overall !== null ? formatNumber(overall, 1) : '—'}
                   </div>
@@ -469,7 +472,7 @@ export default async function ReportsPage({ searchParams }: Props) {
                 <span style={{ fontSize: 13 }}>{row.label}</span>
                 <span
                   style={{
-                    font: '800 18px/1 var(--font-heading)',
+                    font: 'var(--font-heading-weight) 18px/1 var(--font-heading)',
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
@@ -539,7 +542,7 @@ export default async function ReportsPage({ searchParams }: Props) {
                   </div>
                   <div
                     style={{
-                      font: '800 16px/1 var(--font-heading)',
+                      font: 'var(--font-heading-weight) 16px/1 var(--font-heading)',
                       textAlign: 'right',
                       fontVariantNumeric: 'tabular-nums',
                     }}

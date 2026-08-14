@@ -53,6 +53,18 @@ export type CampaignCapabilities = {
   reportsEnabled: boolean
   // CSV-Export der Gästeantworten. Wie `reportsEnabled` ein Betriebswerkzeug.
   exportEnabled: boolean
+  /**
+   * Der Gästebeitrag SELBST (Name + Gruß + Medien) ist das Produkt; es gibt kein Back-Office.
+   *
+   * Bewusst nicht `…Enabled` benannt: das ist keine Feature-Klappe, sondern eine Aussage über die
+   * Form des Flows, aus der mehrere Darstellungsentscheidungen folgen — der QR wird zum eigenen
+   * Ziel (er steht auf den Tischen und ist die Eingangstür), Grüße und Medien teilen sich einen
+   * Bildschirm, und die Kennzahlen zählen Gesammeltes statt Bewertetes.
+   *
+   * Hängt am Flow-Modus, nicht am Sektor: übernähme ein anderer Sektor `guestbook`, bekäme er
+   * dasselbe Panel.
+   */
+  contributionCentric: boolean
 }
 
 export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
@@ -67,6 +79,7 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     serviceRecoveryEnabled: true,
     reportsEnabled: true,
     exportEnabled: true,
+    contributionCentric: false,
   },
   feedback: {
     mediaRequired: false,
@@ -78,6 +91,7 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     serviceRecoveryEnabled: true,
     reportsEnabled: true,
     exportEnabled: true,
+    contributionCentric: false,
   },
   // Privates Gästebuch: Name + Gruß + optionale Medien, nur für den Veranstalter
   // sichtbar (keine geteilte Galerie, keine Reciprocity, kein Rating). Ebenso wenig
@@ -93,6 +107,7 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     serviceRecoveryEnabled: false,
     reportsEnabled: false,
     exportEnabled: false,
+    contributionCentric: true,
   },
 }
 
@@ -257,7 +272,27 @@ export type DashboardCapabilities = Pick<
   | 'serviceRecoveryEnabled'
   | 'reportsEnabled'
   | 'exportEnabled'
+  | 'contributionCentric'
 >
+
+// ─── Betreiber-Dashboard: Erscheinungsbild ────────────────────────────────────
+
+/**
+ * Welche Tokengarnitur das Dashboard dieses Tenants trägt.
+ *
+ * Ein Erscheinungsbild ist bewusst KEINE Fähigkeit und steht deshalb nicht in
+ * `CampaignCapabilities`: alle Themen zeigen dieselben Panels mit denselben Daten, sie sprechen
+ * nur eine andere Sprache. Ein Brautpaar blättert in Erinnerungen, ein Hotel führt eine
+ * Bibliothek — das ändert den Ton, nicht den Funktionsumfang.
+ *
+ * Ein Thema definiert AUSSCHLIESSLICH Tokens (Farbe, Schrift, Kante, Schatten, Rundung) in
+ * `app/globals.css` unter `[data-theme='…']`. Layout und Komponenten bleiben gemeinsam. Das ist
+ * die Bedingung, unter der ein weiteres Thema billig bleibt: ein Tokenblock, keine zweite Galerie.
+ * Wer für ein neues Thema eine Komponente kopieren muss, hat die Grenze verletzt.
+ */
+export const DASHBOARD_THEME_TUPLE = ['modernist', 'album'] as const
+
+export type DashboardTheme = (typeof DASHBOARD_THEME_TUPLE)[number]
 
 // Eine business_type-Unterrolle bündelt die Kampagnentypen eines Geschäftsmodells. `campaignTypes`
 // ist die Allowlist, die die DB-Grenze (current_tenant_allows_campaign, Migration 0017) spiegelt —
@@ -267,6 +302,8 @@ export type BusinessTypeConfig = {
   campaignTypes: CampaignType[]
   // Fehlt sie, greift die Benennung des Sektors, sonst der neutrale Standard.
   dashboardLabels?: DashboardLabelOverrides
+  // Fehlt es, greift das Thema des Sektors, sonst der neutrale Standard (`modernist`).
+  dashboardTheme?: DashboardTheme
 }
 
 /** Eine vom Betreiber entwickelte Sektor-Einheit (ein Ordner unter `lib/sectors/<id>/`). */
@@ -279,6 +316,8 @@ export type SectorModule = {
   businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
   // Benennung für Sektoren ohne business_type (z. B. event). Eine business_type darf sie überschreiben.
   dashboardLabels?: DashboardLabelOverrides
+  // Erscheinungsbild des Sektors. Eine business_type darf es überschreiben.
+  dashboardTheme?: DashboardTheme
 }
 
 export type SectorConfig = {
@@ -286,4 +325,5 @@ export type SectorConfig = {
   campaignTypes: CampaignType[]
   businessTypes?: Partial<Record<BusinessType, BusinessTypeConfig>>
   dashboardLabels?: DashboardLabelOverrides
+  dashboardTheme?: DashboardTheme
 }

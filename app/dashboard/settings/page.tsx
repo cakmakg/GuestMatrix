@@ -65,7 +65,7 @@ export default async function SettingsPage() {
 
         {sector ? (
           <>
-            <div style={{ font: '800 20px/1.2 var(--font-heading)' }}>
+            <div style={{ font: 'var(--font-heading-weight) 20px/1.2 var(--font-heading)' }}>
               {businessType
                 ? (getBusinessTypeConfig(businessType)?.label ?? SECTORS[sector]?.label)
                 : SECTORS[sector]?.label}
@@ -111,7 +111,12 @@ export default async function SettingsPage() {
         >
           <div>
             <h3 style={{ fontSize: 20, margin: '0 0 4px' }}>Tarif</h3>
-            <div style={{ font: '800 20px/1.2 var(--font-heading)', marginBottom: 8 }}>
+            <div
+              style={{
+                font: 'var(--font-heading-weight) 20px/1.2 var(--font-heading)',
+                marginBottom: 8,
+              }}
+            >
               {planConfig.label}
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: MUTED }}>

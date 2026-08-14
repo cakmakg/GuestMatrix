@@ -111,6 +111,16 @@
   --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
+
+  /* Album-Stellschrauben. Sie stehen hier mit neutralen Werten, damit die `gs-album-*`- und
+     `gs-feed-*`-Klassen themenlos funktionieren; ein Thema (unten) dreht daran, ohne eine Regel
+     zu überschreiben. */
+  --album-gutter: 12px;
+
+  /* Grund und Schrift des Vollbilds. Eigene Tokens, weil das Vollbild als einzige Fläche NICHT
+     im Papierton steht: ein Foto braucht einen dunklen Rand, sonst leuchtet die Seite dagegen an. */
+  --lightbox-bg: #171615;
+  --lightbox-fg: #edeae7;
 }
 
 *,
@@ -213,7 +223,9 @@ img {
   background: transparent;
   border: 1px solid transparent;
   padding: var(--space-2) calc(var(--space-3) * 1.2);
-  border-radius: var(--radius-md);
+  /* Bedienelemente können eine eigene Rundung haben (Pillen im Album-Thema). Ohne das Token
+     bleibt es bei der Flächenrundung — im Modernist-Satz also weiterhin 0. */
+  border-radius: var(--radius-control, var(--radius-md));
 }
 .btn svg {
   display: block;
@@ -332,7 +344,7 @@ textarea.input {
   font-size: 11px;
   letter-spacing: 0.02em;
   padding: 3px 10px;
-  border-radius: calc(var(--radius-md) * 0.75);
+  border-radius: var(--radius-control, calc(var(--radius-md) * 0.75));
 }
 .tag-accent {
   background: var(--color-accent-100);
@@ -487,7 +499,9 @@ textarea.input {
 /* — kpi — */
 .gs-kpi {
   background: var(--color-surface);
-  border: 1px solid var(--color-divider);
+  border: var(--panel-border, 1px solid var(--color-divider));
+  border-radius: var(--radius-md);
+  box-shadow: var(--panel-shadow, none);
   padding: 20px 22px 18px;
   display: flex;
   flex-direction: column;
@@ -505,7 +519,11 @@ textarea.input {
 
 .gs-panel {
   background: var(--color-surface);
-  border: 1px solid var(--color-divider);
+  /* Rahmen und Schatten als Tokens: der Modernist-Satz trennt Flächen mit einer Kante, das
+     Album-Thema mit Helligkeit und einem weichen Schatten. Ohne Token beides wie gehabt. */
+  border: var(--panel-border, 1px solid var(--color-divider));
+  border-radius: var(--radius-md);
+  box-shadow: var(--panel-shadow, none);
   padding: 22px 24px 20px;
   display: flex;
   flex-direction: column;
@@ -648,6 +666,10 @@ textarea.input {
   min-height: 100vh;
   font-family: var(--font-body);
   color: var(--color-text);
+  /* Nötig, seit das Gerüst ein Thema tragen kann: die Themen-Tokens werden HIER neu gesetzt,
+     der Untergrund kam aber von <body> — ohne diese Zeile bliebe der Inhaltsbereich im
+     Grundton stehen, während Leisten und Karten schon im Thema stünden. */
+  background: var(--color-bg);
 }
 
 .gs-sidebar {
@@ -752,19 +774,44 @@ textarea.input {
   gap: 6px;
 }
 
-/* Drei Zahlen nebeneinander, mit geteilten Kanten statt Abständen. */
+/* Drei Zahlen nebeneinander.
+   Ob sie EIN Streifen mit geteilten Kanten sind (Modernist) oder DREI einzelne Karten mit
+   Abstand (Album), entscheiden Tokens — nicht zwei Klassenvarianten. Ohne Token bleibt alles
+   wie zuvor. */
 .gs-hero-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--color-divider);
+  gap: var(--stats-gap, 0);
+  border: var(--stats-outer-border, 1px solid var(--color-divider));
 }
 .gs-hero-stats > * {
-  padding: 18px 16px;
-  border-left: 1px solid var(--color-divider);
+  padding: var(--stats-cell-padding, 18px 16px);
+  border-left: var(--stats-inner-border, 1px solid var(--color-divider));
+  background: var(--stats-cell-bg, transparent);
+  border-radius: var(--stats-cell-radius, 0);
+  box-shadow: var(--stats-cell-shadow, none);
   min-width: 0;
 }
 .gs-hero-stats > *:first-child {
   border-left: 0;
+}
+/* Das Kennzahl-Symbol steht über der Zahl (Vorlage) und trägt den Akzent — es ist die einzige
+   Farbe in der Karte, die Zahl selbst bleibt Text. */
+.gs-hero-stat-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  color: var(--color-accent);
+  margin-bottom: 10px;
+}
+.gs-hero-stat-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .gs-hero-stat-value {
   font: 800 clamp(26px, 7vw, 36px) / 1 var(--font-heading);
@@ -912,5 +959,575 @@ textarea.input {
      Markennamen. Das Kürzel im Avatar sagt bereits, wer angemeldet ist; „Abmelden" bleibt. */
   .gs-topbar-email {
     display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ERSCHEINUNGSBILDER  ([data-theme])
+   ═══════════════════════════════════════════════════════════════════════════
+   Ein Thema tauscht AUSSCHLIESSLICH Tokens — Farbe, Schrift, Kante, Rundung, Schatten. Es
+   definiert keine Layoutregel, versteckt nichts und benennt nichts um; dafür gibt es die
+   Registry (`resolveDashboardTheme`, `resolveDashboardLabels`, `resolveDashboardCapabilities`).
+
+   Diese Trennung ist die Bedingung dafür, dass das nächste Thema (Hotel, Agentur) billig bleibt:
+   ein Tokenblock von ~40 Zeilen, keine zweite Galerie. Wer für ein Thema eine Komponente
+   kopieren oder eine `gs-*`-Regel überschreiben muss, hat die Grenze verletzt — dann gehört die
+   Abweichung als Custom Property in den neutralen Teil (Muster: `--album-note-tilt`).
+
+   Der Standard `modernist` steht bewusst NICHT hier: er ist der :root-Satz oben. Ein Thema ist
+   immer nur die Abweichung davon.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* — Album: warmes Papier, Serifen, weiche Kanten (Gästebuch/Hochzeit) —
+   Der Modernist-Satz ist für ein Back-Office gebaut: Nullrundung, 800er Grotesk, Alarmrot,
+   40 % opake Trennlinien. Auf einer Feier ist das die falsche Stimme — dort wird nichts
+   verwaltet, sondern geblättert. Deshalb Papier statt Bildschirmgrau, Serife statt Grotesk und
+   Linien, die trennen ohne zu schneiden. */
+/* Der zweite Selektor hebt die Tokens auf die Wurzel, sobald das Gerüst im Album-Thema steht.
+   Grund ist der Überdehn-Bereich beim Scrollen auf iOS: er zeigt den Untergrund von <body>, und
+   <body> ist ein VORFAHR des Gerüsts — vererbt bekommt es das Thema also nie. `:has()` dreht die
+   Richtung um. Fällt der Selektor aus (alter Browser), bleibt nur dieser Randstreifen im
+   Grundton; die Seite selbst steht über `.gs-shell` ohnehin im Thema. */
+[data-theme='album'],
+:root:has([data-theme='album']) {
+  /* Cremefarbener Grund, WEISSE Karten. Der Unterschied trägt hier die halbe Gestaltung: die
+     Karte hebt sich durch ihre eigene Helligkeit ab, nicht durch eine Rahmenlinie. */
+  --color-bg: #faf7f4;
+  --color-surface: #ffffff;
+  --color-text: #1f1b1a;
+  --color-accent: #7b1e2b;
+  --color-accent-2: #a8756a;
+  /* 9 % statt 40 %: die Linie soll ordnen, nicht zerteilen — und neben einem Schatten reicht
+     schon eine Andeutung. */
+  --color-divider: color-mix(in srgb, #1f1b1a 9%, transparent);
+
+  --color-neutral-100: #f7f3ef;
+  --color-neutral-200: #ede7e2;
+  --color-neutral-300: #ded5cd;
+  --color-neutral-400: #c3b8ae;
+  --color-neutral-500: #a3968c;
+  --color-neutral-600: #85786e;
+  --color-neutral-700: #675b53;
+  --color-neutral-800: #48403a;
+  --color-neutral-900: #2c2723;
+
+  --color-accent-100: #f9edef;
+  --color-accent-200: #f0d5da;
+  --color-accent-300: #e0b0b9;
+  --color-accent-400: #c47c8b;
+  --color-accent-500: #a44a5c;
+  --color-accent-600: #8b2537;
+  --color-accent-700: #7b1e2b;
+  --color-accent-800: #5c1620;
+  --color-accent-900: #3f1017;
+
+  --color-accent-2-100: #f8efec;
+  --color-accent-2-200: #efdcd5;
+  --color-accent-2-300: #e2c2b7;
+  --color-accent-2-400: #c99e8f;
+  --color-accent-2-500: #b4826f;
+  --color-accent-2-600: #94655b;
+  --color-accent-2-700: #7b544c;
+  --color-accent-2-800: #5e403a;
+  --color-accent-2-900: #45302c;
+
+  /* Die Serife trägt die Überschriften. 800 gibt es in Playfair nicht und wäre auch falsch —
+     eine Albumseite ruft nicht. Fallback Georgia, falls die Datei nicht lädt. */
+  --font-heading: var(--font-display), Georgia, 'Times New Roman', serif;
+  --font-heading-weight: 400;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  /* Bedienelemente sind hier Pillen, keine Rechtecke. Eigenes Token, weil eine Karte mit 999px
+     zur Kapsel würde — Fläche und Bedienelement dürfen nicht dieselbe Rundung teilen. */
+  --radius-control: 999px;
+
+  /* Sehr weich und warm getönt: ein grauer Schatten auf Cremeton sieht schmutzig aus. */
+  --shadow-sm:
+    0 1px 2px color-mix(in srgb, #6b5648 5%, transparent),
+    0 6px 20px color-mix(in srgb, #6b5648 7%, transparent);
+  --shadow-md:
+    0 2px 6px color-mix(in srgb, #6b5648 6%, transparent),
+    0 12px 32px color-mix(in srgb, #6b5648 10%, transparent);
+  --shadow-lg: 0 18px 48px color-mix(in srgb, #6b5648 16%, transparent);
+
+  /* Flächen tragen Rahmen UND Schatten — beide sehr zurückgenommen (Muster der Vorlage). */
+  --panel-border: 1px solid var(--color-divider);
+  --panel-shadow: var(--shadow-sm);
+
+  /* Kennzahlen stehen als EINZELNE Karten nebeneinander statt als ein Streifen mit
+     geteilten Kanten. */
+  --stats-gap: 10px;
+  --stats-outer-border: 0;
+  --stats-inner-border: 0;
+  --stats-cell-bg: var(--color-surface);
+  --stats-cell-radius: var(--radius-md);
+  --stats-cell-shadow: var(--shadow-sm);
+  /* Höher als im Streifen: als einzelne Karte braucht die Zahl Luft um sich, sonst wirkt sie
+     hineingequetscht. */
+  --stats-cell-padding: 18px 16px 20px;
+
+  --album-gutter: 14px;
+
+  --lightbox-bg: #17110f;
+  --lightbox-fg: #f2e9e1;
+}
+
+/* Die Grotesk-Details des Modernist-Satzes, die in einer Serife falsch aussehen: negative
+   Laufweite (macht Serifen matschig) und Versalien-Kleinschrift (wirkt wie ein Formularetikett). */
+[data-theme='album'] h1,
+[data-theme='album'] h2,
+[data-theme='album'] h3,
+[data-theme='album'] h4,
+[data-theme='album'] h5,
+[data-theme='album'] .gs-hero-name,
+[data-theme='album'] .gs-page-head h1 {
+  letter-spacing: -0.005em;
+}
+[data-theme='album'] h6,
+[data-theme='album'] .gs-kicker,
+[data-theme='album'] .gs-hero-stat-label,
+[data-theme='album'] .table th {
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+[data-theme='album'] .gs-kicker {
+  font-size: 12px;
+}
+
+/* Die 2px-Kanten des Gerüsts sind Teil der industriellen Anmutung. */
+[data-theme='album'] .gs-sidebar,
+[data-theme='album'] .gs-topbar,
+[data-theme='album'] .gs-bottom-nav,
+[data-theme='album'] .table th {
+  border-width: 1px;
+}
+[data-theme='album'] .hr {
+  height: 1px;
+}
+
+/* Das Quadrat ist die Modernist-Signatur; auf einer Albumseite wird daraus ein Punkt. */
+[data-theme='album'] .gs-avatar {
+  border-radius: 50%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALBUM  (beitragszentrierte Galerie)
+   ═══════════════════════════════════════════════════════════════════════════
+   Absichtlich THEMENFREI: jede Farbe, Kante und Schrift kommt aus einem Token. Hotel und
+   Agentur bekommen später dieselben Klassen mit ihrem eigenen Tokenblock — diese Sektion wird
+   dafür nicht angefasst.
+
+   Ein Beitrag ist hier ein BEITRAG, keine Kachel: erst wer ihn hinterlassen hat und wann, dann
+   was er geschrieben hat, dann das Foto. Ein Raster ließ genau das weg — im Gästebuch ist der
+   Name aber die halbe Botschaft, und ein Gruß ohne Foto war darin nur ein Loch.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.gs-album-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gs-album-title {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: clamp(28px, 8vw, 44px);
+  line-height: 1.1;
+  margin: 0;
+}
+.gs-album-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.gs-album-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Ohne Trennzeichen standen die Angaben nur nebeneinander und lasen sich wie abgerissene
+   Fragmente.
+   Der Punkt hängt am VORANGEHENDEN Element (`::after`), nicht am folgenden: als `::before`
+   rutschte er beim Umbruch mit in die nächste Zeile und eröffnete sie dann mit „· 1
+   ausgeblendet". So bleibt er am Ende der Zeile, die er abschließt. */
+.gs-album-meta span:not(:last-child)::after {
+  content: '·';
+  margin-left: 10px;
+  color: color-mix(in srgb, var(--color-text) 35%, transparent);
+}
+.gs-album-meta .gs-icn {
+  width: 14px;
+  height: 14px;
+}
+
+/* — Segmentschalter —
+   Vier Gattungs-Chips lasen sich wie eine Speisekarte, und nach Dateityp sucht in Erinnerungen
+   ohnehin niemand. Übrig bleibt die eine Unterscheidung, die ein Gast wirklich macht: mit Bild
+   oder nur Worte. Als Segmentschalter, weil er zwei Zustände EINES Dings zeigt — nicht zwei
+   getrennte Knöpfe. */
+.gs-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  border-radius: var(--radius-control, var(--radius-md));
+}
+.gs-segmented a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* 40px + 4px Innenabstand des Behälters = 44px Trefferfläche. */
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-control, var(--radius-md));
+  font-size: 13px;
+  text-decoration: none;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+}
+.gs-segmented a[aria-current='true'] {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+.gs-segmented .gs-icn {
+  width: 15px;
+  height: 15px;
+}
+
+/* — Handlungs-Chips (z. B. Gästelink) — */
+.gs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-control, var(--radius-md));
+}
+.gs-chip:hover {
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+.gs-chip .gs-icn {
+  width: 15px;
+  height: 15px;
+  color: var(--color-accent);
+}
+
+/* — Beitragsstrom — */
+.gs-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--album-gutter);
+}
+
+.gs-feed-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: var(--panel-border, 1px solid var(--color-divider));
+  border-radius: var(--radius-md);
+  box-shadow: var(--panel-shadow, none);
+}
+
+.gs-feed-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.gs-feed-who {
+  flex: 1;
+  min-width: 0;
+}
+.gs-feed-name {
+  font: 600 15px/1.3 var(--font-body);
+  overflow-wrap: anywhere;
+}
+.gs-feed-when {
+  margin-top: 2px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* Das Auge blendet aus und wieder ein — die eine Entscheidung, die man beim Durchsehen
+   tatsächlich trifft. Löschen und Herunterladen bleiben im Vollbild: sie brauchen das große
+   Bild als Kontext, und „Löschen" gehört nicht neben eine Geste, die man im Vorbeiscrollen
+   macht. */
+.gs-feed-toggle {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  background: transparent;
+  border-radius: var(--radius-control, var(--radius-sm));
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.gs-feed-toggle:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  color: var(--color-text);
+}
+.gs-feed-toggle .gs-icn {
+  width: 19px;
+  height: 19px;
+}
+.gs-feed-card[data-blocked='true'] .gs-feed-toggle {
+  color: var(--color-accent);
+}
+
+.gs-feed-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* Das Foto füllt die Karte bis an die Kante der Polsterung. */
+.gs-feed-media {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: var(--color-neutral-200);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  /* Feste Höhe, weil die Bildmaße nicht in der Datenbank stehen: ohne sie springt die Liste
+     bei jedem geladenen Foto (Layout Shift). 4/5 ist das Hochformat, in dem Gäste knipsen. */
+  aspect-ratio: 4 / 5;
+}
+.gs-feed-media img,
+.gs-feed-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gs-feed-media:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* Ausgeblendet heißt zurückgenommen, nicht alarmiert. Ein Warnabzeichen auf dem Foto der
+   Großmutter behauptet einen Vorfall, wo eine Entscheidung war. */
+.gs-feed-card[data-blocked='true'] .gs-feed-media img,
+.gs-feed-card[data-blocked='true'] .gs-feed-media video {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.gs-feed-card[data-blocked='true'] .gs-feed-text,
+.gs-feed-card[data-blocked='true'] .gs-feed-name {
+  opacity: 0.6;
+}
+
+.gs-album-flag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: var(--radius-control, calc(var(--radius-md) * 0.75));
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  color: color-mix(in srgb, var(--color-text) 75%, transparent);
+}
+.gs-album-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--lightbox-bg) 55%, transparent);
+  color: var(--lightbox-fg);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Ein Gruß ohne Foto ist kein leerer Rahmen, sondern eine Karte ohne Bildteil. */
+.gs-feed-card[data-kind='note'] .gs-feed-text {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.gs-album-empty {
+  padding: 40px 4px;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+}
+
+/* — Vollbild (Lightbox) —
+   Hier leben die Werkzeuge. Unter jedem Abzug eine Zeile aus „Sperren · Herunterladen ·
+   Löschen" zu hängen, macht aus dem Album eine Liste mit Bedienelementen; gebraucht wird die
+   Zeile aber immer nur für genau ein Bild — nämlich das, das man gerade ansieht. */
+.gs-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  /* Deckend, nicht halbdurchsichtig. Schon bei 2 % Rest schimmerten Albumtitel und Kopfleiste
+     durch — auf dunklem Grund reicht dem Auge das —, und das Foto stand damit sichtbar in
+     seiner eigenen Seite drin statt davor. */
+  background: var(--lightbox-bg);
+}
+.gs-lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  color: var(--lightbox-fg);
+  font-size: 12px;
+}
+.gs-lightbox-bar button {
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gs-lightbox-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 8px 12px;
+}
+.gs-lightbox-stage img,
+.gs-lightbox-stage video {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+/* Ein reiner Gruß im Vollbild: dieselbe Karte wie im Strom, nur groß. */
+.gs-lightbox-paper {
+  max-width: 34ch;
+  padding: 32px 28px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 20px;
+  line-height: 1.5;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.gs-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--lightbox-bg) 55%, transparent);
+  color: var(--lightbox-fg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gs-lightbox-nav[data-dir='prev'] {
+  left: 8px;
+}
+.gs-lightbox-nav[data-dir='next'] {
+  right: 8px;
+}
+.gs-lightbox-sheet {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 16px 18px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.gs-lightbox-msg {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 18px;
+  line-height: 1.5;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.gs-lightbox-who {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.gs-lightbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-divider);
+}
+.gs-lightbox-actions button,
+.gs-lightbox-actions a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.gs-lightbox-actions .quiet {
+  color: color-mix(in srgb, var(--color-text) 58%, transparent);
+}
+
+@media (max-width: 640px) {
+  /* Der Strom bleibt einspaltig — er wird nur schmaler. Angepasst wird deshalb nur, was auf
+     375px sonst zu viel Höhe kostet. */
+  .gs-feed-card {
+    padding: 14px;
+    gap: 10px;
+  }
+  .gs-segmented a {
+    padding: 0 13px;
+  }
+  .gs-lightbox-sheet {
+    max-height: 40vh;
   }
 }
