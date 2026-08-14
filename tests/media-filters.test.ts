@@ -27,6 +27,16 @@ function item(over: Partial<MediaItemLike> = {}): MediaItemLike {
 }
 
 describe('mediaKind', () => {
+  // DIES ist der Fall, der in Produktion vorkommt: `submissions.file_type` enthält 'image' bzw.
+  // 'video' (so schreibt es presign/route.ts), nicht den MIME-Typ. Vorher prüfte mediaKind nur
+  // auf das Präfix 'image/' — 'image'.startsWith('image/') ist false, also war JEDE Datei
+  // 'unknown' und der Foto/Video-Filter der Bibliothek traf nie etwas. Die alten Tests haben
+  // das nicht bemerkt, weil sie ausschließlich MIME-Typen übergaben.
+  it('classifies the values that actually stand in the database', () => {
+    expect(mediaKind('image')).toBe('photo')
+    expect(mediaKind('video')).toBe('video')
+  })
+
   it('classifies every allowed upload type', () => {
     expect(mediaKind('image/jpeg')).toBe('photo')
     expect(mediaKind('image/png')).toBe('photo')
@@ -75,6 +85,37 @@ describe('hasActiveMediaFilters', () => {
     expect(hasActiveMediaFilters({ ...DEFAULT_MEDIA_FILTERS, state: 'blocked' })).toBe(true)
     expect(hasActiveMediaFilters({ ...DEFAULT_MEDIA_FILTERS, sort: 'oldest' })).toBe(true)
     expect(hasActiveMediaFilters({ ...DEFAULT_MEDIA_FILTERS, campaign: EVENT_A })).toBe(true)
+  })
+})
+
+describe('matchesKind (with the DB values, not MIME)', () => {
+  it('actually filters what the library stores', () => {
+    expect(matchesKind('image', 'photo')).toBe(true)
+    expect(matchesKind('image', 'video')).toBe(false)
+    expect(matchesKind('video', 'video')).toBe(true)
+    expect(matchesKind('video', 'photo')).toBe(false)
+  })
+})
+
+describe('matchesKind: greetings (contributions without a file)', () => {
+  it('picks exactly the contributions that carry no file', () => {
+    expect(matchesKind(null, 'greeting', false)).toBe(true)
+    expect(matchesKind('image', 'greeting', true)).toBe(false)
+  })
+
+  it('never counts a file-less greeting as photo or video', () => {
+    expect(matchesKind(null, 'photo', false)).toBe(false)
+    expect(matchesKind(null, 'video', false)).toBe(false)
+  })
+
+  it('keeps greetings inside "all" — the tab shows everything the guests left', () => {
+    expect(matchesKind(null, 'all', false)).toBe(true)
+  })
+
+  // Aufrufer, die nur Dateien laden (Hotel/Agentur), übergeben hasMedia gar nicht.
+  it('defaults to "has a file" so existing callers are unaffected', () => {
+    expect(matchesKind('image', 'photo')).toBe(true)
+    expect(matchesKind('image', 'greeting')).toBe(false)
   })
 })
 

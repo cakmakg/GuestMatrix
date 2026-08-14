@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { bottomNavItems, dashboardNavItems, moreNavItems } from '@/lib/dashboard/nav'
-import { heroStats } from '@/lib/dashboard/overview'
+import { countdownKicker, daysUntil, heroStats } from '@/lib/dashboard/overview'
 import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 
 // Die drei aktiven Geschäftsmodelle, so wie das Dashboard sie aus der Registry auflöst.
@@ -72,20 +72,30 @@ describe('dashboardNavItems (sidebar)', () => {
 })
 
 describe('bottomNavItems (phone)', () => {
-  it('is always exactly four, and the same four for every business model', () => {
-    for (const { labels } of [HOTEL, AGENCY, WEDDING]) {
-      const ids = bottomNavItems(labels).map((i) => i.id)
-      expect(ids).toEqual(['overview', 'responses', 'media', 'more'])
+  it('is always exactly four — more than that breaks the labels at 360px', () => {
+    for (const { labels, can } of [HOTEL, AGENCY, WEDDING]) {
+      expect(bottomNavItems(labels, can)).toHaveLength(4)
     }
   })
 
-  it('still speaks the tenant language', () => {
-    expect(bottomNavItems(WEDDING.labels).map((i) => i.label)).toEqual([
-      'Übersicht',
-      'Glückwünsche',
-      'Fotos & Videos',
-      'Mehr',
-    ])
+  // Im Sammel-Flow ist der QR die häufigste Handlung (er steht auf den Tischen), und Grüße wie
+  // Medien sind dasselbe: was die Gäste dagelassen haben. Deshalb Galerie statt zweier Listen.
+  it('gives a guestbook tenant its own set with the QR code', () => {
+    const items = bottomNavItems(WEDDING.labels, WEDDING.can)
+    expect(items.map((i) => i.id)).toEqual(['overview', 'media', 'qr', 'settings'])
+    expect(items.map((i) => i.label)).toEqual(['Übersicht', 'Galerie', 'QR-Code', 'Einstellungen'])
+  })
+
+  it('keeps the operating set for hotel and agency, in their own words', () => {
+    for (const { labels, can } of [HOTEL, AGENCY]) {
+      expect(bottomNavItems(labels, can).map((i) => i.id)).toEqual([
+        'overview',
+        'responses',
+        'media',
+        'more',
+      ])
+    }
+    expect(bottomNavItems(HOTEL.labels, HOTEL.can)[2]?.label).toBe('Medien')
   })
 })
 
@@ -95,14 +105,17 @@ describe('moreNavItems', () => {
     expect(hotel).toEqual(['experiences', 'reports', 'settings'])
   })
 
-  it('thins out on its own for a guestbook tenant', () => {
+  // Beim Gästebuch-Tenant steht „Mehr" gar nicht in der Leiste (dort liegen Galerie und QR).
+  // Was hier übrig bleibt, ist trotzdem erreichbar: die Kampagnenliste zeigt die Übersicht selbst,
+  // sobald mehr als eine läuft, und zu den Grüßen führt „Alle ansehen" bzw. der Galerie-Chip.
+  it('for a guestbook tenant it holds what the four tabs do not', () => {
     const wedding = moreNavItems(WEDDING.labels, WEDDING.can).map((i) => i.id)
-    expect(wedding).toEqual(['experiences', 'settings'])
+    expect(wedding).toEqual(['experiences', 'responses'])
   })
 
   it('never duplicates a bottom-bar destination', () => {
     for (const { labels, can } of [HOTEL, AGENCY, WEDDING]) {
-      const bottom = new Set(bottomNavItems(labels).map((i) => i.id))
+      const bottom = new Set(bottomNavItems(labels, can).map((i) => i.id))
       for (const item of moreNavItems(labels, can)) {
         expect(bottom.has(item.id)).toBe(false)
       }
@@ -110,8 +123,48 @@ describe('moreNavItems', () => {
   })
 })
 
+describe('countdown kicker', () => {
+  // 2026-08-13, 14:30 Ortszeit — bewusst nachmittags, damit auffiele, wenn in
+  // 24-Stunden-Blöcken statt in Kalendertagen gerechnet würde.
+  const now = new Date(2026, 7, 13, 14, 30).getTime()
+
+  it('counts calendar days, independent of the time of day', () => {
+    expect(daysUntil('2026-08-13', now)).toBe(0)
+    expect(daysUntil('2026-08-14', now)).toBe(1)
+    expect(daysUntil('2026-08-25', now)).toBe(12)
+    expect(daysUntil('2026-08-12', now)).toBe(-1)
+
+    // Derselbe Tag, andere Uhrzeit → dieselbe Antwort. Genau das bricht bei ms-Arithmetik.
+    const morning = new Date(2026, 7, 13, 6, 0).getTime()
+    const night = new Date(2026, 7, 13, 23, 59).getTime()
+    expect(daysUntil('2026-08-14', morning)).toBe(1)
+    expect(daysUntil('2026-08-14', night)).toBe(1)
+  })
+
+  it('counts down before, says today on the day, and steps back afterwards', () => {
+    expect(countdownKicker('2026-08-25', now, 'Hochzeit')).toBe('Hochzeit · noch 12 Tage')
+    expect(countdownKicker('2026-08-14', now, 'Hochzeit')).toBe('Hochzeit · noch 1 Tag')
+    expect(countdownKicker('2026-08-13', now, 'Hochzeit')).toBe('Hochzeit · heute')
+    // Nach der Feier kein Negativ-Countdown — dann kommen die Beiträge erst richtig.
+    expect(countdownKicker('2026-08-01', now, 'Hochzeit')).toBe('Hochzeit')
+  })
+
+  it('falls back to the plain label when the date is unreadable', () => {
+    expect(daysUntil('kaputt', now)).toBeNull()
+    expect(countdownKicker('kaputt', now, 'Hochzeit')).toBe('Hochzeit')
+  })
+})
+
 describe('heroStats: three numbers over a single campaign', () => {
-  const input = { responses: 42, media: 17, guests: 9, openItems: 3, averageRating: 4.25 }
+  const input = {
+    responses: 42,
+    media: 17,
+    photos: 12,
+    videos: 5,
+    guests: 9,
+    openItems: 3,
+    averageRating: 4.25,
+  }
 
   it('hotel and agency get responses, rating and open items', () => {
     for (const { labels, can } of [HOTEL, AGENCY]) {
@@ -123,11 +176,32 @@ describe('heroStats: three numbers over a single campaign', () => {
     }
   })
 
-  it('a wedding gets greetings, media and contributing guests', () => {
+  // Im Sammel-Flow zählt, was zusammengekommen ist — und Fotos/Videos getrennt, weil ein
+  // Brautpaar sie unterschiedlich verwendet.
+  it('a wedding gets greetings, photos and videos', () => {
     const stats = heroStats(input, WEDDING.labels, WEDDING.can)
-    expect(stats.map((s) => s.id)).toEqual(['responses', 'media', 'guests'])
+    expect(stats.map((s) => s.id)).toEqual(['responses', 'photos', 'videos'])
     expect(stats[0]?.label).toBe('Glückwünsche')
-    expect(stats[1]?.label).toBe('Fotos & Videos')
+    expect(stats[1]?.value).toBe('12')
+    expect(stats[2]?.value).toBe('5')
+  })
+
+  it('shows a growth line only where something actually grew today', () => {
+    const stats = heroStats(
+      { ...input, today: { responses: 3, photos: 8, videos: 0 } },
+      WEDDING.labels,
+      WEDDING.can,
+    )
+    expect(stats.find((s) => s.id === 'responses')?.delta).toBe('+3 heute')
+    expect(stats.find((s) => s.id === 'photos')?.delta).toBe('+8 heute')
+    // Kein Zuwachs → keine Zeile. Ein „±0" wäre nur Rauschen.
+    expect(stats.find((s) => s.id === 'videos')?.delta).toBeUndefined()
+  })
+
+  it('omits the growth line entirely when no today-counts are supplied', () => {
+    for (const stat of heroStats(input, WEDDING.labels, WEDDING.can)) {
+      expect(stat.delta).toBeUndefined()
+    }
   })
 
   it('always returns three distinct stats for every business model', () => {

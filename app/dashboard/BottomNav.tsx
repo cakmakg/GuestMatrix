@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { bottomNavItems } from '@/lib/dashboard/nav'
-import type { DashboardLabels } from '@/lib/sectors'
+import type { DashboardCapabilities, DashboardLabels } from '@/lib/sectors'
 
 import { NAV_ICONS } from './nav-icons'
 
@@ -19,11 +19,12 @@ import { NAV_ICONS } from './nav-icons'
 
 type Props = {
   labels: DashboardLabels
+  can: DashboardCapabilities
 }
 
-export function BottomNav({ labels }: Props): React.ReactElement {
+export function BottomNav({ labels, can }: Props): React.ReactElement {
   const pathname = usePathname()
-  const items = bottomNavItems(labels)
+  const items = bottomNavItems(labels, can)
 
   return (
     <nav className="gs-bottom-nav" aria-label="Hauptnavigation">

@@ -55,4 +55,12 @@ export const NAV_ICONS: Record<NavItemId, ReactElement> = {
       <path d="M4 17h16" />
     </svg>
   ),
+  qr: (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+      <path d="M14 14h3v3h-3zM20 14h1M14 20h3M20 17v4" />
+    </svg>
+  ),
 }

@@ -10,7 +10,9 @@
 
 import { z } from 'zod'
 
-export const MEDIA_KIND_TUPLE = ['all', 'photo', 'video'] as const
+// `greeting` = ein Beitrag OHNE Datei (nur Name + Text). Er erscheint nur dort, wo der Flow
+// beitragszentriert ist (Gästebuch) — sonst enthält die Bibliothek ohnehin nur Dateien.
+export const MEDIA_KIND_TUPLE = ['all', 'photo', 'video', 'greeting'] as const
 export const MEDIA_STATE_TUPLE = ['all', 'released', 'blocked'] as const
 export const MEDIA_SORT_TUPLE = ['recent', 'oldest'] as const
 
@@ -51,14 +53,24 @@ export function hasActiveMediaFilters(filters: MediaFilters): boolean {
 }
 
 /**
- * MIME-Typ → Gattung. Ein fehlender oder unbekannter Typ ist `unknown` und wird von den
+ * Dateityp → Gattung. Ein fehlender oder unbekannter Typ ist `unknown` und wird von den
  * Gattungsfiltern NICHT eingeschlossen — sonst tauchte eine Datei unbekannter Art sowohl
  * unter „Fotos" als auch unter „Videos" auf.
+ *
+ * Akzeptiert BEIDE Schreibweisen, und das ist eine Fehlbehebung: in der Datenbank steht
+ * `'image'` / `'video'` (so schreibt es app/api/submissions/presign/route.ts, so steht es im
+ * Schema-Kommentar von 0001), NICHT der MIME-Typ. Die Funktion prüfte aber nur auf das Präfix
+ * `'image/'` — und `'image'.startsWith('image/')` ist false. Ergebnis: jede Datei galt als
+ * `unknown`, und der Foto/Video-Filter der Medien-Bibliothek traf nie etwas. Die Tests
+ * übergaben ausschließlich MIME-Typen und bestätigten damit dieselbe falsche Annahme.
+ *
+ * Beide Formen zu akzeptieren statt nur die DB-Form ist Absicht: der MIME-Typ ist das, was am
+ * Upload-Rand ankommt, und ein künftiger Aufrufer soll hier nicht erneut stolpern.
  */
 export function mediaKind(fileType: string | null): MediaKind {
   if (!fileType) return 'unknown'
-  if (fileType.startsWith('image/')) return 'photo'
-  if (fileType.startsWith('video/')) return 'video'
+  if (fileType === 'image' || fileType.startsWith('image/')) return 'photo'
+  if (fileType === 'video' || fileType.startsWith('video/')) return 'video'
   return 'unknown'
 }
 
@@ -67,10 +79,26 @@ export type MediaItemLike = {
   fileType: string | null
   blocked: boolean
   uploadedAt: string | null
+  /** Ohne Datei — ein reiner Gruß. Fehlt bei Aufrufern, die nur Dateien laden. */
+  hasMedia?: boolean
 }
 
-export function matchesKind(fileType: string | null, filter: MediaKindFilter): boolean {
+/**
+ * `all` schließt ALLES ein, was der Aufrufer geladen hat — auch reine Grüße. Wer die Bibliothek
+ * ohne Grüße lädt (Hotel/Agentur), merkt davon nichts.
+ *
+ * Ein Beitrag ohne Datei ist niemals „Foto" oder „Video": `hasMedia === false` schlägt die
+ * Typprüfung, sonst zählte ein Gruß ohne Anhang als `unknown` und verschwände zwar aus beiden
+ * Gattungsfiltern — aber eben auch aus `greeting`, wenn man sich allein auf file_type verließe.
+ */
+export function matchesKind(
+  fileType: string | null,
+  filter: MediaKindFilter,
+  hasMedia = true,
+): boolean {
   if (filter === 'all') return true
+  if (filter === 'greeting') return !hasMedia
+  if (!hasMedia) return false
   return mediaKind(fileType) === filter
 }
 
@@ -86,7 +114,7 @@ export function applyMediaFilters<T extends MediaItemLike>(
   return items.filter(
     (item) =>
       (filters.campaign === undefined || item.eventId === filters.campaign) &&
-      matchesKind(item.fileType, filters.kind) &&
+      matchesKind(item.fileType, filters.kind, item.hasMedia ?? true) &&
       matchesState(item.blocked, filters.state),
   )
 }
