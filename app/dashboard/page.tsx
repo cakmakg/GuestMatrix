@@ -814,7 +814,7 @@ export default async function DashboardPage({
                 }}
               >
                 <p style={{ color: MUTED, marginBottom: 16 }}>
-                  Noch keine {labels.experiences.toLowerCase()}. Erstelle die erste!
+                  Noch keine {labels.experiences}. Erstelle die erste!
                 </p>
                 <Link className="btn btn-primary" href="/dashboard/events/new">
                   {labels.experience} erstellen

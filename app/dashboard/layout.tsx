@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
+import { drawerNavItems } from '@/lib/dashboard/nav'
 import { quotaPercent } from '@/lib/dashboard/metrics'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import {
@@ -13,16 +14,16 @@ import {
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { BottomNav } from './BottomNav'
+import { NavDrawer } from './NavDrawer'
 import { SidebarNav } from './SidebarNav'
 
 /**
  * Anzeigeschrift des Album-Themas. Wie Archivo selbst gehostet über next/font — ein @import von
  * fonts.googleapis.com scheiterte an der CSP (`font-src 'self'`, next.config.ts).
  *
- * `preload: false`, weil nur EIN Thema sie benutzt: mit Vorladen holte jede Dashboard-Route die
- * Dateien, auch bei Tenants, die sie nie zu sehen bekommen. Die Klasse hängt unten entsprechend
- * nur am Album-Thema; ohne sie bleibt `--font-display` ungesetzt und die Serifenregeln greifen
- * gar nicht erst.
+ * Wird von JEDEM Thema getragen (die Serife ist Teil der gemeinsamen Sprache, siehe
+ * `[data-theme]` in globals.css) — deshalb vorgeladen und die Variable unbedingt gesetzt. Sie
+ * gilt nur für Überschriften; Fließtext, Listen und Tabellen bleiben auf Archivo.
  */
 const display = Playfair_Display({
   // latin-ext wegen der türkischen Zeichen in Gäste- und Kampagnennamen (ş, ğ, ı, İ, ö, ü, ç):
@@ -33,7 +34,6 @@ const display = Playfair_Display({
   style: ['normal', 'italic'],
   variable: '--font-display',
   display: 'swap',
-  preload: false,
 })
 
 type TenantRow = {
@@ -97,15 +97,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Und ebenso der Ton: die Tokens liegen in globals.css unter [data-theme='…'], die Auswahl
   // in der Registry. Hier wird nur zugewiesen — keine Seite verzweigt selbst über den Sektor.
   const theme = resolveDashboardTheme(tenant?.sector, tenant?.business_type)
+  // Was die untere Leiste nicht trägt, liegt hinter dem Hamburger — abgeleitet, nicht zweitgepflegt.
+  const drawerItems = drawerNavItems(labels, can)
 
   const email = user?.email ?? ''
   const brandName = tenant?.brand_name ?? BRAND.name
 
   return (
-    <div
-      className={theme === 'album' ? `gs-shell ${display.variable}` : 'gs-shell'}
-      data-theme={theme}
-    >
+    <div className={`gs-shell ${display.variable}`} data-theme={theme}>
       {/* ═══ SIDEBAR (ab 1024px; darunter übernimmt BottomNav) ═══ */}
       <aside className="gs-sidebar">
         <div
@@ -168,8 +167,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               color: 'color-mix(in srgb, var(--color-text) 60%, transparent)',
             }}
           >
-            {activeEvents} von {planConfig.maxActiveEvents} aktiven{' '}
-            {labels.experiences.toLowerCase()}
+            {activeEvents} von {planConfig.maxActiveEvents} aktiven {labels.experiences}
           </div>
           <div className="gs-bar" style={{ marginTop: 10 }}>
             <i style={{ width: `${planPct}%` }} />
@@ -180,6 +178,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* ═══ MAIN ═══ */}
       <div className="gs-main">
         <header className="gs-topbar">
+          {/* Nur wo die untere Leiste nicht alles abdeckt. Im Gästebuch decken ihre vier Plätze
+              den gesamten Umfang ab — ein Hamburger, der eine leere Liste öffnet, wäre dort ein
+              Versprechen auf nichts. */}
+          {drawerItems.length > 0 && !can.contributionCentric && (
+            <NavDrawer
+              items={drawerItems}
+              planLabel={planConfig.label}
+              planUsage={`${activeEvents} von ${planConfig.maxActiveEvents} aktiven ${labels.experiences}`}
+              planPercent={planPct}
+            />
+          )}
+
           <div
             style={{
               display: 'flex',

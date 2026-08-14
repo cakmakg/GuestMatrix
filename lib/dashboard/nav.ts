@@ -17,7 +17,7 @@
 import type { DashboardCapabilities, DashboardLabels } from '@/lib/sectors'
 
 export type NavItemId =
-  'overview' | 'experiences' | 'responses' | 'media' | 'reports' | 'settings' | 'more' | 'qr'
+  'overview' | 'experiences' | 'responses' | 'media' | 'reports' | 'settings' | 'qr'
 
 export type NavItem = {
   id: NavItemId
@@ -46,20 +46,22 @@ export function dashboardNavItems(labels: DashboardLabels, can: DashboardCapabil
 }
 
 /**
- * Die vier Ziele der Leiste am unteren Rand (Telefon).
+ * Die Ziele der Leiste am unteren Rand (Telefon) — die Handvoll, die der Daumen erreichen soll.
  *
- * Immer GENAU vier: bei 360 px bleiben sonst ~72 px je Eintrag, und die Beschriftung bricht.
- * Innerhalb eines Geschäftsmodells stehen sie fest — eine Leiste, deren Einträge wandern, lässt
- * sich nicht mit dem Daumen lernen.
+ * Innerhalb eines Geschäftsmodells stehen sie fest: eine Leiste, deren Einträge wandern, lässt
+ * sich nicht mit dem Daumen lernen. Bei 360 px bleiben pro Eintrag ~90 px (drei) bzw. ~72 px
+ * (vier); darunter bricht die Beschriftung.
  *
  * Zwei Belegungen, abgeleitet aus `contributionCentric`:
  *
- * - Sammel-Flow (Gästebuch): Übersicht · Galerie · QR · Einstellungen. Der QR bekommt einen
- *   eigenen Platz, weil er dort die häufigste Handlung überhaupt ist — er steht auf den Tischen
- *   und wird herumgezeigt. Grüße und Medien teilen sich die „Galerie", weil beide dasselbe sind:
- *   das, was die Gäste dagelassen haben. „Mehr" entfällt, es bliebe nichts darin.
- * - Betriebs-Flow (Hotel/Agentur): Übersicht · Antworten · Medien · Mehr. Der QR wird einmal
- *   eingerichtet und dann vergessen; dafür gibt es Berichte und Export hinter „Mehr".
+ * - Sammel-Flow (Gästebuch), VIER: Übersicht · Galerie · QR · Einstellungen. Der QR bekommt
+ *   einen eigenen Platz, weil er dort die häufigste Handlung überhaupt ist — er steht auf den
+ *   Tischen und wird herumgezeigt. Grüße und Medien teilen sich die „Galerie", weil beide
+ *   dasselbe sind: das, was die Gäste dagelassen haben.
+ * - Betriebs-Flow (Hotel/Agentur), DREI: Übersicht · Antworten · Medien. Das ist die tägliche
+ *   Runde. Alles Übrige (Kampagnen, Berichte, Einstellungen) liegt in der Schublade — es wird
+ *   selten und dann bewusst aufgesucht, nicht im Vorbeigehen. Der QR wird dort einmal
+ *   eingerichtet und danach vergessen.
  *
  * `experiences` fehlt in beiden absichtlich: wer nur eine laufende Kampagne hat (Free-Tarif
  * erlaubt genau eine), sieht sie bereits auf der Übersicht.
@@ -80,19 +82,26 @@ export function bottomNavItems(labels: DashboardLabels, can: DashboardCapabiliti
     overview,
     { id: 'responses', href: '/dashboard/feedback', label: labels.responses },
     { id: 'media', href: '/dashboard/media', label: labels.media },
-    { id: 'more', href: '/dashboard/more', label: 'Mehr' },
   ]
 }
 
 /**
- * Was die „Mehr"-Seite auflistet: alles aus der Seitenleiste, was nicht schon in der unteren
- * Leiste steht. Abgeleitet statt zweitgepflegt — ein neues Ziel taucht damit automatisch auf.
+ * Was die Schublade (Hamburger) auflistet: alles aus der Seitenleiste, was nicht schon in der
+ * unteren Leiste steht. Abgeleitet statt zweitgepflegt — ein neues Ziel taucht damit automatisch
+ * auf, statt beim nächsten Feature zu fehlen.
+ *
+ * Ersetzt die frühere Seite `/dashboard/more`: ein eigener Bildschirm, der nichts tat, als Links
+ * aufzuzählen, kostete einen Fingertipp mehr als eine Schublade — und war selbst ein Ziel, das
+ * in der Leiste einen der knappen Plätze belegte.
+ *
+ * Kann leer sein (Gästebuch: die vier Plätze decken bereits alles ab). Dann rendert der Aufrufer
+ * keinen Hamburger — ein Knopf, der eine leere Liste öffnet, ist schlimmer als keiner.
  *
  * Der CSV-Export erscheint hier NICHT als eigener Punkt: er hängt immer an einem Zeitraum
  * (Berichte) oder an einer Kampagne (Detailseite) und wäre ohne diesen Kontext eine Datei
  * ohne Bezug.
  */
-export function moreNavItems(labels: DashboardLabels, can: DashboardCapabilities): NavItem[] {
+export function drawerNavItems(labels: DashboardLabels, can: DashboardCapabilities): NavItem[] {
   const inBottomBar = new Set(bottomNavItems(labels, can).map((item) => item.id))
   return dashboardNavItems(labels, can).filter((item) => !inBottomBar.has(item.id))
 }

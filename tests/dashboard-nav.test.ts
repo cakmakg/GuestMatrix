@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bottomNavItems, dashboardNavItems, moreNavItems } from '@/lib/dashboard/nav'
+import { bottomNavItems, dashboardNavItems, drawerNavItems } from '@/lib/dashboard/nav'
 import { countdownKicker, daysUntil, heroStats } from '@/lib/dashboard/overview'
 import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 
@@ -72,9 +72,11 @@ describe('dashboardNavItems (sidebar)', () => {
 })
 
 describe('bottomNavItems (phone)', () => {
-  it('is always exactly four — more than that breaks the labels at 360px', () => {
+  it('never exceeds four — more than that breaks the labels at 360px', () => {
     for (const { labels, can } of [HOTEL, AGENCY, WEDDING]) {
-      expect(bottomNavItems(labels, can)).toHaveLength(4)
+      const items = bottomNavItems(labels, can)
+      expect(items.length).toBeGreaterThanOrEqual(3)
+      expect(items.length).toBeLessThanOrEqual(4)
     }
   })
 
@@ -86,38 +88,52 @@ describe('bottomNavItems (phone)', () => {
     expect(items.map((i) => i.label)).toEqual(['Übersicht', 'Galerie', 'QR-Code', 'Einstellungen'])
   })
 
-  it('keeps the operating set for hotel and agency, in their own words', () => {
+  // Drei statt vier: die tägliche Runde. „Mehr" war selbst ein Ziel und belegte einen der
+  // knappen Plätze, um danach nur Links aufzuzählen — das macht jetzt die Schublade.
+  it('gives hotel and agency the daily three, in their own words', () => {
     for (const { labels, can } of [HOTEL, AGENCY]) {
       expect(bottomNavItems(labels, can).map((i) => i.id)).toEqual([
         'overview',
         'responses',
         'media',
-        'more',
       ])
     }
     expect(bottomNavItems(HOTEL.labels, HOTEL.can)[2]?.label).toBe('Medien')
   })
 })
 
-describe('moreNavItems', () => {
+describe('drawerNavItems (hamburger)', () => {
   it('holds exactly what the bottom bar does not', () => {
-    const hotel = moreNavItems(HOTEL.labels, HOTEL.can).map((i) => i.id)
+    const hotel = drawerNavItems(HOTEL.labels, HOTEL.can).map((i) => i.id)
     expect(hotel).toEqual(['experiences', 'reports', 'settings'])
   })
 
-  // Beim Gästebuch-Tenant steht „Mehr" gar nicht in der Leiste (dort liegen Galerie und QR).
-  // Was hier übrig bleibt, ist trotzdem erreichbar: die Kampagnenliste zeigt die Übersicht selbst,
-  // sobald mehr als eine läuft, und zu den Grüßen führt „Alle ansehen" bzw. der Galerie-Chip.
-  it('for a guestbook tenant it holds what the four tabs do not', () => {
-    const wedding = moreNavItems(WEDDING.labels, WEDDING.can).map((i) => i.id)
-    expect(wedding).toEqual(['experiences', 'responses'])
+  // Ohne Auswertung fällt „Berichte" weg — die Schublade erbt das, weil sie aus derselben
+  // Zielliste abgeleitet wird und nicht aus einer zweiten Aufzählung.
+  it('drops reports where the flow carries no evaluation', () => {
+    const wedding = drawerNavItems(WEDDING.labels, WEDDING.can).map((i) => i.id)
+    expect(wedding).not.toContain('reports')
   })
 
   it('never duplicates a bottom-bar destination', () => {
     for (const { labels, can } of [HOTEL, AGENCY, WEDDING]) {
       const bottom = new Set(bottomNavItems(labels, can).map((i) => i.id))
-      for (const item of moreNavItems(labels, can)) {
+      for (const item of drawerNavItems(labels, can)) {
         expect(bottom.has(item.id)).toBe(false)
+      }
+    }
+  })
+
+  // Zusammen müssen beide Formen jedes Ziel der Seitenleiste abdecken: was in keiner von beiden
+  // steht, ist auf dem Telefon unerreichbar — und das fiele erst am Gerät auf.
+  it('bottom bar and drawer together cover every sidebar destination', () => {
+    for (const { labels, can } of [HOTEL, AGENCY]) {
+      const reachable = new Set([
+        ...bottomNavItems(labels, can).map((i) => i.id),
+        ...drawerNavItems(labels, can).map((i) => i.id),
+      ])
+      for (const item of dashboardNavItems(labels, can)) {
+        expect(reachable.has(item.id), `${item.id} ist auf dem Telefon nicht erreichbar`).toBe(true)
       }
     }
   })
