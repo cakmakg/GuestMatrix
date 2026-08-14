@@ -50,6 +50,33 @@ type Props = {
 
 const MUTED = 'color-mix(in srgb, var(--color-text) 55%, transparent)'
 
+const ICON_FILTER = (
+  <svg viewBox="0 0 24 24">
+    <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+  </svg>
+)
+const ICON_DOWNLOAD = (
+  <svg viewBox="0 0 24 24">
+    <path d="M12 3v12M7 11l5 5 5-5M4 20h16" />
+  </svg>
+)
+
+/**
+ * Beschriftung des Zeitraum-Chips — offene Enden werden benannt statt weggelassen.
+ *
+ * „ab 1.6.2026" sagt, dass hinten NICHTS begrenzt ist; ein Chip, der nur „1.6.2026" zeigte,
+ * ließe offen, ob das der Anfang, das Ende oder ein einzelner Tag ist.
+ */
+function rangeLabel(filters: { from?: string; to?: string }): string {
+  const from = filters.from ? new Date(filters.from).toLocaleDateString('de-DE') : null
+  const to = filters.to ? new Date(filters.to).toLocaleDateString('de-DE') : null
+
+  if (from && to) return `${from} – ${to}`
+  if (from) return `ab ${from}`
+  if (to) return `bis ${to}`
+  return 'Zeitraum'
+}
+
 /** Ein Datumsfeld des Zeitraum-Formulars — dieselbe Beschriftungsform wie die Listenfilter. */
 function DateField({
   label,
@@ -101,8 +128,12 @@ function DimensionRow({ summary }: { summary: DimensionSummary }): React.ReactEl
         </div>
       </div>
 
-      <div className="gs-bar">
-        <i style={{ width: `${pct}%` }} />
+      {/* Wrapper trägt die Beschriftung, nicht der Balken selbst: `[data-label]` macht die Zelle
+          zum Raster, und der Text säße dann im 6px hohen Balken. */}
+      <div data-label="Bewertung">
+        <div className="gs-bar">
+          <i style={{ width: `${pct}%` }} />
+        </div>
       </div>
 
       <div
@@ -112,6 +143,7 @@ function DimensionRow({ summary }: { summary: DimensionSummary }): React.ReactEl
           fontVariantNumeric: 'tabular-nums',
           color: summary.average === null ? MUTED : 'var(--color-text)',
         }}
+        data-label="Ø"
       >
         {summary.average === null ? '—' : formatNumber(summary.average, 1)}
       </div>
@@ -225,30 +257,53 @@ export default async function ReportsPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* ═══ Zeitraum (GET, ohne Client-JavaScript) + Export ═══ */}
-      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
-        <DateField label="Von" name="from" value={filters.from ?? ''} />
-        <DateField label="Bis" name="to" value={filters.to ?? ''} />
+      {/* ═══ Zeitraum (GET, ohne Client-JavaScript) + Export ═══
+          Der Zeitraum ist EIN Filter, nicht zwei: „von" ohne „bis" ergibt keine zweite Aussage.
+          Er bekommt deshalb einen einzigen Chip, der beide Enden abwirft. Der Export ist keine
+          Einschränkung, sondern eine Handlung — er bleibt sichtbar. */}
+      <div className="gs-filterbar gs-rise" data-i="1">
+        <details>
+          <summary>
+            <span className="gs-icn" aria-hidden="true">
+              {ICON_FILTER}
+            </span>
+            Zeitraum
+          </summary>
 
-        <button className="btn btn-primary" type="submit">
-          Anwenden
-        </button>
+          <form method="GET" className="gs-panel gs-filters">
+            <DateField label="Von" name="from" value={filters.from ?? ''} />
+            <DateField label="Bis" name="to" value={filters.to ?? ''} />
+
+            <button className="btn btn-primary" type="submit">
+              Anwenden
+            </button>
+
+            {hasActiveRange(filters) && (
+              <Link className="btn btn-secondary" href="/dashboard/reports">
+                Zurücksetzen
+              </Link>
+            )}
+          </form>
+        </details>
 
         {hasActiveRange(filters) && (
-          <Link className="btn btn-secondary" href="/dashboard/reports">
-            Zurücksetzen
+          <Link className="gs-filter-chip" href="/dashboard/reports">
+            {rangeLabel(filters)}
+            <span className="x" aria-hidden="true">
+              ×
+            </span>
+            <span className="sr-only">Zeitraum entfernen</span>
           </Link>
         )}
 
         {/* Der Export trägt denselben Zeitraum wie die Ansicht. */}
-        <a
-          className="btn btn-secondary"
-          href={`/api/reports/export${rangeQuery(filters)}`}
-          style={{ marginLeft: 'auto' }}
-        >
-          ⬇ CSV-Export
+        <a className="gs-chip" href={`/api/reports/export${rangeQuery(filters)}`}>
+          <span className="gs-icn" aria-hidden="true">
+            {ICON_DOWNLOAD}
+          </span>
+          CSV-Export
         </a>
-      </form>
+      </div>
 
       {/* ═══ Freie Kurzantworten (z. B. „drei Worte") ═══ */}
       {/* Nicht an ratingEnabled gehängt, sondern am Katalog: sobald ein Kampagnentyp eine
@@ -533,12 +588,23 @@ export default async function ReportsPage({ searchParams }: Props) {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 13 }}>{row.label}</div>
-                  <div style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                  {/* data-label: auf dem Telefon stapeln die Zellen und die Kopfzeile ist weg —
+                      dann trägt jede Zelle ihre Beschriftung selbst (siehe globals.css). */}
+                  <div style={{ fontSize: 13 }} data-label="Typ">
+                    {row.label}
+                  </div>
+                  <div
+                    style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}
+                    data-label="Antworten"
+                  >
                     {formatNumber(row.responses)}
                   </div>
-                  <div className="gs-bar">
-                    <i style={{ width: `${((row.average ?? 0) / 5) * 100}%` }} />
+                  {/* Der Balken bekommt die Beschriftung NICHT selbst: `[data-label]` macht die
+                      Zelle zum Raster, und der Text säße dann im 6px hohen Balken. */}
+                  <div data-label="Bewertung">
+                    <div className="gs-bar">
+                      <i style={{ width: `${((row.average ?? 0) / 5) * 100}%` }} />
+                    </div>
                   </div>
                   <div
                     style={{
@@ -546,6 +612,7 @@ export default async function ReportsPage({ searchParams }: Props) {
                       textAlign: 'right',
                       fontVariantNumeric: 'tabular-nums',
                     }}
+                    data-label="Ø Bewertung"
                   >
                     {row.average !== null ? formatNumber(row.average, 1) : '—'}
                   </div>

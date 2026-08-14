@@ -5,11 +5,13 @@ import { redirect } from 'next/navigation'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import {
+  DEFAULT_EXPERIENCE_FILTERS,
   applyExperienceFilters,
   hasActiveExperienceFilters,
   parseExperienceFilters,
   sortExperiences,
 } from '@/lib/dashboard/experience-filters'
+import { buildFilterChips } from '@/lib/dashboard/filter-chips'
 import { formatNumber, formatRelative, quotaPercent } from '@/lib/dashboard/metrics'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import { getCampaignConfig, isCampaignType, resolveDashboardLabels } from '@/lib/sectors'
@@ -36,6 +38,28 @@ type Props = {
 
 const MUTED = 'color-mix(in srgb, var(--color-text) 55%, transparent)'
 const GRID = 'minmax(0, 1fr) 130px 92px 128px 108px'
+
+/**
+ * Auswahlmöglichkeiten der Filter — als Konstanten, weil sie an ZWEI Stellen gebraucht werden:
+ * im Formular und als Beschriftung der Chips. Inline im JSX gingen die beiden beim nächsten
+ * neuen Wert auseinander, und der Chip zeigte dann den rohen Schlüssel.
+ */
+const STATE_OPTIONS = [
+  { value: 'active', label: 'Nur aktive' },
+  { value: 'archived', label: 'Nur archivierte' },
+  { value: 'all', label: 'Alle' },
+]
+const SORT_OPTIONS = [
+  { value: 'date', label: 'Datum (neueste zuerst)' },
+  { value: 'responses', label: 'Antworten (meiste zuerst)' },
+  { value: 'name', label: 'Name (A–Z)' },
+]
+
+const ICON_FILTER = (
+  <svg viewBox="0 0 24 24">
+    <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+  </svg>
+)
 
 const SELECT_STYLE: React.CSSProperties = {
   minHeight: 34,
@@ -141,6 +165,20 @@ export default async function ExperiencesPage({ searchParams }: Props) {
   const activeCount = rows.filter((row) => !row.archived).length
   const now = Date.now()
 
+  // Nur was vom Standard ABWEICHT wird zum Chip; „Nur aktive" ist hier der Standard und damit
+  // kein Filter, sondern die Grundeinstellung.
+  const chips = buildFilterChips(
+    '/dashboard/experiences',
+    {
+      state: filters.state === DEFAULT_EXPERIENCE_FILTERS.state ? undefined : filters.state,
+      sort: filters.sort === DEFAULT_EXPERIENCE_FILTERS.sort ? undefined : filters.sort,
+    },
+    {
+      ...Object.fromEntries(STATE_OPTIONS.map((o) => [`state:${o.value}`, o.label])),
+      ...Object.fromEntries(SORT_OPTIONS.map((o) => [`sort:${o.value}`, o.label])),
+    },
+  )
+
   return (
     <div className="gs-page">
       <div className="gs-page-head gs-rise" data-i="0">
@@ -164,38 +202,44 @@ export default async function ExperiencesPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
-        <Field
-          label="Status"
-          name="state"
-          value={filters.state}
-          options={[
-            { value: 'active', label: 'Nur aktive' },
-            { value: 'archived', label: 'Nur archivierte' },
-            { value: 'all', label: 'Alle' },
-          ]}
-        />
-        <Field
-          label="Sortierung"
-          name="sort"
-          value={filters.sort}
-          options={[
-            { value: 'date', label: 'Datum (neueste zuerst)' },
-            { value: 'responses', label: 'Antworten (meiste zuerst)' },
-            { value: 'name', label: 'Name (A–Z)' },
-          ]}
-        />
+      {/* Sichtbar ist nur, was gesetzt IST — je ein Chip mit eigenem Ausschalter. Das Formular
+          liegt dahinter im <details>. */}
+      <div className="gs-filterbar gs-rise" data-i="1">
+        <details>
+          <summary>
+            <span className="gs-icn" aria-hidden="true">
+              {ICON_FILTER}
+            </span>
+            Filter
+            {chips.length > 0 && ` · ${chips.length}`}
+          </summary>
 
-        <button className="btn btn-primary" type="submit">
-          Anwenden
-        </button>
+          <form method="GET" className="gs-panel gs-filters">
+            <Field label="Status" name="state" value={filters.state} options={STATE_OPTIONS} />
+            <Field label="Sortierung" name="sort" value={filters.sort} options={SORT_OPTIONS} />
 
-        {hasActiveExperienceFilters(filters) && (
-          <Link className="btn btn-secondary" href="/dashboard/experiences">
-            Zurücksetzen
+            <button className="btn btn-primary" type="submit">
+              Anwenden
+            </button>
+
+            {hasActiveExperienceFilters(filters) && (
+              <Link className="btn btn-secondary" href="/dashboard/experiences">
+                Zurücksetzen
+              </Link>
+            )}
+          </form>
+        </details>
+
+        {chips.map((chip) => (
+          <Link key={chip.key} className="gs-filter-chip" href={chip.href}>
+            {chip.label}
+            <span className="x" aria-hidden="true">
+              ×
+            </span>
+            <span className="sr-only">entfernen</span>
           </Link>
-        )}
-      </form>
+        ))}
+      </div>
 
       <section className="gs-panel gs-rise" data-i="2">
         <div
@@ -275,27 +319,36 @@ export default async function ExperiencesPage({ searchParams }: Props) {
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 13 }}>{row.typeLabel}</div>
+                  {/* data-label: auf dem Telefon stapeln die Zellen und die Kopfzeile ist weg —
+                      dann trägt jede Zelle ihre Beschriftung selbst (siehe globals.css). */}
+                  <div style={{ fontSize: 13 }} data-label="Typ">
+                    {row.typeLabel}
+                  </div>
 
-                  <div>
+                  <div data-label="Status">
                     <span className={`tag ${row.archived ? 'tag-neutral' : 'tag-accent'}`}>
                       {row.archived ? 'Archiviert' : 'Aktiv'}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="gs-bar" style={{ flex: 1 }}>
-                      <i style={{ width: `${pct}%` }} />
-                    </div>
-                    <div
-                      style={{
-                        font: '600 12px/1 var(--font-body)',
-                        minWidth: 30,
-                        textAlign: 'right',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      {Math.round(pct)}%
+                  {/* Der Wrapper trägt die Beschriftung, nicht die Flex-Zeile darin: ein inline
+                      gesetztes `display` schlägt jede Regel aus globals.css, das Etikett-Raster
+                      käme also gar nicht zum Zug. */}
+                  <div data-label="Auslastung">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="gs-bar" style={{ flex: 1 }}>
+                        <i style={{ width: `${pct}%` }} />
+                      </div>
+                      <div
+                        style={{
+                          font: '600 12px/1 var(--font-body)',
+                          minWidth: 30,
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {Math.round(pct)}%
+                      </div>
                     </div>
                   </div>
 

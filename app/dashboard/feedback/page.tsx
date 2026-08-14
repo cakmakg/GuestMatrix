@@ -5,11 +5,13 @@ import { redirect } from 'next/navigation'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import {
+  DEFAULT_FILTERS,
   applyFeedbackFilters,
   hasActiveFilters,
   parseFeedbackFilters,
   sortFeedback,
 } from '@/lib/dashboard/feedback-filters'
+import { buildFilterChips } from '@/lib/dashboard/filter-chips'
 import {
   answeredQuestions,
   parseAnswers,
@@ -69,6 +71,12 @@ const SORT_LABELS: Record<string, string> = {
   lowest: 'Schlechteste zuerst',
   highest: 'Beste zuerst',
 }
+
+const ICON_FILTER = (
+  <svg viewBox="0 0 24 24">
+    <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+  </svg>
+)
 
 /** Aktionen sitzen als reine Textknöpfe in der Zeile — wie in der Medien-Bibliothek. */
 const ACTION_BUTTON: React.CSSProperties = {
@@ -166,6 +174,34 @@ export default async function FeedbackPage({ searchParams }: Props) {
   const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
   const eventNameById = new Map(events.map((event) => [event.id, event.name]))
 
+  // Nur was vom Standard ABWEICHT wird zum Chip: „Alle Bewertungen" ist kein Filter, sondern
+  // dessen Abwesenheit — als Chip wäre es ein Ausschalter für nichts.
+  const activeFilterParams: Record<string, string | undefined> = {
+    campaign: filters.campaign,
+    rating: filters.rating === DEFAULT_FILTERS.rating ? undefined : filters.rating,
+    media: filters.media === DEFAULT_FILTERS.media ? undefined : filters.media,
+    state: filters.state === DEFAULT_FILTERS.state ? undefined : filters.state,
+    sort: filters.sort === DEFAULT_FILTERS.sort ? undefined : filters.sort,
+  }
+
+  const chipLabels: Record<string, string> = {
+    ...Object.fromEntries(events.map((event) => [`campaign:${event.id}`, event.name])),
+    ...Object.fromEntries(
+      Object.entries(RATING_LABELS).map(([value, label]) => [`rating:${value}`, label]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(MEDIA_LABELS).map(([value, label]) => [`media:${value}`, label]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(STATE_LABELS).map(([value, label]) => [`state:${value}`, label]),
+    ),
+    ...Object.fromEntries(
+      Object.entries(SORT_LABELS).map(([value, label]) => [`sort:${value}`, label]),
+    ),
+  }
+
+  const chips = buildFilterChips('/dashboard/feedback', activeFilterParams, chipLabels)
+
   const rows = subs.map((sub) => ({
     id: sub.id,
     eventId: sub.event_id,
@@ -201,55 +237,80 @@ export default async function FeedbackPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* ═══ Filter (GET, ohne Client-JavaScript) ═══ */}
-      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
-        <Field
-          label="Kampagne"
-          name="campaign"
-          value={filters.campaign ?? 'all'}
-          options={[
-            { value: 'all', label: 'Alle Kampagnen' },
-            ...events.map((event) => ({ value: event.id, label: event.name })),
-          ]}
-        />
-        {/* Ein Bewertungsfilter ohne Bewertungen böte nur Optionen an, die nie etwas treffen. */}
-        {can.ratingEnabled && (
-          <Field
-            label="Bewertung"
-            name="rating"
-            value={filters.rating}
-            options={Object.entries(RATING_LABELS).map(([value, label]) => ({ value, label }))}
-          />
-        )}
-        <Field
-          label="Medien"
-          name="media"
-          value={filters.media}
-          options={Object.entries(MEDIA_LABELS).map(([value, label]) => ({ value, label }))}
-        />
-        <Field
-          label="Bearbeitung"
-          name="state"
-          value={filters.state}
-          options={Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label }))}
-        />
-        <Field
-          label="Sortierung"
-          name="sort"
-          value={filters.sort}
-          options={Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label }))}
-        />
+      {/* ═══ Filter (GET, ohne Client-JavaScript) ═══
+          Sichtbar ist nur, was gesetzt IST — je ein Chip mit eigenem Ausschalter. Das Formular
+          liegt dahinter im <details>; auf 375px füllte es sonst den ersten Bildschirm, bevor
+          eine einzige Antwort zu sehen war. */}
+      <div className="gs-filterbar gs-rise" data-i="1">
+        <details>
+          <summary>
+            <span className="gs-icn" aria-hidden="true">
+              {ICON_FILTER}
+            </span>
+            Filter
+            {chips.length > 0 && ` · ${chips.length}`}
+          </summary>
 
-        <button className="btn btn-primary" type="submit">
-          Anwenden
-        </button>
+          <form method="GET" className="gs-panel gs-filters">
+            <Field
+              label="Kampagne"
+              name="campaign"
+              value={filters.campaign ?? 'all'}
+              options={[
+                { value: 'all', label: 'Alle Kampagnen' },
+                ...events.map((event) => ({ value: event.id, label: event.name })),
+              ]}
+            />
+            {/* Ein Bewertungsfilter ohne Bewertungen böte nur Optionen an, die nie etwas treffen. */}
+            {can.ratingEnabled && (
+              <Field
+                label="Bewertung"
+                name="rating"
+                value={filters.rating}
+                options={Object.entries(RATING_LABELS).map(([value, label]) => ({ value, label }))}
+              />
+            )}
+            <Field
+              label="Medien"
+              name="media"
+              value={filters.media}
+              options={Object.entries(MEDIA_LABELS).map(([value, label]) => ({ value, label }))}
+            />
+            <Field
+              label="Bearbeitung"
+              name="state"
+              value={filters.state}
+              options={Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label }))}
+            />
+            <Field
+              label="Sortierung"
+              name="sort"
+              value={filters.sort}
+              options={Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label }))}
+            />
 
-        {hasActiveFilters(filters) && (
-          <Link className="btn btn-secondary" href="/dashboard/feedback">
-            Zurücksetzen
+            <button className="btn btn-primary" type="submit">
+              Anwenden
+            </button>
+
+            {hasActiveFilters(filters) && (
+              <Link className="btn btn-secondary" href="/dashboard/feedback">
+                Zurücksetzen
+              </Link>
+            )}
+          </form>
+        </details>
+
+        {chips.map((chip) => (
+          <Link key={chip.key} className="gs-filter-chip" href={chip.href}>
+            {chip.label}
+            <span className="x" aria-hidden="true">
+              ×
+            </span>
+            <span className="sr-only">entfernen</span>
           </Link>
-        )}
-      </form>
+        ))}
+      </div>
 
       {/* ═══ Liste ═══ */}
       <section className="gs-panel gs-rise" data-i="2">

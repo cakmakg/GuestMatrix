@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import { countContributors, formatAlbumDate } from '@/lib/dashboard/album'
+import { buildFilterChips } from '@/lib/dashboard/filter-chips'
 import {
+  DEFAULT_MEDIA_FILTERS,
   applyMediaFilters,
   hasActiveMediaFilters,
   mediaKind,
@@ -45,6 +47,12 @@ const ICON_CALENDAR = (
   <svg viewBox="0 0 24 24">
     <rect x="3" y="5" width="18" height="16" rx="2" />
     <path d="M8 3v4M16 3v4M3 10h18" />
+  </svg>
+)
+
+const ICON_FILTER = (
+  <svg viewBox="0 0 24 24">
+    <path d="M3 5h18l-7 8v6l-4 2v-8z" />
   </svg>
 )
 
@@ -259,6 +267,31 @@ export default async function MediaPage({ searchParams }: Props) {
   }
 
   // ═══ Medien-Bibliothek (Hotel/Agentur) ═══
+  //
+  // Nur was vom Standard ABWEICHT wird zum Chip: „Alle Kampagnen" ist kein Filter, sondern
+  // dessen Abwesenheit.
+  const chips = buildFilterChips(
+    '/dashboard/media',
+    {
+      campaign: filters.campaign,
+      kind: filters.kind === DEFAULT_MEDIA_FILTERS.kind ? undefined : filters.kind,
+      state: filters.state === DEFAULT_MEDIA_FILTERS.state ? undefined : filters.state,
+      sort: filters.sort === DEFAULT_MEDIA_FILTERS.sort ? undefined : filters.sort,
+    },
+    {
+      ...Object.fromEntries(events.map((event) => [`campaign:${event.id}`, event.name])),
+      ...Object.fromEntries(
+        Object.entries(KIND_LABELS).map(([value, label]) => [`kind:${value}`, label]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(STATE_LABELS).map(([value, label]) => [`state:${value}`, label]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(SORT_LABELS).map(([value, label]) => [`sort:${value}`, label]),
+      ),
+    },
+  )
+
   return (
     <div className="gs-page">
       <div className="gs-page-head gs-rise" data-i="0">
@@ -274,46 +307,69 @@ export default async function MediaPage({ searchParams }: Props) {
       </div>
 
       {/* ═══ Filter ═══
-          Betriebs-Bibliothek: hier lohnen die vollen Filter (Kampagne, Freigabe, Sortierung). */}
-      <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
-        <Field
-          label="Kampagne"
-          name="campaign"
-          value={filters.campaign ?? 'all'}
-          options={[
-            { value: 'all', label: 'Alle Kampagnen' },
-            ...events.map((event) => ({ value: event.id, label: event.name })),
-          ]}
-        />
-        <Field
-          label="Art"
-          name="kind"
-          value={filters.kind}
-          options={Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label }))}
-        />
-        <Field
-          label="Freigabe"
-          name="state"
-          value={filters.state}
-          options={Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label }))}
-        />
-        <Field
-          label="Sortierung"
-          name="sort"
-          value={filters.sort}
-          options={Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label }))}
-        />
+          Betriebs-Bibliothek: hier lohnen die vollen Filter (Kampagne, Freigabe, Sortierung) —
+          sichtbar bleibt aber nur, was gesetzt IST. */}
+      <div className="gs-filterbar gs-rise" data-i="1">
+        <details>
+          <summary>
+            <span className="gs-icn" aria-hidden="true">
+              {ICON_FILTER}
+            </span>
+            Filter
+            {chips.length > 0 && ` · ${chips.length}`}
+          </summary>
 
-        <button className="btn btn-primary" type="submit">
-          Anwenden
-        </button>
+          <form method="GET" className="gs-panel gs-filters">
+            <Field
+              label="Kampagne"
+              name="campaign"
+              value={filters.campaign ?? 'all'}
+              options={[
+                { value: 'all', label: 'Alle Kampagnen' },
+                ...events.map((event) => ({ value: event.id, label: event.name })),
+              ]}
+            />
+            <Field
+              label="Art"
+              name="kind"
+              value={filters.kind}
+              options={Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label }))}
+            />
+            <Field
+              label="Freigabe"
+              name="state"
+              value={filters.state}
+              options={Object.entries(STATE_LABELS).map(([value, label]) => ({ value, label }))}
+            />
+            <Field
+              label="Sortierung"
+              name="sort"
+              value={filters.sort}
+              options={Object.entries(SORT_LABELS).map(([value, label]) => ({ value, label }))}
+            />
 
-        {hasActiveMediaFilters(filters) && (
-          <Link className="btn btn-secondary" href="/dashboard/media">
-            Zurücksetzen
+            <button className="btn btn-primary" type="submit">
+              Anwenden
+            </button>
+
+            {hasActiveMediaFilters(filters) && (
+              <Link className="btn btn-secondary" href="/dashboard/media">
+                Zurücksetzen
+              </Link>
+            )}
+          </form>
+        </details>
+
+        {chips.map((chip) => (
+          <Link key={chip.key} className="gs-filter-chip" href={chip.href}>
+            {chip.label}
+            <span className="x" aria-hidden="true">
+              ×
+            </span>
+            <span className="sr-only">entfernen</span>
           </Link>
-        )}
-      </form>
+        ))}
+      </div>
 
       {/* ═══ Raster ═══ */}
       <section className="gs-panel gs-rise" data-i="2">
