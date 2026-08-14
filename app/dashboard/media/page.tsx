@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
+import { countContributors, formatAlbumDate } from '@/lib/dashboard/album'
 import {
   applyMediaFilters,
   hasActiveMediaFilters,
@@ -13,15 +14,16 @@ import {
 } from '@/lib/dashboard/media-filters'
 import { formatNumber, formatRelative } from '@/lib/dashboard/metrics'
 import { SIGNED_URL_EXPIRY, createSignedUrls } from '@/lib/storage/signed-url'
-import { resolveDashboardLabels } from '@/lib/sectors'
+import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { deleteFromDashboardAction, moderateAction } from '../actions'
 import { ConfirmSubmit } from '../ConfirmSubmit'
+import { AlbumGallery, type AlbumItem } from './AlbumGallery'
 
 export const metadata: Metadata = { title: `Medien – ${BRAND.name}` }
 
-type EventRow = { id: string; name: string }
+type EventRow = { id: string; name: string; date: string | null }
 type SubmissionRow = {
   id: string
   event_id: string
@@ -39,11 +41,19 @@ type Props = {
 
 const MUTED = 'color-mix(in srgb, var(--color-text) 55%, transparent)'
 
+const ICON_CALENDAR = (
+  <svg viewBox="0 0 24 24">
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M8 3v4M16 3v4M3 10h18" />
+  </svg>
+)
+
 const KIND_LABELS: Record<string, string> = {
   all: 'Fotos und Videos',
   photo: 'Nur Fotos',
   video: 'Nur Videos',
 }
+
 const STATE_LABELS: Record<string, string> = {
   all: 'Alle',
   released: 'Nur freigegeben',
@@ -113,20 +123,27 @@ export default async function MediaPage({ searchParams }: Props) {
     .select('sector, business_type')
     .single<{ sector: string; business_type: string | null }>()
   const labels = resolveDashboardLabels(tenant?.sector, tenant?.business_type)
+  const can = resolveDashboardCapabilities(tenant?.sector, tenant?.business_type)
 
   const { data: eventsData } = await supabase
     .from('events')
-    .select('id, name')
+    .select('id, name, date')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
 
-  const { data: subsData } = await supabase
+  // Im Sammel-Flow ist dieser Bildschirm die „Galerie" und zeigt ALLES, was die Gäste dagelassen
+  // haben — auch einen Gruß ohne Foto. In der reinen Medien-Bibliothek (Hotel/Agentur) bleibt es
+  // bei Dateien; ein Feedback ohne Anhang gehört dort in die Antwortliste, nicht hierher.
+  const query = supabase
     .from('submissions')
     .select('id, event_id, media_url, file_type, guest_name, comment, moderation_flag, uploaded_at')
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
     .not('uploaded_at', 'is', null)
-    .not('media_url', 'is', null)
+
+  const { data: subsData } = can.contributionCentric
+    ? await query
+    : await query.not('media_url', 'is', null)
 
   const events = (eventsData as EventRow[]) ?? []
   const subs = (subsData as SubmissionRow[]) ?? []
@@ -141,6 +158,7 @@ export default async function MediaPage({ searchParams }: Props) {
     comment: sub.comment,
     blocked: sub.moderation_flag,
     uploadedAt: sub.uploaded_at,
+    hasMedia: sub.media_url !== null,
   }))
 
   const visible = sortMedia(applyMediaFilters(rows, filters), filters.sort)
@@ -153,6 +171,94 @@ export default async function MediaPage({ searchParams }: Props) {
   const blockedTotal = rows.filter((row) => row.blocked).length
   const now = Date.now()
 
+  // ═══ Album (beitragszentriert) ═══
+  //
+  // Eigener Rückgabezweig statt Verzweigungen im gemeinsamen Baum: die beiden Ansichten teilen
+  // die Daten, aber keine Form. Als Ternär-Kette in einem Baum wurde jede Zeile zur Fallfrage
+  // („Beiträge" oder „Dateien"?) — und die eigentliche Aussage, dass hier ein Album und dort
+  // eine Bibliothek steht, war nirgends zu lesen.
+  if (can.contributionCentric) {
+    const single = events.length === 1 ? events[0] : undefined
+    const contributors = countContributors(rows)
+    const greetings = rows.filter((row) => !row.hasMedia).length
+
+    const albumItems: AlbumItem[] = visible.map((row) => ({
+      id: row.id,
+      url: row.mediaUrl ? (signedUrls.get(row.mediaUrl) ?? null) : null,
+      kind: mediaKind(row.fileType),
+      hasMedia: row.hasMedia,
+      guestName: row.guestName,
+      comment: row.comment,
+      blocked: row.blocked,
+      uploadedAt: row.uploadedAt,
+      // Bei genau einer Feier stünde in jeder Zeile derselbe Name.
+      eventName: single ? null : (eventNameById.get(row.eventId) ?? null),
+    }))
+
+    const albumDate = single ? formatAlbumDate(single.date) : ''
+    const countWord = rows.length === 1 ? labels.response : labels.responses
+    // „87 Glückwünsche von 34 Gästen" ist EIN Gedanke und bleibt deshalb ein Satzteil; die
+    // Gästezahl mit einem Mittelpunkt abzutrennen las sich wie zwei getrennte Kennzahlen.
+    const collected =
+      contributors > 0
+        ? `${formatNumber(rows.length)} ${countWord} von ${formatNumber(contributors)} ${contributors === 1 ? 'Gast' : 'Gästen'}`
+        : `${formatNumber(rows.length)} ${countWord}`
+
+    return (
+      <div className="gs-page">
+        <header className="gs-album-head gs-rise" data-i="0">
+          <h1 className="gs-album-title">{single ? single.name : labels.media}</h1>
+          {rows.length > 0 && (
+            <p className="gs-album-meta">
+              {albumDate !== '' && (
+                <span>
+                  <span className="gs-icn" aria-hidden="true">
+                    {ICON_CALENDAR}
+                  </span>
+                  {albumDate}
+                </span>
+              )}
+              <span>{collected}</span>
+              {blockedTotal > 0 && <span>{formatNumber(blockedTotal)} ausgeblendet</span>}
+            </p>
+          )}
+        </header>
+
+        {/* Der Schalter erscheint nur, wenn es wirklich zwei Sorten zu trennen gibt — bei einer
+            Feier ganz ohne textlose Fotos (oder ganz ohne reine Grüße) wäre er eine Zierde, die
+            nichts tut. */}
+        {greetings > 0 && greetings < rows.length && (
+          <nav className="gs-rise" data-i="1" aria-label="Ansicht">
+            <span className="gs-segmented">
+              <Link
+                href="/dashboard/media"
+                aria-current={filters.kind === 'all' ? 'true' : undefined}
+              >
+                Alles
+              </Link>
+              <Link
+                href="/dashboard/media?kind=greeting"
+                aria-current={filters.kind === 'greeting' ? 'true' : undefined}
+              >
+                Nur Grüße
+              </Link>
+            </span>
+          </nav>
+        )}
+
+        <AlbumGallery
+          items={albumItems}
+          emptyText={
+            rows.length === 0
+              ? 'Sobald deine Gäste den QR-Code scannen, sammeln sich ihre Grüße und Fotos hier.'
+              : 'Zu dieser Ansicht gibt es nichts.'
+          }
+        />
+      </div>
+    )
+  }
+
+  // ═══ Medien-Bibliothek (Hotel/Agentur) ═══
   return (
     <div className="gs-page">
       <div className="gs-page-head gs-rise" data-i="0">
@@ -167,7 +273,8 @@ export default async function MediaPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* ═══ Filter (GET, ohne Client-JavaScript) ═══ */}
+      {/* ═══ Filter ═══
+          Betriebs-Bibliothek: hier lohnen die vollen Filter (Kampagne, Freigabe, Sortierung). */}
       <form method="GET" className="gs-panel gs-filters gs-rise" data-i="1">
         <Field
           label="Kampagne"

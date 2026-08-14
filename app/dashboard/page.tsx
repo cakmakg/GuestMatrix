@@ -14,17 +14,21 @@ import {
   percentDelta,
   sparklinePath,
 } from '@/lib/dashboard/metrics'
-import type { HeroStat } from '@/lib/dashboard/overview'
-import { heroStats } from '@/lib/dashboard/overview'
+import { mediaKind } from '@/lib/dashboard/media-filters'
+import type { HeroStat, HeroStatId } from '@/lib/dashboard/overview'
+import { countdownKicker, heroStats, isToday } from '@/lib/dashboard/overview'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import {
   getCampaignConfig,
   isCampaignType,
+  isSector,
   resolveDashboardCapabilities,
   resolveDashboardLabels,
 } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+import { CopyLinkChip } from './CopyLinkChip'
+import { EventForm } from './events/new/EventForm'
 import { rowCols } from './row-cols'
 
 type EventRow = {
@@ -45,6 +49,7 @@ type SubmissionRow = {
   guest_name: string | null
   comment: string | null
   media_url: string | null
+  file_type: string | null
   moderation_flag: boolean
   uploaded_at: string | null
   resolved_at: string | null
@@ -160,7 +165,12 @@ function KpiCard({ kpi, index }: { kpi: Kpi; index: number }): React.ReactElemen
       )}
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-        <div style={{ font: '800 38px/1 var(--font-heading)', letterSpacing: '-0.025em' }}>
+        <div
+          style={{
+            font: 'var(--font-heading-weight) 38px/1 var(--font-heading)',
+            letterSpacing: '-0.025em',
+          }}
+        >
           {kpi.value}
         </div>
         {kpi.unit && <span style={{ fontSize: 14, color: MUTED }}>{kpi.unit}</span>}
@@ -230,6 +240,60 @@ const ICON_PIN = (
 )
 
 /**
+ * Ein Symbol je Kennzahl, gekeyt auf die stabile `HeroStatId` aus `lib/dashboard/overview.ts`.
+ *
+ * Über die id und nicht über die Beschriftung: die Beschriftung kommt aus der Registry und heißt
+ * je Geschäftsmodell anders („Glückwünsche" vs. „Rückmeldungen"), das Symbol soll aber dasselbe
+ * bleiben. Ein vollständiger Record erzwingt außerdem, dass eine neue Kennzahl hier auftaucht —
+ * sonst stünde sie ohne Symbol da.
+ */
+const STAT_ICONS: Record<HeroStatId, React.ReactElement> = {
+  responses: (
+    <svg viewBox="0 0 24 24">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+  rating: (
+    <svg viewBox="0 0 24 24">
+      <path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z" />
+    </svg>
+  ),
+  media: (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  ),
+  photos: (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  ),
+  videos: (
+    <svg viewBox="0 0 24 24">
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+      <path d="M16 10l6-3v10l-6-3z" />
+    </svg>
+  ),
+  guests: (
+    <svg viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 5.5a3.2 3.2 0 0 1 0 6M17.5 14.2A6.5 6.5 0 0 1 21.5 20" />
+    </svg>
+  ),
+  open: (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v6M12 16.5v.5" />
+    </svg>
+  ),
+}
+
+/**
  * Der Kopf der Ein-Kampagnen-Übersicht: Name groß, darunter Datum und Ort, darunter drei Zahlen.
  *
  * Diese Ansicht ersetzt die Kachelwand, sobald genau EINE Kampagne läuft — im Free-Tarif ist das
@@ -238,12 +302,16 @@ const ICON_PIN = (
  */
 function CampaignHero({
   event,
-  typeLabel,
+  kicker,
   stats,
+  guestUrl,
 }: {
   event: EventRow
-  typeLabel: string
+  /** Kampagnentyp — vor der Feier mit Countdown, siehe countdownKicker. */
+  kicker: string
   stats: HeroStat[]
+  /** Die Adresse hinter dem QR-Code — zum Weitergeben ohne Ausdruck. */
+  guestUrl: string
 }): React.ReactElement {
   const date = new Date(event.date).toLocaleDateString('de-DE', {
     day: 'numeric',
@@ -258,7 +326,7 @@ function CampaignHero({
       style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
     >
       <div>
-        <div className="gs-kicker">{typeLabel}</div>
+        <div className="gs-kicker">{kicker}</div>
         <h1 className="gs-hero-name">{event.name}</h1>
         <div className="gs-hero-meta">
           <span>
@@ -278,6 +346,12 @@ function CampaignHero({
         </div>
       </div>
 
+      {/* Nicht jeder Gast steht vor dem aufgestellten QR-Code — wer später gratuliert, bekommt
+          denselben Weg als Link in die Nachricht. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <CopyLinkChip url={guestUrl} label="Gästelink" />
+      </div>
+
       <div className="gs-hero-stats">
         {stats.map((stat) => (
           <Link
@@ -285,11 +359,19 @@ function CampaignHero({
             href={stat.href}
             style={{ color: 'inherit', textDecoration: 'none', display: 'block' }}
           >
+            <span className="gs-hero-stat-icon" aria-hidden="true">
+              {STAT_ICONS[stat.id]}
+            </span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
               <span className="gs-hero-stat-value">{stat.value}</span>
               {stat.unit && <span style={{ fontSize: 12, color: MUTED }}>{stat.unit}</span>}
             </div>
             <div className="gs-hero-stat-label">{stat.label}</div>
+            {stat.delta && (
+              <div style={{ fontSize: 11, color: 'var(--color-accent-700)', marginTop: 4 }}>
+                {stat.delta}
+              </div>
+            )}
           </Link>
         ))}
       </div>
@@ -297,7 +379,14 @@ function CampaignHero({
   )
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  // Nur für die Fehlermeldung des Anlegen-Formulars, das im Leerzustand hier steht.
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error: createError } = await searchParams
+
   let tenantId: string
   try {
     const session = await requireTenantAuth()
@@ -319,7 +408,7 @@ export default async function DashboardPage() {
   const { data: subsData } = await supabase
     .from('submissions')
     .select(
-      'event_id, rating, guest_user_id, guest_name, comment, media_url, moderation_flag, uploaded_at, resolved_at',
+      'event_id, rating, guest_user_id, guest_name, comment, media_url, file_type, moderation_flag, uploaded_at, resolved_at',
     )
     .eq('tenant_id', tenantId)
     .is('deleted_at', null)
@@ -538,18 +627,25 @@ export default async function DashboardPage() {
   // Daten, nicht am Sektor: ein Hotel mit einem Aufenthalt sieht dasselbe wie ein Brautpaar.
   const soleEvent = activeEvents.length === 1 ? activeEvents[0] : undefined
 
+  const soleSubs = soleEvent ? subs.filter((s) => s.event_id === soleEvent.id) : []
+  const solePhotos = soleSubs.filter((s) => mediaKind(s.file_type) === 'photo')
+  const soleVideos = soleSubs.filter((s) => mediaKind(s.file_type) === 'video')
+
   const soleStats = soleEvent
     ? heroStats(
         {
-          responses: subs.filter((s) => s.event_id === soleEvent.id).length,
-          media: withMedia.filter((s) => s.event_id === soleEvent.id).length,
-          guests: new Set(
-            subs.filter((s) => s.event_id === soleEvent.id).map((s) => s.guest_user_id),
-          ).size,
+          responses: soleSubs.length,
+          media: soleSubs.filter((s) => s.media_url !== null).length,
+          photos: solePhotos.length,
+          videos: soleVideos.length,
+          guests: new Set(soleSubs.map((s) => s.guest_user_id)).size,
           openItems: openItems.filter((s) => s.event_id === soleEvent.id).length,
-          averageRating: avgOf(
-            subs.filter((s) => s.event_id === soleEvent.id && s.rating !== null),
-          ),
+          averageRating: avgOf(soleSubs.filter((s) => s.rating !== null)),
+          today: {
+            responses: soleSubs.filter((s) => isToday(s.uploaded_at, now)).length,
+            photos: solePhotos.filter((s) => isToday(s.uploaded_at, now)).length,
+            videos: soleVideos.filter((s) => isToday(s.uploaded_at, now)).length,
+          },
         },
         labels,
         can,
@@ -561,18 +657,86 @@ export default async function DashboardPage() {
       ? (getCampaignConfig(soleEvent.campaign_type)?.label ?? labels.experience)
       : labels.experience
 
+  // Vor der Feier zählt der Kicker herunter — das ist die Information, die das Brautpaar in den
+  // Tagen davor tatsächlich sucht.
+  const soleKicker = soleEvent ? countdownKicker(soleEvent.date, now, soleTypeLabel) : soleTypeLabel
+
+  // Eine Quelle für beide Wege zum Gast: der QR-Code und der Link zum Weitergeben zeigen
+  // garantiert auf dieselbe Adresse.
+  const soleGuestUrl = soleEvent
+    ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${soleEvent.id}`
+    : ''
+
   const soleQrDataUrl = soleEvent
-    ? await QRCode.toDataURL(
-        `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${soleEvent.id}`,
-        { width: 300, margin: 2 },
-      )
+    ? await QRCode.toDataURL(soleGuestUrl, { width: 300, margin: 2 })
     : null
+
+  // Noch gar keine Kampagne: die Übersicht IST das Anlegen-Formular.
+  //
+  // Hier stand vorher eine Beispielansicht mit erfundenen Zahlen. Sie sollte zeigen, wie das
+  // Dashboard aussieht, wenn es läuft — beantwortete aber nicht die einzige Frage, die jemand
+  // ohne Kampagne hat: wie fange ich an. Wer nichts hat, braucht kein Schaufenster, sondern das
+  // Formular; und nach dem Absenden steht an derselben Stelle die echte Kampagne
+  // (createEventAction kehrt mit `returnTo` hierher zurück).
+  if (events.length === 0) {
+    return (
+      <div className="gs-page" style={{ maxWidth: 640 }}>
+        <div className="gs-page-head gs-rise" data-i="0">
+          <div>
+            <div className="gs-kicker">{labels.experiences}</div>
+            <h1>Erste {labels.experience} anlegen</h1>
+            <div className="gs-page-lead">
+              Danach bekommst du den QR-Code, den deine Gäste scannen.
+            </div>
+          </div>
+        </div>
+
+        {createError && (
+          <div
+            className="gs-panel gs-rise"
+            data-i="1"
+            style={{ borderColor: 'var(--color-accent)', padding: '14px 16px' }}
+          >
+            {decodeURIComponent(createError)}
+          </div>
+        )}
+
+        {/* Ohne zugewiesene Branche kennt die Registry keinen Kampagnentyp — das Formular hätte
+            dann kein Feld, das es absenden könnte, und liefe erst beim Absenden auf einen Fehler.
+            Die Branche weist der Betreiber zu (kein Self-Service), deshalb der Verweis statt eines
+            leeren Formulars. Kommt in der Praxis vor: eine Tenant-Zeile ohne `sector`. */}
+        {tenant && isSector(tenant.sector) ? (
+          <EventForm
+            sector={tenant.sector}
+            businessType={tenant.business_type}
+            returnTo="/dashboard"
+            submitLabel={`${labels.experience} erstellen`}
+          />
+        ) : (
+          <div className="gs-panel gs-rise" data-i="2">
+            <p style={{ margin: 0, fontSize: 14 }}>
+              Deinem Konto ist noch keine Branche zugewiesen — ohne sie steht nicht fest, welche Art
+              von {labels.experience} du anlegen kannst.
+            </p>
+            <Link className="btn btn-secondary" href="/dashboard/settings">
+              Zu den Einstellungen
+            </Link>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="gs-page">
       {soleEvent ? (
         /* ═══ Eine Kampagne: Kopf = Kampagne ═══ */
-        <CampaignHero event={soleEvent} typeLabel={soleTypeLabel} stats={soleStats} />
+        <CampaignHero
+          event={soleEvent}
+          kicker={soleKicker}
+          stats={soleStats}
+          guestUrl={soleGuestUrl}
+        />
       ) : (
         <>
           {/* ═══ Seitenkopf ═══ */}
