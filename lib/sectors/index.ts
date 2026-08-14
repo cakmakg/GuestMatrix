@@ -63,6 +63,7 @@ export const SECTORS: Partial<Record<Sector, SectorConfig>> = {
     label: tourism.label,
     campaignTypes: ['agency', 'stay'],
     businessTypes: tourism.businessTypes,
+    dashboardTheme: tourism.dashboardTheme,
   },
   // event (Hochzeit/Event) seit 0018 aktiv: ein Kampagnentyp `wedding` (Flow-Modus guestbook).
   // Kein business_type (nicht-tourism → tenants.business_type bleibt NULL, tenants_business_type_check).
@@ -188,11 +189,12 @@ export function resolveDashboardLabels(
 /**
  * Rückfall für Sektoren, die kein Thema mitbringen — und für die unbekannte/defekte tenants-Zeile.
  *
- * `modernist` ist hier kein „Standard-Look", den ein Sektor erst abwählen müsste, sondern das
- * einzige Thema, von dem sicher ist, dass jede Seite darin schon einmal gebaut wurde. Ein
- * unbekannter Sektor bekommt deshalb das erprobte, nicht das schönste.
+ * `operator` ist hier kein „Standard-Look", den ein Sektor erst abwählen müsste, sondern das
+ * Thema, in dem jede Seite des Dashboards schon einmal gebaut wurde — auch die, die eine Feier
+ * nie zu sehen bekommt (Berichte, Export, Antwortlisten). Ein unbekannter Sektor bekommt deshalb
+ * das vollständig erprobte, nicht das schönste.
  */
-export const DEFAULT_DASHBOARD_THEME: DashboardTheme = 'modernist'
+export const DEFAULT_DASHBOARD_THEME: DashboardTheme = 'operator'
 
 /**
  * Welches Erscheinungsbild das Dashboard dieses Tenants trägt. Dritter Ableitungspunkt neben

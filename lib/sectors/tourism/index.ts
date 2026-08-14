@@ -17,6 +17,11 @@ import type { SectorModule } from '../types'
 export const tourism = {
   id: 'tourism',
   label: 'Tourismus',
+  // Beide Geschäftsmodelle dieses Sektors führen einen Betrieb: Listen, Filter, Auswertungen.
+  // Sie teilen deshalb EIN Thema — was hotel von agency unterscheidet, steht in der Benennung
+  // (Aufenthalte vs. Reisen) und in den Fähigkeiten, nicht im Erscheinungsbild. Ausdrücklich
+  // gesetzt, obwohl es dem Standard entspricht: die Registry soll die Absicht aussprechen.
+  dashboardTheme: 'operator',
   // Unterrollen (tenants.business_type): Hotels machen Aufenthalts-Feedback (stay), Reiseagenturen
   // die Foto-Galerie + Agentur-Feedback (agency). Diese Allowlist spiegelt die DB-Sicherheitsgrenze
   // (current_tenant_allows_campaign, Migration 0017): hotel→stay, agency→agency.

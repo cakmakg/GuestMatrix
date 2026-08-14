@@ -383,8 +383,10 @@ describe('dashboard labels resolve from the registry', () => {
     // Das Gästebuch blättert in Erinnerungen — es bekommt das Album-Thema aus lib/sectors/event.
     expect(resolveDashboardTheme('event', null)).toBe('album')
     // Der Betriebspfad bleibt beim erprobten Standardsatz.
-    expect(resolveDashboardTheme('tourism', 'hotel')).toBe('modernist')
-    expect(resolveDashboardTheme('tourism', 'agency')).toBe('modernist')
+    // Beide Geschäftsmodelle des Betriebspfads teilen EIN Thema — was sie unterscheidet, steht
+    // in der Benennung und in den Fähigkeiten, nicht im Erscheinungsbild.
+    expect(resolveDashboardTheme('tourism', 'hotel')).toBe('operator')
+    expect(resolveDashboardTheme('tourism', 'agency')).toBe('operator')
   })
 
   it('falls back to the neutral theme for unknown, deactivated or missing input', () => {

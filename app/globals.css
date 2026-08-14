@@ -480,20 +480,20 @@ textarea.input {
 .gs-nav-item:hover {
   background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
-.gs-nav-item[aria-current='page'] {
-  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+/* Aktiv = gefüllte Pille, nicht Kante plus Graufläche.
+   Die 3px-Kante am linken Rand war die Modernist-Signatur; neben runden Karten liest sie sich
+   wie ein Rest. Die Pille sagt dasselbe mit den Mitteln, die der Rest der Oberfläche benutzt. */
+.gs-nav-item {
+  margin: 1px 10px;
+  padding-inline: 14px;
+  border-radius: var(--radius-sm);
 }
-.gs-nav-item[aria-current='page']::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--color-accent);
+.gs-nav-item[aria-current='page'] {
+  background: var(--color-accent-100);
 }
 .gs-nav-item[aria-current='page'] .gs-nav-label {
-  color: var(--color-accent);
+  color: var(--color-accent-800);
+  font-weight: 600;
 }
 
 /* — kpi — */
@@ -524,7 +524,7 @@ textarea.input {
   border: var(--panel-border, 1px solid var(--color-divider));
   border-radius: var(--radius-md);
   box-shadow: var(--panel-shadow, none);
-  padding: 22px 24px 20px;
+  padding: var(--panel-padding, 22px 24px 20px);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -540,7 +540,7 @@ textarea.input {
   grid-template-columns: var(--gs-row-cols, 1fr 140px 90px 120px 24px);
   align-items: center;
   gap: 16px;
-  padding: 14px 4px;
+  padding: var(--row-padding, 14px 4px);
   border-top: 1px solid var(--color-divider);
   transition: background 160ms ease;
 }
@@ -702,6 +702,12 @@ textarea.input {
   flex-direction: column;
   gap: 24px;
   min-width: 0;
+  /* Ohne Obergrenze zog eine Zeile auf einem 27-Zoll-Schirm über 2000 px: Name ganz links,
+     Handlung ganz rechts, dazwischen Leere. Das Auge verliert die Zeile beim Springen. Die
+     Grenze gilt für die Fläche, nicht für den Bildschirm — Seiten, die wirklich Breite brauchen
+     (Vollbild), sitzen ohnehin außerhalb. */
+  max-width: 1180px;
+  width: 100%;
 }
 
 /* Seitenkopf: Titel links, Handlung rechts — auf schmalem Schirm untereinander. */
@@ -745,12 +751,95 @@ textarea.input {
   align-items: start;
 }
 
-/* Filterleiste: waagerecht, auf dem Telefon gestapelt und in einem <details> versteckt. */
+/* Filterleiste: waagerecht, auf dem Telefon gestapelt. */
 .gs-filters {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 14px;
+}
+
+/* — Filter hinter einem Schalter —
+   Vier Auswahlfelder plus zwei Knöpfe füllten auf 375px den ersten Bildschirm, bevor eine
+   einzige Zeile Inhalt kam. Sichtbar bleibt deshalb nur, was gesetzt IST (als Chip mit eigenem
+   Ausschalter); das Formular liegt in einem <details> darunter.
+
+   <details> und nicht ein Client-Zustand: das Formular ist ein GET-Formular ohne JavaScript, und
+   sein Auf- und Zuklappen soll es nicht zum ersten Mal davon abhängig machen. */
+.gs-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.gs-filterbar > details {
+  order: -1;
+}
+/* Geschlossen ist das <details> nur so breit wie sein Schalter und teilt sich die Zeile mit den
+   Chips; offen beansprucht es die ganze Zeile, damit das Formular darunter Platz hat. */
+.gs-filterbar > details[open] {
+  flex-basis: 100%;
+}
+.gs-filterbar summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-control, var(--radius-md));
+}
+.gs-filterbar summary::-webkit-details-marker {
+  display: none;
+}
+.gs-filterbar summary:hover {
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+.gs-filterbar details[open] summary {
+  background: var(--color-accent-100);
+  border-color: var(--color-accent-300);
+  color: var(--color-accent-800);
+}
+.gs-filterbar .gs-icn {
+  width: 15px;
+  height: 15px;
+}
+/* Das Formular sprengt die Chipzeile und steht darunter über die volle Breite. */
+.gs-filterbar details > .gs-filters {
+  margin-top: 10px;
+  width: 100%;
+}
+
+/* Ein gesetzter Filter, mit „×" zum Abwerfen. */
+.gs-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 8px 0 13px;
+  font-size: 12px;
+  text-decoration: none;
+  color: var(--color-accent-800);
+  background: var(--color-accent-100);
+  border-radius: var(--radius-control, var(--radius-md));
+}
+.gs-filter-chip:hover {
+  background: var(--color-accent-200);
+}
+.gs-filter-chip .x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  background: color-mix(in srgb, var(--color-accent-800) 12%, transparent);
 }
 
 /* — Kampagnen-Hero (Ein-Kampagnen-Übersicht) — */
@@ -837,12 +926,18 @@ textarea.input {
   /* Home-Indikator auf iOS: sonst liegt die letzte Zeile unter der Wischleiste. */
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* Flex statt fester Spaltenzahl: die Leiste trägt je nach Geschäftsmodell drei oder vier Ziele
+   (Betrieb bzw. Gästebuch), und eine hart geschriebene `repeat(4, …)` ließe im Betriebsfall eine
+   leere vierte Spalte stehen. */
 .gs-bottom-nav ul {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+.gs-bottom-nav li {
+  flex: 1;
+  min-width: 0;
 }
 .gs-bottom-nav a {
   /* 56px: die Trefferfläche aus dem mobilen Smoke-Test (≥44px) mit Luft für zwei Zeilen. */
@@ -868,6 +963,151 @@ textarea.input {
   height: 21px;
 }
 
+/* — Hamburger + Schublade (nur Telefon/Tablet) —
+   Die untere Leiste trägt die täglichen Ziele, die Schublade den Rest. Getrennt, weil beides
+   unterschiedlich oft gebraucht wird: der Daumen soll drei Ziele blind treffen, und die
+   Auswertung darf zwei Tipps entfernt liegen. */
+.gs-hamburger {
+  display: none;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  border-radius: var(--radius-control, var(--radius-sm));
+}
+.gs-hamburger:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.gs-hamburger .gs-icn {
+  width: 22px;
+  height: 22px;
+}
+
+.gs-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.gs-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: color-mix(in srgb, #1f1b1a 45%, transparent);
+}
+.gs-drawer-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(84vw, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-divider);
+  box-shadow: var(--shadow-lg);
+  /* Kerbe und Home-Indikator auf iOS. */
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  overflow-y: auto;
+}
+@keyframes gs-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+.gs-drawer-panel {
+  animation: gs-drawer-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.gs-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px 14px 18px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.gs-drawer-title {
+  font: var(--font-heading-weight) 17px/1.2 var(--font-heading);
+}
+.gs-drawer-head button {
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  border-radius: var(--radius-control, var(--radius-sm));
+}
+.gs-drawer-head button:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.gs-drawer-head .gs-icn {
+  width: 20px;
+  height: 20px;
+}
+
+.gs-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 0;
+}
+.gs-drawer-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* 48px: die Schublade wird einhändig bedient, oft im Gehen. */
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  text-decoration: none;
+  color: var(--color-text);
+}
+.gs-drawer-nav a:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+.gs-drawer-nav a[aria-current='page'] {
+  background: var(--color-accent-100);
+  color: var(--color-accent-800);
+}
+.gs-drawer-nav .gs-icn {
+  width: 19px;
+  height: 19px;
+}
+
+.gs-drawer-foot {
+  margin-top: auto;
+  padding: 18px;
+  border-top: 1px solid var(--color-divider);
+}
+.gs-drawer-plan {
+  font: var(--font-heading-weight) 15px/1.2 var(--font-heading);
+  margin-bottom: 4px;
+}
+.gs-drawer-usage {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.gs-drawer-foot .btn {
+  width: 100%;
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-drawer-panel {
+    animation: none;
+  }
+}
+
 /* ── ≤1024px: Gerüst auf eine Spalte, Navigation nach unten ────────────────── */
 @media (max-width: 1024px) {
   .gs-shell {
@@ -878,6 +1118,11 @@ textarea.input {
   }
   .gs-bottom-nav {
     display: block;
+  }
+  /* Nur hier: darüber übernimmt die Seitenleiste, dann wäre der Knopf ein zweiter Weg zum selben
+     Ziel. `grid` statt `block`, damit `place-items` das Symbol zentriert. */
+  .gs-hamburger {
+    display: grid;
   }
   .gs-topbar {
     padding: 12px 16px;
@@ -901,10 +1146,13 @@ textarea.input {
   .gs-kpi {
     padding: 14px 14px 12px;
   }
-  /* Verlauf und Vormonats-Vergleich sind Nebentext: auf 375px kostet beides die
-     Lesbarkeit der Zahl, um die es geht. Auf dem Desktop bleiben sie. */
-  .gs-kpi .gs-spark,
-  .gs-kpi .gs-kpi-delta {
+  /* Der Verlauf ist Nebentext: auf 375px kostet die Kurve die Lesbarkeit der Zahl, um die es
+     geht — und in Daumenbreite sagt sie ohnehin wenig. Auf dem Desktop bleibt sie.
+
+     Der Vergleich („+3 heute") war hier ebenfalls ausgeblendet, und das war zu viel des Guten:
+     er ist keine Verzierung, sondern die einzige Aussage darüber, ob sich gerade etwas bewegt.
+     Genau danach schaut jemand, der das Dashboard unterwegs kurz aufmacht. */
+  .gs-kpi .gs-spark {
     display: none;
   }
 
@@ -917,13 +1165,38 @@ textarea.input {
      Seite eigene Spalten mitgibt. */
   .gs-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-    padding: 12px 2px;
+    gap: 8px;
+    padding: 14px 2px;
   }
 
   /* Ohne Spalten keine Spaltenüberschriften. */
   .gs-row-head {
     display: none;
+  }
+
+  /* … dafür trägt jede Zelle ihre Beschriftung selbst.
+     Vorher stapelten die Zellen ohne Kontext übereinander, WÄHREND die Kopfzeile ausgeblendet
+     wurde — aus „Auslastung 12 %" wurde eine nackte 12 %, aus dem Kampagnentyp ein Wort ohne
+     Bezug. Das war kein Gestaltungsmangel, sondern Informationsverlust.
+
+     Über `attr()` und nicht über zwei Markup-Varianten: die Seite schreibt `data-label` einmal
+     hin, Desktop und Telefon lesen dieselbe Zeile. Zellen ohne `data-label` (Name, Handlungen)
+     bleiben unbeschriftet — sie sprechen für sich. */
+  .gs-row > [data-label] {
+    display: grid;
+    grid-template-columns: minmax(0, 7rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+  .gs-row > [data-label]::before {
+    content: attr(data-label);
+    font-size: 12px;
+    color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  }
+  /* Ein Abzeichen ist so breit wie sein Wort. Als Rasterzelle würde es sonst auf die volle
+     Spaltenbreite gedehnt und sähe aus wie ein Eingabefeld. */
+  .gs-row > [data-label] > .tag {
+    justify-self: start;
   }
 
   .gs-filters {
@@ -969,36 +1242,40 @@ textarea.input {
    definiert keine Layoutregel, versteckt nichts und benennt nichts um; dafür gibt es die
    Registry (`resolveDashboardTheme`, `resolveDashboardLabels`, `resolveDashboardCapabilities`).
 
-   Diese Trennung ist die Bedingung dafür, dass das nächste Thema (Hotel, Agentur) billig bleibt:
-   ein Tokenblock von ~40 Zeilen, keine zweite Galerie. Wer für ein Thema eine Komponente
-   kopieren oder eine `gs-*`-Regel überschreiben muss, hat die Grenze verletzt — dann gehört die
-   Abweichung als Custom Property in den neutralen Teil (Muster: `--album-note-tilt`).
+   Aufbau in zwei Ebenen:
 
-   Der Standard `modernist` steht bewusst NICHT hier: er ist der :root-Satz oben. Ein Thema ist
-   immer nur die Abweichung davon.
+   1. `[data-theme]` — die GEMEINSAME Sprache. Papierton, weiße Karten, Weinrot, Playfair,
+      weiche Schatten, Pillen. Sie gilt für jedes Thema, weil das Produkt EIN Produkt sein soll.
+   2. `[data-theme='…']` — worin sich ein Thema davon unterscheidet. Heute ist das allein die
+      DICHTE: eine Feier darf großzügig sein, ein Betrieb muss viele Zeilen auf einen Bildschirm
+      bekommen.
+
+   Der Sammelselektor `[data-theme]` statt einer Liste beider Namen ist Absicht: ein drittes Thema
+   erbt die Sprache damit automatisch und muss nur noch sagen, worin es abweicht. Wer für ein
+   Thema eine Komponente kopieren oder eine `gs-*`-Regel überschreiben muss, hat die Grenze
+   verletzt — dann gehört die Abweichung als Custom Property in den neutralen Teil.
+
+   Der :root-Satz weiter oben ist KEIN Thema mehr, sondern nur noch der Rückfall für Flächen
+   außerhalb des Dashboard-Gerüsts (Gäste-Flow, Login).
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* — Album: warmes Papier, Serifen, weiche Kanten (Gästebuch/Hochzeit) —
-   Der Modernist-Satz ist für ein Back-Office gebaut: Nullrundung, 800er Grotesk, Alarmrot,
-   40 % opake Trennlinien. Auf einer Feier ist das die falsche Stimme — dort wird nichts
-   verwaltet, sondern geblättert. Deshalb Papier statt Bildschirmgrau, Serife statt Grotesk und
-   Linien, die trennen ohne zu schneiden. */
-/* Der zweite Selektor hebt die Tokens auf die Wurzel, sobald das Gerüst im Album-Thema steht.
-   Grund ist der Überdehn-Bereich beim Scrollen auf iOS: er zeigt den Untergrund von <body>, und
-   <body> ist ein VORFAHR des Gerüsts — vererbt bekommt es das Thema also nie. `:has()` dreht die
+/* ── 1 · Gemeinsame Sprache ─────────────────────────────────────────────────
+   Der zweite Selektor hebt die Tokens auf die Wurzel, sobald das Gerüst ein Thema trägt. Grund
+   ist der Überdehn-Bereich beim Scrollen auf iOS: er zeigt den Untergrund von <body>, und <body>
+   ist ein VORFAHR des Gerüsts — vererbt bekommt es das Thema also nie. `:has()` dreht die
    Richtung um. Fällt der Selektor aus (alter Browser), bleibt nur dieser Randstreifen im
    Grundton; die Seite selbst steht über `.gs-shell` ohnehin im Thema. */
-[data-theme='album'],
-:root:has([data-theme='album']) {
-  /* Cremefarbener Grund, WEISSE Karten. Der Unterschied trägt hier die halbe Gestaltung: die
-     Karte hebt sich durch ihre eigene Helligkeit ab, nicht durch eine Rahmenlinie. */
+[data-theme],
+:root:has([data-theme]) {
+  /* Cremefarbener Grund, WEISSE Karten. Der Unterschied trägt die halbe Gestaltung: die Karte
+     hebt sich durch ihre eigene Helligkeit ab, nicht durch eine Rahmenlinie. */
   --color-bg: #faf7f4;
   --color-surface: #ffffff;
   --color-text: #1f1b1a;
   --color-accent: #7b1e2b;
   --color-accent-2: #a8756a;
-  /* 9 % statt 40 %: die Linie soll ordnen, nicht zerteilen — und neben einem Schatten reicht
-     schon eine Andeutung. */
+  /* 9 % statt 40 %: die Linie soll ordnen, nicht zerteilen — neben einem Schatten reicht schon
+     eine Andeutung. */
   --color-divider: color-mix(in srgb, #1f1b1a 9%, transparent);
 
   --color-neutral-100: #f7f3ef;
@@ -1031,16 +1308,14 @@ textarea.input {
   --color-accent-2-800: #5e403a;
   --color-accent-2-900: #45302c;
 
-  /* Die Serife trägt die Überschriften. 800 gibt es in Playfair nicht und wäre auch falsch —
-     eine Albumseite ruft nicht. Fallback Georgia, falls die Datei nicht lädt. */
+  /* Die Serife trägt die Überschriften — nur die. Fließtext, Zeilen und Tabellen bleiben auf
+     `--font-body` (Archivo): wer täglich Listen überfliegt, liest keine Serife. 800 gibt es in
+     Playfair nicht und wäre auch falsch. Fallback Georgia, falls die Datei nicht lädt. */
   --font-heading: var(--font-display), Georgia, 'Times New Roman', serif;
   --font-heading-weight: 400;
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  /* Bedienelemente sind hier Pillen, keine Rechtecke. Eigenes Token, weil eine Karte mit 999px
-     zur Kapsel würde — Fläche und Bedienelement dürfen nicht dieselbe Rundung teilen. */
+  /* Bedienelemente sind Pillen, keine Rechtecke. Eigenes Token, weil eine Karte mit 999px zur
+     Kapsel würde — Fläche und Bedienelement dürfen nicht dieselbe Rundung teilen. */
   --radius-control: 999px;
 
   /* Sehr weich und warm getönt: ein grauer Schatten auf Cremeton sieht schmutzig aus. */
@@ -1052,64 +1327,97 @@ textarea.input {
     0 12px 32px color-mix(in srgb, #6b5648 10%, transparent);
   --shadow-lg: 0 18px 48px color-mix(in srgb, #6b5648 16%, transparent);
 
-  /* Flächen tragen Rahmen UND Schatten — beide sehr zurückgenommen (Muster der Vorlage). */
+  /* Flächen tragen Rahmen UND Schatten — beide sehr zurückgenommen. */
   --panel-border: 1px solid var(--color-divider);
   --panel-shadow: var(--shadow-sm);
 
-  /* Kennzahlen stehen als EINZELNE Karten nebeneinander statt als ein Streifen mit
-     geteilten Kanten. */
+  /* Kennzahlen stehen als EINZELNE Karten nebeneinander statt als ein Streifen mit geteilten
+     Kanten. */
   --stats-gap: 10px;
   --stats-outer-border: 0;
   --stats-inner-border: 0;
   --stats-cell-bg: var(--color-surface);
   --stats-cell-radius: var(--radius-md);
   --stats-cell-shadow: var(--shadow-sm);
-  /* Höher als im Streifen: als einzelne Karte braucht die Zahl Luft um sich, sonst wirkt sie
-     hineingequetscht. */
-  --stats-cell-padding: 18px 16px 20px;
-
-  --album-gutter: 14px;
 
   --lightbox-bg: #17110f;
   --lightbox-fg: #f2e9e1;
 }
 
-/* Die Grotesk-Details des Modernist-Satzes, die in einer Serife falsch aussehen: negative
-   Laufweite (macht Serifen matschig) und Versalien-Kleinschrift (wirkt wie ein Formularetikett). */
-[data-theme='album'] h1,
-[data-theme='album'] h2,
-[data-theme='album'] h3,
-[data-theme='album'] h4,
-[data-theme='album'] h5,
-[data-theme='album'] .gs-hero-name,
-[data-theme='album'] .gs-page-head h1 {
+/* Details des früheren Modernist-Satzes, die in einer Serife falsch aussehen: negative Laufweite
+   (macht Serifen matschig) und Versalien-Kleinschrift (wirkt wie ein Formularetikett). */
+[data-theme] h1,
+[data-theme] h2,
+[data-theme] h3,
+[data-theme] h4,
+[data-theme] h5,
+[data-theme] .gs-hero-name,
+[data-theme] .gs-page-head h1 {
   letter-spacing: -0.005em;
 }
-[data-theme='album'] h6,
-[data-theme='album'] .gs-kicker,
-[data-theme='album'] .gs-hero-stat-label,
-[data-theme='album'] .table th {
+[data-theme] h6,
+[data-theme] .gs-kicker,
+[data-theme] .gs-hero-stat-label,
+[data-theme] .table th {
   text-transform: none;
   letter-spacing: 0.01em;
 }
-[data-theme='album'] .gs-kicker {
+[data-theme] .gs-kicker {
   font-size: 12px;
 }
 
-/* Die 2px-Kanten des Gerüsts sind Teil der industriellen Anmutung. */
-[data-theme='album'] .gs-sidebar,
-[data-theme='album'] .gs-topbar,
-[data-theme='album'] .gs-bottom-nav,
-[data-theme='album'] .table th {
+/* Die 2px-Kanten des Gerüsts waren Teil der industriellen Anmutung. */
+[data-theme] .gs-sidebar,
+[data-theme] .gs-topbar,
+[data-theme] .gs-bottom-nav,
+[data-theme] .table th {
   border-width: 1px;
 }
-[data-theme='album'] .hr {
+[data-theme] .hr {
   height: 1px;
 }
 
-/* Das Quadrat ist die Modernist-Signatur; auf einer Albumseite wird daraus ein Punkt. */
-[data-theme='album'] .gs-avatar {
+/* Das Quadrat war die Modernist-Signatur; hier wird daraus ein Punkt. */
+[data-theme] .gs-avatar {
   border-radius: 50%;
+}
+
+/* ── 2a · Album — die Feier ─────────────────────────────────────────────────
+   Großzügig und ruhig. Hier wird nichts verwaltet, sondern geblättert; ein Beitrag darf Platz
+   einnehmen, weil es am Tag danach nur ein paar Dutzend davon gibt. */
+[data-theme='album'] {
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --album-gutter: 14px;
+
+  /* Als einzelne Karte braucht die Zahl Luft um sich, sonst wirkt sie hineingequetscht. */
+  --stats-cell-padding: 18px 16px 20px;
+}
+
+/* ── 2b · Operator — der Betrieb (Hotel, Agentur) ───────────────────────────
+   Dieselbe Sprache, enger gesetzt. Der Unterschied ist nicht Geschmack, sondern Arbeitsweise:
+   ein Brautpaar sieht sein Album ein paar Mal, ein Hotel überfliegt täglich Listen. Jede Zeile
+   Polsterung kostet dort eine Zeile Inhalt.
+
+   Kein eigener Farb- oder Schriftsatz: das Produkt soll EIN Produkt bleiben. Was hier steht,
+   ist ausschließlich Dichte. */
+[data-theme='operator'] {
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --album-gutter: 10px;
+
+  /* Flacher als im Album — die Kennzahlenreihe soll nicht den halben ersten Bildschirm füllen. */
+  --stats-cell-padding: 14px 14px 15px;
+  --stats-gap: 8px;
+
+  /* Panel- und Zeilendichte. Beide werden von den neutralen Klassen gelesen, damit die
+     Abweichung ein Token bleibt und keine überschriebene Regel. */
+  --panel-padding: 16px 18px 15px;
+  --row-padding: 11px 4px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

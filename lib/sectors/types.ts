@@ -282,15 +282,23 @@ export type DashboardCapabilities = Pick<
  *
  * Ein Erscheinungsbild ist bewusst KEINE Fähigkeit und steht deshalb nicht in
  * `CampaignCapabilities`: alle Themen zeigen dieselben Panels mit denselben Daten, sie sprechen
- * nur eine andere Sprache. Ein Brautpaar blättert in Erinnerungen, ein Hotel führt eine
- * Bibliothek — das ändert den Ton, nicht den Funktionsumfang.
+ * nur eine andere Sprache. Ein Brautpaar blättert in Erinnerungen, ein Hotel führt einen Betrieb —
+ * das ändert den Ton, nicht den Funktionsumfang.
  *
  * Ein Thema definiert AUSSCHLIESSLICH Tokens (Farbe, Schrift, Kante, Schatten, Rundung) in
- * `app/globals.css` unter `[data-theme='…']`. Layout und Komponenten bleiben gemeinsam. Das ist
- * die Bedingung, unter der ein weiteres Thema billig bleibt: ein Tokenblock, keine zweite Galerie.
- * Wer für ein neues Thema eine Komponente kopieren muss, hat die Grenze verletzt.
+ * `app/globals.css`. Layout und Komponenten bleiben gemeinsam. Das ist die Bedingung, unter der
+ * ein weiteres Thema billig bleibt: ein Tokenblock, keine zweite Galerie. Wer für ein neues Thema
+ * eine Komponente kopieren muss, hat die Grenze verletzt.
+ *
+ * Die GEMEINSAME Sprache (Papierton, Serifen-Überschrift, weiche Kanten, Weinrot) liegt unter dem
+ * Sammelselektor `[data-theme]`; ein Thema trägt nur noch, worin es sich unterscheidet. Heute ist
+ * das allein die Dichte:
+ *
+ * - `album` — die Feier. Großzügig, ruhig, zum Blättern.
+ * - `operator` — der Betrieb (Hotel, Agentur). Dieselbe Sprache, enger gesetzt: wer täglich
+ *   Zeilen überfliegt, braucht mehr davon auf einem Bildschirm.
  */
-export const DASHBOARD_THEME_TUPLE = ['modernist', 'album'] as const
+export const DASHBOARD_THEME_TUPLE = ['operator', 'album'] as const
 
 export type DashboardTheme = (typeof DASHBOARD_THEME_TUPLE)[number]
 
@@ -302,7 +310,7 @@ export type BusinessTypeConfig = {
   campaignTypes: CampaignType[]
   // Fehlt sie, greift die Benennung des Sektors, sonst der neutrale Standard.
   dashboardLabels?: DashboardLabelOverrides
-  // Fehlt es, greift das Thema des Sektors, sonst der neutrale Standard (`modernist`).
+  // Fehlt es, greift das Thema des Sektors, sonst der Standard (`operator`).
   dashboardTheme?: DashboardTheme
 }
 
