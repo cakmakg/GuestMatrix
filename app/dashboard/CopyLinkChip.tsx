@@ -3,17 +3,23 @@
 import { useCallback, useRef, useState } from 'react'
 
 /**
- * Kopiert den Gästelink in die Zwischenablage.
+ * Kopiert den Gästelink in die Zwischenablage — und sagt die Wahrheit, wenn das nicht geht.
  *
- * Drei Wege, absteigend nach Zuverlässigkeit — und der dritte ist keine Zierde:
+ * Zwei Wege, und die Grenze zwischen ihnen ist wichtiger als die Wege selbst:
  *
- *  1. `navigator.clipboard` — nur in einem SECURE CONTEXT vorhanden (https oder localhost).
- *     Genau daran scheitert es im Alltag dieses Projekts: das Dashboard wird zum Testen über
- *     `http://192.168.x.x:3000` vom Telefon aufgerufen, und dort ist die API schlicht `undefined`.
- *  2. `document.execCommand('copy')` über ein kurzlebiges Textfeld — veraltet, funktioniert aber
- *     auch ohne sicheren Kontext.
- *  3. Klappt beides nicht, wird der Link sichtbar und vorausgewählt eingeblendet. Manuell
- *     kopieren ist unbequem, ein Knopf ohne Wirkung wäre schlimmer.
+ *  1. `navigator.clipboard` — nur in einem SECURE CONTEXT vorhanden (https oder localhost). Wenn
+ *     sie da ist und nicht wirft, IST der Link kopiert. Nur hier darf der Knopf „Kopiert" sagen.
+ *  2. Sonst: der Link wird sichtbar und vorausgewählt eingeblendet, dazu ein „Öffnen".
+ *
+ * Dazwischen läuft still ein Versuch über `document.execCommand('copy')` — er hilft, wo er
+ * funktioniert (Android Chrome über http), wird aber NICHT als Erfolg gemeldet. Grund ist ein
+ * konkreter Fehlschlag am Gerät: iOS Safari liefert für `execCommand` ein `true` zurück, ohne
+ * etwas in die Zwischenablage zu legen. Der Knopf sagte „Kopiert", die Zwischenablage war leer,
+ * und der Betreiber stand mit einem Versprechen da, das niemand einlöst. Ein Knopf, der nicht
+ * weiß, ob er gewirkt hat, darf keinen Erfolg behaupten.
+ *
+ * Die Auswahl im versteckten Feld folgt dem iOS-Rezept (contentEditable + Range +
+ * `setSelectionRange`): `select()` allein ist dort an einem readonly-Feld wirkungslos.
  */
 
 type Props = {
@@ -36,30 +42,34 @@ const ICON_CHECK = (
   </svg>
 )
 
-async function writeToClipboard(url: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(url)
-      return true
-    }
-  } catch {
-    // Auch im sicheren Kontext kann der Nutzer die Berechtigung verweigert haben.
-  }
+/** iOS-taugliche Vollauswahl eines Textfelds. */
+function selectAll(field: HTMLTextAreaElement): void {
+  // readonly + `select()` ist auf iOS wirkungslos; contentEditable macht das Feld auswählbar,
+  // ohne die Tastatur zu öffnen (das Feld liegt außerhalb des Sichtfelds).
+  field.contentEditable = 'true'
+  field.readOnly = false
 
+  const range = document.createRange()
+  range.selectNodeContents(field)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+  field.setSelectionRange(0, field.value.length)
+}
+
+/** Stiller Versuch ohne sicheren Kontext. Sein Rückgabewert ist bewusst uninteressant. */
+function tryLegacyCopy(url: string): void {
   try {
     const field = document.createElement('textarea')
     field.value = url
-    // Außerhalb des Sichtfelds, aber fokussierbar — `display:none` wäre nicht auswählbar.
-    field.setAttribute('readonly', '')
     field.style.position = 'fixed'
     field.style.top = '-1000px'
     document.body.appendChild(field)
-    field.select()
-    const ok = document.execCommand('copy')
+    selectAll(field)
+    document.execCommand('copy')
     document.body.removeChild(field)
-    return ok
   } catch {
-    return false
+    // Nichts zu retten — der sichtbare Link darunter ist der eigentliche Ausweg.
   }
 }
 
@@ -68,13 +78,20 @@ export function CopyLinkChip({ url, label }: Props): React.ReactElement {
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const copy = useCallback(async () => {
-    const ok = await writeToClipboard(url)
-    setState(ok ? 'copied' : 'manual')
-
-    if (ok) {
-      if (resetTimer.current) clearTimeout(resetTimer.current)
-      resetTimer.current = setTimeout(() => setState('idle'), 2000)
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url)
+        setState('copied')
+        if (resetTimer.current) clearTimeout(resetTimer.current)
+        resetTimer.current = setTimeout(() => setState('idle'), 2000)
+        return
+      } catch {
+        // Auch im sicheren Kontext kann die Berechtigung verweigert sein.
+      }
     }
+
+    tryLegacyCopy(url)
+    setState('manual')
   }, [url])
 
   if (state === 'manual') {
@@ -83,7 +100,7 @@ export function CopyLinkChip({ url, label }: Props): React.ReactElement {
         <span
           style={{ fontSize: 12, color: 'color-mix(in srgb, var(--color-text) 60%, transparent)' }}
         >
-          Kopieren hat der Browser abgelehnt — hier ist der Link:
+          Ohne HTTPS sperrt der Browser die Zwischenablage — hier ist der Link:
         </span>
         <input
           className="input"
@@ -92,6 +109,22 @@ export function CopyLinkChip({ url, label }: Props): React.ReactElement {
           onFocus={(event) => event.currentTarget.select()}
           autoFocus
         />
+        {/* Auf dem Telefon der schnellste Weg zur Probe: der Betreiber sieht sofort, was der Gast
+            sieht — ohne den Link irgendwo einfügen zu müssen. */}
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            fontSize: 12,
+            alignSelf: 'flex-start',
+            minHeight: 44,
+            display: 'inline-flex',
+            alignItems: 'center',
+          }}
+        >
+          Öffnen
+        </a>
       </span>
     )
   }

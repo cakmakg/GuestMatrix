@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import QRCode from 'qrcode'
 
+import { appOrigin } from '@/lib/app-url'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { resolveDashboardCapabilities, resolveDashboardLabels } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -71,7 +72,7 @@ export default async function QrPage() {
     )
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const baseUrl = await appOrigin()
   const codes = await Promise.all(
     events.map(async (event) => ({
       event,

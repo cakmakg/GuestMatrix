@@ -10,6 +10,7 @@ import {
   isEventVisibility,
   isFlowMode,
 } from '@/lib/sectors'
+import { guestUrlFor } from '@/lib/app-url'
 import { requireEventOwnership, requireTenantAuth } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSignedUrls, SIGNED_URL_EXPIRY } from '@/lib/storage/signed-url'
@@ -190,7 +191,7 @@ export default async function EventDetailPage({
     ? getFeedbackQuestions(event.campaign_type)
     : []
 
-  const guestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${eventId}`
+  const guestUrl = await guestUrlFor(eventId)
   const qrDataUrl = await QRCode.toDataURL(guestUrl, { width: 300, margin: 2 })
 
   const flagged = submissions.filter((s) => s.moderation_flag).length

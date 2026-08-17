@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import QRCode from 'qrcode'
 
+import { guestUrlFor } from '@/lib/app-url'
 import { requireTenantAuth } from '@/lib/auth/session'
 import { needsAttention } from '@/lib/dashboard/feedback-filters'
 import {
@@ -689,9 +690,7 @@ export default async function DashboardPage({
 
   // Eine Quelle für beide Wege zum Gast: der QR-Code und der Link zum Weitergeben zeigen
   // garantiert auf dieselbe Adresse.
-  const soleGuestUrl = soleEvent
-    ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/e/${soleEvent.id}`
-    : ''
+  const soleGuestUrl = soleEvent ? await guestUrlFor(soleEvent.id) : ''
 
   const soleQrDataUrl = soleEvent
     ? await QRCode.toDataURL(soleGuestUrl, { width: 300, margin: 2 })
