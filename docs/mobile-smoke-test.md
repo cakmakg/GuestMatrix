@@ -1,12 +1,18 @@
-# Mobiler Smoke-Test — Gäste-Ablauf (echtes Gerät)
+# Mobiler Smoke-Test — Gäste-Ablauf und Betreiber-Panel (echtes Gerät)
 
-Verifiziert den Gäste-Ablauf auf **echten Mobilgeräten** (nicht Emulator, nicht nur DevTools),
-weil iOS Safari / Android Chrome Eigenheiten haben, die Desktop nicht zeigt (Kamera-Dialog,
-HEIC-Fotos, `.mov`-Videos, Tastatur/Viewport). Deckt **NFR-04.1/.2/.3** und **NFR-01.1**
-(`docs/30-requirements.md`) ab.
+Verifiziert die mobilen Oberflächen auf **echten Mobilgeräten** (nicht Emulator, nicht nur
+DevTools), weil iOS Safari / Android Chrome Eigenheiten haben, die Desktop nicht zeigt
+(Kamera-Dialog, HEIC-Fotos, `.mov`-Videos, Tastatur/Viewport, mitwandernde Adressleiste). Deckt
+**NFR-04.1/.2/.3** und **NFR-01.1** (`docs/30-requirements.md`) ab.
+
+Zwei Teile, beide manuell und zum Abhaken:
+
+- **Teil A — Gäste-Ablauf** (`/e/<eventId>`): die Seite hinter dem QR, in allen drei Flow-Modi.
+- **Teil B — Betreiber-Panel** (`/dashboard`): seit dem mobilen Umbau eine eigene Oberfläche mit
+  unterer Leiste, Schublade und klebender Tabellenkopfzeile. Sie war **nie** an einem Gerät.
 
 **Kein Vercel/Deploy nötig** — der lokale Dev-Server wird im selben WLAN vom Telefon erreichbar
-gemacht. Dies ist ein **manueller** Test; die Schritte unten sind zum Abhaken.
+gemacht.
 
 ## Code-Bereitschaft (vorab statisch geprüft — 2026-07-31)
 
@@ -23,15 +29,53 @@ gemacht. Dies ist ein **manueller** Test; die Schritte unten sind zum Abhaken.
   **nicht**. Safari transcodiert HEIC beim Upload i. d. R. zu JPEG — **muss am echten Gerät bestätigt
   werden** (Schritt 3b). Schlägt es fehl, ist das eine echte Lücke (accept/Server um HEIC erweitern).
 
+### Nachtrag 2026-08-17 — was sich seit der ersten Fassung geändert hat
+
+Der Stand dieser Liste, ehrlich: die Punkte unten sind statisch geprüft und im Browser bei
+360/390px gemessen. Ein **erster Lauf am echten Gerät fand am 2026-08-17 statt** — er hat zwei
+Befunde erbracht (beide behoben, siehe unten) und lief danach durch; die vollständige Matrix ist
+damit **nicht** abgehakt, sondern erst begonnen.
+
+**Befunde des ersten Geräte-Laufs (2026-08-17, beide behoben):**
+
+1. **Der Gästelink/QR zeigte auf `localhost`** und war vom Telefon aus tot. Ursache war keine
+   Testkonfiguration, sondern die Herkunft der Adresse: sie kam aus `NEXT_PUBLIC_APP_URL` statt aus
+   dem Request. Behoben in `lib/app-url.ts` — die Adresse ist jetzt die, unter der das Dashboard
+   gerade läuft. Der Vorbereitungspunkt 6 unten ist damit **hinfällig** (er bleibt als Erklärung
+   stehen, falls jemand eine alte Fassung testet).
+2. **„Gästelink kopieren" behauptete Erfolg, ohne zu kopieren.** Ohne HTTPS fehlt
+   `navigator.clipboard`; der Rückfall `execCommand` meldet auf iOS Safari `true`, legt aber nichts
+   in die Zwischenablage. Der Knopf zeigt jetzt in diesem Fall den Link zum Auswählen und ein
+   „Öffnen" statt eine Erfolgsmeldung.
+
+Weiterhin nur gemessen, nicht am Gerät durchgespielt:
+
+- **Gäste-Flow trägt jetzt die Themen-Tokens** (`resolveGuestTheme`): cremefarbener Grund, weiße
+  Karte, Serifen-Überschrift, Pillen-Knöpfe. Vorher stand er im alten Satz (roter Kopfbalken,
+  Nullrundung). Ein Gästebuch-Gast sieht `album`, ein Hotel-/Agentur-Gast `operator` — der
+  Unterschied ist nur Dichte, die Sprache ist dieselbe.
+- **Sterne sind Grafiken mit 44px Trefferfläche** (vorher Textglyphen, die Zusatzfragen mit ~24px).
+- **Dateiauswahl ist ein `<label>`** mit unsichtbarem, aber fokussierbarem Feld (vorher ein `<div
+onClick>`). Am Telefon zählt: die **ganze** gestrichelte Fläche öffnet den Dialog.
+- **Gäste-Karte nutzt `100dvh`** statt `100vh` — Prüfpunkt: beim ersten Scrollen darf die Karte
+  nicht springen, wenn die Adressleiste einfährt.
+- **Betreiber-Panel:** untere Leiste (drei Ziele im Betrieb, vier im Gästebuch), Hamburger-Schublade
+  (nur Betrieb), klebende Tabellenkopfzeile, Sortier-Chips statt Auswahlfeld. Alles neu und
+  ungeprüft am Gerät.
+
 ## Voraussetzungen
 
 1. Rechner und Telefon im **gleichen WLAN** (kein Gäste-WLAN mit Client-Isolation — siehe „Bekannte
    Risiken").
 2. Lokaler Supabase-Stack läuft: `npx supabase start`.
-3. **Tenant + Event vorhanden.** Als Tenant im Dashboard einloggen → „Neue Kampagne":
-   - Für den **Galerie-Ablauf** (Reziprozität): Kampagnentyp **Tour** (`gallery`).
-   - Für den **Feedback-Ablauf**: Kampagnentyp **Hotel/Aufenthalt** (`stay`, `feedback`).
-     Beide mindestens einmal testen. Die `eventId` aus der URL notieren.
+3. **Tenant + Event vorhanden.** Als Tenant im Dashboard einloggen → „Neue Kampagne". Welche
+   Kampagnentypen wählbar sind, hängt an der Geschäftsart des Tenants (`tenants.business_type`,
+   unveränderlich) — für alle drei Abläufe braucht es deshalb **drei Tenants**:
+   - **Reiseagentur** → Kampagnentyp **Agentur / Reise** (`agency`, Flow `gallery`, mit
+     Reziprozität). Hieß vor Migration 0016 `tour`.
+   - **Hotel / Resort** → **Hotel / Aufenthalt** (`stay`, Flow `feedback`).
+   - **Hochzeit / Event** → **Hochzeit/Event** (`wedding`, Flow `guestbook`).
+     Alle drei mindestens einmal testen. Die `eventId` aus der URL notieren.
 4. Dev-Server auf **allen Netzwerk-Interfaces** starten (nicht nur localhost):
 
    ```bash
@@ -55,7 +99,7 @@ Jeden Ablauf auf **beiden** durchführen:
 
 ---
 
-## Ablauf (Schritt für Schritt)
+## Teil A — Gäste-Ablauf (Schritt für Schritt)
 
 ### 0. Erreichbarkeit
 
@@ -70,11 +114,21 @@ erlaubt Port 3000 nicht, oder WLAN-Client-Isolation.)
 Bildschirmbreite **ohne horizontales Scrollen**, Text ist ohne Pinch-Zoom lesbar (Viewport greift).
 Ungültige `eventId` → **404**.
 
+**Neu (2026-08-17):** Der Auftritt ist cremefarbener Grund + **weiße** Karte, Kampagnenname in der
+Anzeigeschrift (Serife), Marke als kleine Zeile darüber, Knopf als **Pille**. Kein roter
+Kopfbalken, keine eckigen Ecken — sieht es so aus wie früher, hat die Schrift oder das Thema nicht
+geladen (dann Konsole/Netzwerk prüfen: `--font-display`, `data-theme`).
+**Scroll-Prüfung:** einmal nach unten und wieder nach oben wischen — die Karte darf **nicht
+springen**, wenn die Adressleiste ein-/ausfährt (`100dvh`).
+
 ### 2. Consent-Gate
 
 **Erwartet:** Consent-Checkbox ist **nicht** vorangehakt. Solange sie leer ist, ist der Weiter-/
 Upload-Button **inaktiv**. Nach dem Anhaken wird er aktiv. (Serverseitig wird `consent_at` erst beim
 Absenden gesetzt.)
+**Trefferfläche:** Nicht nur das Kästchen, sondern die **ganze grau abgesetzte Zeile** schaltet
+(nativer `<label>`) — mit dem Daumen irgendwo in den Text tippen und prüfen, dass der Haken
+umspringt.
 
 ### 3. Kamera/Datei-Upload — Galerie-Ablauf (`gallery`)
 
@@ -106,6 +160,12 @@ erscheint. Medien (Bild/Video) laden über signierte URLs.
 1–5 Sterne wählen **oder** „Überspringen".
 **Erwartet:** Auswahl wird gespeichert (später im Dashboard sichtbar), Überspringen bricht nichts.
 
+**Neu (2026-08-17), der eigentliche Prüfpunkt hier:** Die Sterne sind Grafiken mit **44px**
+Trefferfläche. Gezielt den **dritten von fünf** treffen — bei der Gesamtnote **und** bei jeder
+Zusatzfrage (Agentur-Reise hat vier: Reiseerlebnis, Organisation, Service, Preis-Leistung). Vorher
+waren die Fragen-Sterne ~24px groß und das Treffen Glückssache. Auf 360px stehen Frage und Sterne
+**untereinander**; nebeneinander erst ab 480px.
+
 ### 3'/4'. Feedback-Ablauf (`feedback`, Event vom Typ `stay`)
 
 Statt Galerie: Feedback-Formular nach dem Consent.
@@ -113,7 +173,23 @@ Statt Galerie: Feedback-Formular nach dem Consent.
 Mindestens **Bewertung ODER Kommentar** ist Pflicht (leer → Hinweis). Absenden → Dankeschön-Bildschirm,
 **keine Galerie, keine Reziprozität**.
 
-### 6. Löschung (DSGVO, `gallery`/`feedback`)
+### 3''/4''. Gästebuch-Ablauf (`guestbook`, Event vom Typ `wedding`)
+
+Fehlte in der ersten Fassung — der Modus kam erst mit Migration 0018 dazu.
+
+Nach dem Consent erscheint ein Formular mit **Name** (Pflicht), **Glückwunsch** (Freitext),
+optional „Beschreibt die Feier in drei Worten" und optional **mehrere** Fotos/Videos (max. 10).
+**Erwartet:**
+
+- Ohne Namen → Hinweis, kein Absenden. Ohne Gruß **und** ohne Datei → Hinweis.
+- Mehrfachauswahl aus der Mediathek funktioniert; der Fortschritt zählt „Datei 2 von 3".
+- Nur Gruß, keine Datei → Beitrag wird trotzdem gespeichert (medienloser Gruß).
+- Abschluss: Dankeschön mit Blumen-Symbol, danach **keine Galerie** (das Gästebuch ist
+  geschlossen — Gäste sehen die Beiträge der anderen nicht).
+- **Tastatur:** Beim Fokus in „Glückwünsche" scrollt das Feld über die Tastatur, das Layout bricht
+  nicht; die Karte bleibt schmaler als der Bildschirm.
+
+### 6. Löschung (DSGVO, `gallery`/`feedback`/`guestbook`)
 
 „Löschen" am eigenen Beitrag antippen und bestätigen.
 **Erwartet:** Der Beitrag verschwindet aus der Ansicht.
@@ -136,23 +212,93 @@ Kurz ins Querformat drehen → keine Überlappungen/abgeschnittenen Steuerelemen
 
 ---
 
+## Teil B — Betreiber-Panel am Telefon (`/dashboard`)
+
+Am Telefon einloggen (`http://<LAN-IP>:3000/login`). Diese Oberfläche ist beim mobilen Umbau
+entstanden und **bisher nur im Browser bei 360/390px gemessen** — die Punkte hier sind genau die,
+die eine Messung nicht beantwortet.
+
+Je Geschäftsart einmal durchgehen: die untere Leiste und der Umfang der Navigation hängen an den
+Fähigkeiten des Tenants (`resolveDashboardCapabilities`), nicht am Geschmack.
+
+### B1. Untere Leiste
+
+**Erwartet — Betrieb (Hotel/Agentur):** DREI Ziele: Übersicht · Antworten/Rückmeldungen · Medien.
+**Erwartet — Gästebuch (Hochzeit):** VIER: Übersicht · Galerie · QR-Code · Einstellungen.
+Beschriftungen kommen aus der Registry („Aufenthalte", „Reisen", „Glückwünsche").
+**Zu prüfen:** jedes Ziel blind mit dem Daumen treffbar (≥44px hoch), aktives Ziel farbig markiert,
+und auf iPhones mit Home-Indikator liegt die Leiste **nicht** unter der Wischleiste
+(`env(safe-area-inset-bottom)`). Aus einer Detailseite zurück → das übergeordnete Ziel bleibt
+markiert (Präfix-Treffer).
+
+### B2. Hamburger-Schublade (nur Betrieb)
+
+**Erwartet:** Im Betrieb öffnet der Knopf links in der Kopfleiste eine Schublade mit dem Rest
+(Kampagnen/Reisen · Berichte · Einstellungen) plus Tarif-Fußzeile. Ein Tipp auf den dunklen
+Hintergrund schließt sie.
+**Erwartet — Gästebuch:** **kein** Hamburger. Stattdessen führt „Alle Feiern (mit Archiv)" unter
+den Kennzahlen der Übersicht zur Liste, und die Kennzahl „Glückwünsche" zu den Beiträgen. Beide
+Wege antippen — ohne sie wären diese Seiten am Telefon unerreichbar (das war ein echter Befund,
+siehe Commit `73a7c1f`).
+
+### B3. Klebende Tabellenkopfzeile + Sortier-Chips (`/dashboard/experiences`)
+
+Am Telefon steht die Kopfzeile der Liste als **Chipzeile**: `Name · Datum · Auslastung` (die nicht
+sortierbaren Spalten Typ/Status erscheinen dort nicht).
+**Erwartet:**
+
+- Einen Chip antippen → die Liste ordnet sich neu, der Chip färbt sich (Akzent) und trägt einen
+  Pfeil. **Nochmal** tippen → Pfeil dreht, Reihenfolge kehrt um.
+- Weit nach unten scrollen (bei wenigen Kampagnen vorher „Alle" filtern, damit die Liste lang wird):
+  die Chipzeile **bleibt stehen**, direkt unter der Kopfleiste, und die Zeilen laufen darunter
+  durch — nichts scheint durch (deckender Grund).
+- Jede Zeile trägt ihre Beschriftungen selbst („Datum", „Typ", „Status", „Auslastung"), weil die
+  Spaltenüberschriften am Telefon fehlen.
+- Filter setzen (Schalter „Filter"), dann sortieren: **beides** bleibt gleichzeitig aktiv. Danach
+  einen Filter-Chip mit „×" abwerfen → die Sortierung darf **nicht** zurückspringen.
+
+### B4. Album / Medien (`/dashboard/media`)
+
+**Erwartet:** Beitragsstrom (Karten), ein Foto antippen öffnet das Vollbild; Wischen/Pfeile
+wechseln, „Schließen" führt zurück an dieselbe Stelle der Liste. Die Werkzeuge (Sperren,
+Herunterladen, Löschen) liegen im Vollbild, nicht unter jeder Karte.
+
+### B5. Breite und Zoom
+
+Auf 360–428px: **kein horizontales Scrollen** auf Übersicht, Liste, Antworten, Medien,
+Einstellungen. Kennzahlen stehen zweispaltig. Kein Pinch-Zoom nötig, um Zahlen zu lesen.
+
+---
+
 ## Ergebnis-Matrix (pro Gerät abhaken)
 
-| Prüfung                                | iOS Safari | Android Chrome |
-| -------------------------------------- | ---------- | -------------- |
-| 0 Erreichbarkeit (< 2 s, kein Timeout) |            |                |
-| 1 Landing, kein H-Scroll, lesbar       |            |                |
-| 2 Consent-Gate blockiert Button        |            |                |
-| 3a Foto aufnehmen → Upload OK          |            |                |
-| 3b Mediathek/HEIC → Upload OK          |            |                |
-| 3c `.mov` < 50 MB → Upload OK          |            |                |
-| 3c `.mov` > 50 MB → klarer Fehler      |            |                |
-| 4 Reziprozität + Galerie sichtbar      |            |                |
-| 5 Bewertung optional/Überspringen      |            |                |
-| 3'/4' Feedback-Formular (stay-Event)   |            |                |
-| 6 Löschen entfernt Beitrag             |            |                |
-| 7 Layout 360–428 px sauber             |            |                |
-| 8 Tastatur/Orientierung ok             |            |                |
+| Prüfung                                    | iOS Safari | Android Chrome |
+| ------------------------------------------ | ---------- | -------------- |
+| 0 Erreichbarkeit (< 2 s, kein Timeout)     |            |                |
+| 1 Landing, kein H-Scroll, lesbar           |            |                |
+| 1 Neuer Auftritt (Creme/Serife/Pille)      |            |                |
+| 1 Karte springt nicht beim Scrollen (dvh)  |            |                |
+| 2 Consent-Gate blockiert Button            |            |                |
+| 2 Ganze Consent-Zeile schaltet             |            |                |
+| 3a Foto aufnehmen → Upload OK              |            |                |
+| 3b Mediathek/HEIC → Upload OK              |            |                |
+| 3c `.mov` < 50 MB → Upload OK              |            |                |
+| 3c `.mov` > 50 MB → klarer Fehler          |            |                |
+| 4 Reziprozität + Galerie sichtbar          |            |                |
+| 5 Bewertung optional/Überspringen          |            |                |
+| 5 Dritter Stern trifft (Note + Fragen)     |            |                |
+| 3'/4' Feedback-Formular (stay-Event)       |            |                |
+| 3''/4'' Gästebuch (wedding-Event)          |            |                |
+| 6 Löschen entfernt Beitrag                 |            |                |
+| 7 Layout 360–428 px sauber                 |            |                |
+| 8 Tastatur/Orientierung ok                 |            |                |
+| B1 Untere Leiste (3 bzw. 4 Ziele, Daumen)  |            |                |
+| B2 Schublade / kein Hamburger im Gästebuch |            |                |
+| B2 „Alle Feiern" + Kennzahl führen weiter  |            |                |
+| B3 Chipzeile klebt, Sortieren dreht        |            |                |
+| B3 Filter + Sortierung stören sich nicht   |            |                |
+| B4 Vollbild öffnet/schließt an der Stelle  |            |                |
+| B5 Panel ohne H-Scroll bei 360 px          |            |                |
 
 ## Bekannte Risiken / worauf achten
 
@@ -176,9 +322,18 @@ Kurz ins Querformat drehen → keine Überlappungen/abgeschnittenen Steuerelemen
   sperren. Falls Galerie-**Videos** nicht abspielen bzw. Medien leer bleiben → eigener Befund
   (`media-src`/COEP), gilt auch in Produktion.
 - **Windows-Firewall:** beim ersten `-H 0.0.0.0`-Start ggf. Freigabe für Node/Port 3000 bestätigen.
+- **Klebende Kopfzeile auf 641–1024px (Tablet):** Der Versatz der Tabellenkopfzeile ist die Höhe der
+  Kopfleiste (`--gs-topbar-h: 56px`, nur unter 1025px gesetzt). Sitzt die Chipzeile **hinter** der
+  Kopfleiste statt darunter, stimmt diese Zahl nicht mehr mit der tatsächlichen Höhe überein — dann
+  ist `min-height` der `.gs-topbar` das erste, wo man nachsieht.
+- **Kein `aria-sort`:** Ein Screenreader hört an der Chipzeile Links („Datum — nach dieser Spalte
+  absteigend sortieren"), keine Tabellenüberschriften. Das ist Absicht (die Listen sind Raster, keine
+  Tabellen); wer mit VoiceOver/TalkBack prüft, sollte es wissen und nicht als Befund notieren.
 
 ## Nach dem Lauf
 
 Ergebnisse festhalten; Abweichungen als Befund/Issue notieren (mit Gerät + iOS/Chrome-Version).
-Bei durchgängigem Bestehen sind **NFR-04.1/.2/.3** (mobile Kompatibilität) und **NFR-01.1** (FCP)
-verifiziert — im Härtungs-Inventar Punkt **Z1** als erledigt markieren.
+Bei durchgängigem Bestehen von **Teil A** sind **NFR-04.1/.2/.3** (mobile Kompatibilität) und
+**NFR-01.1** (FCP) verifiziert — im Härtungs-Inventar Punkt **Z1** als erledigt markieren.
+**Teil B** hängt an keiner NFR; er schließt die Lücke, dass das mobile Panel bisher ausschließlich
+im Browser gemessen wurde.
