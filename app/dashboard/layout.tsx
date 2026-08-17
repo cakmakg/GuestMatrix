@@ -1,9 +1,9 @@
-import { Playfair_Display } from 'next/font/google'
 import { redirect } from 'next/navigation'
 
 import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import { drawerNavItems } from '@/lib/dashboard/nav'
+import { displayFont } from '@/lib/fonts'
 import { quotaPercent } from '@/lib/dashboard/metrics'
 import { getPlanConfig, resolvePlan } from '@/lib/plans'
 import {
@@ -16,25 +16,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { BottomNav } from './BottomNav'
 import { NavDrawer } from './NavDrawer'
 import { SidebarNav } from './SidebarNav'
-
-/**
- * Anzeigeschrift des Album-Themas. Wie Archivo selbst gehostet über next/font — ein @import von
- * fonts.googleapis.com scheiterte an der CSP (`font-src 'self'`, next.config.ts).
- *
- * Wird von JEDEM Thema getragen (die Serife ist Teil der gemeinsamen Sprache, siehe
- * `[data-theme]` in globals.css) — deshalb vorgeladen und die Variable unbedingt gesetzt. Sie
- * gilt nur für Überschriften; Fließtext, Listen und Tabellen bleiben auf Archivo.
- */
-const display = Playfair_Display({
-  // latin-ext wegen der türkischen Zeichen in Gäste- und Kampagnennamen (ş, ğ, ı, İ, ö, ü, ç):
-  // ohne den Subset fällt genau dort die Ersatzschrift ein, und ein Name wie „Gülşen" bräche
-  // mitten im Wort auf zwei Schriften.
-  subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '600'],
-  style: ['normal', 'italic'],
-  variable: '--font-display',
-  display: 'swap',
-})
 
 type TenantRow = {
   brand_name: string
@@ -104,7 +85,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const brandName = tenant?.brand_name ?? BRAND.name
 
   return (
-    <div className={`gs-shell ${display.variable}`} data-theme={theme}>
+    <div className={`gs-shell ${displayFont.variable}`} data-theme={theme}>
       {/* ═══ SIDEBAR (ab 1024px; darunter übernimmt BottomNav) ═══ */}
       <aside className="gs-sidebar">
         <div

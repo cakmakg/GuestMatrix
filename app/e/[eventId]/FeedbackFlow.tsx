@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import type { GuestFlowLabels } from '@/lib/sectors'
 
+import { GuestPick } from './GuestPick'
 import GuestShell from './GuestShell'
+import { GuestStars } from './GuestStars'
 
 type Step = 'landing' | 'feedback' | 'submitting' | 'success'
 
@@ -46,7 +48,9 @@ export default function FeedbackFlow({
 }: Props) {
   // labels kommt als JSON über /api/events/[eventId]/public (fetch-gecacht). Defensiv gegen ein
   // Payload ohne questions (z. B. veralteter Cache) — der Gäste-Flow darf nie deshalb crashen.
-  const questions = labels.questions ?? []
+  // Nach `rating` gefiltert wie im GalleryFlow: eine Freitextfrage bekäme hier sonst Sterne und
+  // schickte eine Zahl an ein Textfeld, was validate_feedback_answers (DB) ablehnt.
+  const questions = (labels.questions ?? []).filter((q) => q.type === 'rating')
   const [step, setStep] = useState<Step>('landing')
   const [consentChecked, setConsentChecked] = useState(false)
   const [rating, setRating] = useState<number>(0)
@@ -56,7 +60,6 @@ export default function FeedbackFlow({
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submissionId, setSubmissionId] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleConsentContinue = useCallback(async () => {
     setError(null)
@@ -154,30 +157,29 @@ export default function FeedbackFlow({
     <GuestShell brandName={brandName} eventName={eventName}>
       {/* ── Landing ──────────────────────────────────────────────────────── */}
       {step === 'landing' && (
-        <div className="space-y-4">
-          {description && <p className="text-gray-600 text-sm">{description}</p>}
-          <p className="text-gray-700">{labels.landingHeadline}</p>
+        <div className="gs-guest-step">
+          {description && <p className="gs-guest-lead">{description}</p>}
+          <p className="gs-guest-text">{labels.landingHeadline}</p>
 
-          <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                className="mt-0.5 w-4 h-4 accent-indigo-600"
-                checked={consentChecked}
-                onChange={(e) => setConsentChecked(e.target.checked)}
-              />
-              <span className="text-sm text-gray-600">{labels.consentText}</span>
-            </label>
-          </div>
+          <label className="gs-guest-consent">
+            <input
+              type="checkbox"
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+            />
+            <span>{labels.consentText}</span>
+          </label>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && (
+            <p className="gs-guest-error" role="alert">
+              {error}
+            </p>
+          )}
 
           <button
             onClick={handleConsentContinue}
             disabled={!consentChecked}
-            className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium
-                       disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700
-                       transition-colors"
+            className="btn btn-primary gs-guest-btn"
           >
             Weiter
           </button>
@@ -186,93 +188,57 @@ export default function FeedbackFlow({
 
       {/* ── Feedback ─────────────────────────────────────────────────────── */}
       {step === 'feedback' && (
-        <div className="space-y-5">
-          <div className="space-y-2 text-center">
-            <p className="text-gray-700 font-medium">{labels.ratingPrompt}</p>
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  className="text-4xl hover:scale-110 transition-transform"
-                  aria-label={`${star} Sterne`}
-                >
-                  {star <= rating ? '★' : '☆'}
-                </button>
-              ))}
-            </div>
+        <div className="gs-guest-step">
+          <div className="gs-guest-field">
+            <p className="gs-guest-label">{labels.ratingPrompt}</p>
+            <GuestStars label={labels.ratingPrompt} value={rating} onChange={setRating} />
           </div>
 
           {/* Strukturierte Zusatzfragen (aus dem Kampagnen-Katalog) — alle optional. */}
           {questions.length > 0 && (
-            <div className="space-y-3">
+            <div className="gs-guest-questions">
               {questions.map((q) => (
-                <div key={q.id} className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-600">{q.prompt}</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: star }))}
-                        className="text-2xl leading-none hover:scale-110 transition-transform"
-                        aria-label={`${q.prompt}: ${star} Sterne`}
-                      >
-                        {star <= (answers[q.id] ?? 0) ? '★' : '☆'}
-                      </button>
-                    ))}
-                  </div>
+                <div key={q.id} className="gs-guest-question">
+                  <span className="gs-guest-label">{q.prompt}</span>
+                  <GuestStars
+                    label={q.prompt}
+                    value={answers[q.id] ?? 0}
+                    onChange={(value) => setAnswers((prev) => ({ ...prev, [q.id]: value }))}
+                  />
                 </div>
               ))}
             </div>
           )}
 
-          <div>
-            <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1.5">
+          <div className="gs-guest-field">
+            <label htmlFor="comment" className="gs-guest-label">
               {labels.commentPrompt}
             </label>
             <textarea
               id="comment"
+              className="input"
               rows={4}
               maxLength={1000}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder={labels.commentPlaceholder}
-              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         resize-none"
             />
           </div>
 
-          <div>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center
-                         cursor-pointer hover:border-indigo-400 transition-colors"
-            >
-              {selectedFile ? (
-                <p className="text-sm text-gray-700 truncate">{selectedFile.name}</p>
-              ) : (
-                <p className="text-sm text-gray-400">Foto/Video anhängen (optional)</p>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,video/mp4,video/quicktime"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-400">JPEG, PNG, MP4 oder MOV · Max. 50 MB</p>
-          </div>
+          <GuestPick
+            empty="Foto/Video anhängen (optional)"
+            chosen={selectedFile?.name ?? null}
+            hint="JPEG, PNG, MP4 oder MOV · Max. 50 MB"
+            onChange={handleFileSelect}
+          />
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && (
+            <p className="gs-guest-error" role="alert">
+              {error}
+            </p>
+          )}
 
-          <button
-            onClick={handleSubmit}
-            className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium
-                       hover:bg-indigo-700 transition-colors"
-          >
+          <button onClick={handleSubmit} className="btn btn-primary gs-guest-btn">
             Absenden
           </button>
         </div>
@@ -280,17 +246,16 @@ export default function FeedbackFlow({
 
       {/* ── Submitting ───────────────────────────────────────────────────── */}
       {step === 'submitting' && (
-        <div className="space-y-4 py-4">
-          <p className="text-gray-700 font-medium text-center">Wird gesendet…</p>
+        <div className="gs-guest-wait">
+          <p className="gs-guest-label">Wird gesendet…</p>
           {selectedFile && (
             <>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
+              <div className="gs-guest-progress">
+                <i style={{ width: `${progress}%` }} />
               </div>
-              <p className="text-center text-sm text-gray-500">{progress}%</p>
+              <p className="gs-guest-progress-label" aria-live="polite">
+                {progress}%
+              </p>
             </>
           )}
         </div>
@@ -298,16 +263,15 @@ export default function FeedbackFlow({
 
       {/* ── Success ──────────────────────────────────────────────────────── */}
       {step === 'success' && (
-        <div className="space-y-4 text-center">
-          <div className="text-5xl">🙏</div>
-          <p className="text-gray-800 font-semibold text-lg">{labels.successText}</p>
-          <p className="text-gray-500 text-sm">Dein Feedback wurde übermittelt.</p>
+        <div className="gs-guest-done">
+          <span className="gs-guest-done-mark" aria-hidden="true">
+            🙏
+          </span>
+          <h2 className="gs-guest-done-title">{labels.successText}</h2>
+          <p className="gs-guest-lead">Dein Feedback wurde übermittelt.</p>
 
           {submissionId && (
-            <button
-              onClick={handleDelete}
-              className="text-xs text-red-400 hover:text-red-600 underline mt-2"
-            >
+            <button onClick={handleDelete} className="gs-guest-quiet">
               Feedback löschen (DSGVO)
             </button>
           )}

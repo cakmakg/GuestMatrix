@@ -6,17 +6,25 @@ type Props = {
   children: ReactNode
 }
 
-/** Gemeinsame Karten-Hülle mit Marken-/Event-Header für alle Gäste-Flows. */
+/**
+ * Gemeinsame Karte mit Marken-/Event-Kopf für alle Gäste-Flows.
+ *
+ * Der farbige Kopfbalken ist weg. Er war das erste, was ein Gast nach dem Scannen sah — eine
+ * Signalfläche über dem Namen der Feier. Jetzt trägt der Name selbst den Auftritt (Anzeigeschrift),
+ * die Marke steht als leise Zeile darüber: der Gast soll wissen, wessen Seite das ist, hat aber
+ * nicht danach gesucht.
+ *
+ * Der Seitenrahmen (Grund, Zentrierung, Thema, Anzeigeschrift) liegt in `page.tsx` — ein Server-
+ * Component. Nur so kann das Thema aus der Registry kommen, ohne dass jeder Flow es weiterreicht.
+ */
 export default function GuestShell({ brandName, eventName, children }: Props) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg overflow-hidden">
-        <div className="bg-indigo-600 px-6 py-5 text-white">
-          {brandName && <p className="text-indigo-200 text-sm mb-1">{brandName}</p>}
-          <h1 className="text-xl font-bold">{eventName}</h1>
-        </div>
-        <div className="p-6">{children}</div>
-      </div>
+    <div className="gs-guest-card">
+      <header className="gs-guest-head">
+        {brandName && <p className="gs-guest-brand">{brandName}</p>}
+        <h1 className="gs-guest-title">{eventName}</h1>
+      </header>
+      {children}
     </div>
   )
 }

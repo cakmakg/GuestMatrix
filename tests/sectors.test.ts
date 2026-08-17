@@ -13,6 +13,7 @@ import {
   resolveDashboardCapabilities,
   resolveDashboardLabels,
   resolveDashboardTheme,
+  resolveGuestTheme,
   allowedCampaignTypes,
   businessTypesForSector,
   campaignTypesForBusinessType,
@@ -406,6 +407,33 @@ describe('dashboard labels resolve from the registry', () => {
     for (const theme of cases) {
       expect(DASHBOARD_THEME_TUPLE).toContain(theme)
     }
+  })
+
+  it('resolves the guest appearance from the campaign type — same axis, other input', () => {
+    // Der Gast eines Gästebuchs sieht die Feier-Dichte, der Gast eines Betriebs die Betriebs-Dichte.
+    expect(resolveGuestTheme('wedding')).toBe('album')
+    expect(resolveGuestTheme('agency')).toBe('operator')
+    expect(resolveGuestTheme('stay')).toBe('operator')
+  })
+
+  it('guest appearance agrees with the dashboard of the same tenant', () => {
+    // Der Punkt der Achse: Panel und QR-Seite dürfen nicht wie zwei Produkte aussehen. Der Gast
+    // kennt nur den Kampagnentyp, das Dashboard nur Sektor + Geschäftsart — dasselbe Ergebnis.
+    expect(resolveGuestTheme('wedding')).toBe(resolveDashboardTheme('event', null))
+    expect(resolveGuestTheme('agency')).toBe(resolveDashboardTheme('tourism', 'agency'))
+    expect(resolveGuestTheme('stay')).toBe(resolveDashboardTheme('tourism', 'hotel'))
+  })
+
+  it('guest appearance falls back to the neutral theme for unknown or missing input', () => {
+    // Eine öffentliche Seite darf an einem unbekannten Wert nicht scheitern: der Rückfall ist das
+    // erprobte Thema, nicht das schönste (wie bei resolveDashboardTheme).
+    expect(resolveGuestTheme(null)).toBe(DEFAULT_DASHBOARD_THEME)
+    expect(resolveGuestTheme(undefined)).toBe(DEFAULT_DASHBOARD_THEME)
+    expect(resolveGuestTheme('')).toBe(DEFAULT_DASHBOARD_THEME)
+    expect(resolveGuestTheme('nonsense')).toBe(DEFAULT_DASHBOARD_THEME)
+    // Deaktivierter (dormanter) Kampagnentyp — als Code vorhanden, nicht registriert.
+    expect(resolveGuestTheme('property')).toBe(DEFAULT_DASHBOARD_THEME)
+    expect(DASHBOARD_THEME_TUPLE).toContain(resolveGuestTheme('nonsense'))
   })
 
   it('never returns an empty string — every field is renderable', () => {

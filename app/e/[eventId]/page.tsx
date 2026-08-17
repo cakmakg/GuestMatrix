@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 
+import { displayFont } from '@/lib/fonts'
+import { resolveGuestTheme } from '@/lib/sectors'
 import type { FlowMode, GuestFlowLabels } from '@/lib/sectors'
 
 import GuestFlow from './GuestFlow'
@@ -33,14 +35,22 @@ export default async function GuestPage({ params }: { params: Promise<{ eventId:
 
   if (!event) notFound()
 
+  // Erscheinungsbild wie im Dashboard aus der Registry, nicht aus einer Fallunterscheidung — hier
+  // aus dem Kampagnentyp, weil gästeseitig kein Tenant angemeldet ist (`resolveGuestTheme`).
+  // Die Anzeigeschrift trägt jedes Thema, deshalb steht ihre Variable unbedingt an derselben Stelle.
   return (
-    <GuestFlow
-      eventId={event.id}
-      eventName={event.name}
-      brandName={event.brandName}
-      description={event.description}
-      flowMode={event.flowMode}
-      labels={event.labels}
-    />
+    <div
+      className={`gs-guest-page ${displayFont.variable}`}
+      data-theme={resolveGuestTheme(event.campaignType)}
+    >
+      <GuestFlow
+        eventId={event.id}
+        eventName={event.name}
+        brandName={event.brandName}
+        description={event.description}
+        flowMode={event.flowMode}
+        labels={event.labels}
+      />
+    </div>
   )
 }

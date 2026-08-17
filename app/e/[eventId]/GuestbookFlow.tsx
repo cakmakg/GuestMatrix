@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import type { GuestFlowLabels } from '@/lib/sectors'
 
+import { GuestPick } from './GuestPick'
 import GuestShell from './GuestShell'
 
 type Step = 'landing' | 'form' | 'submitting' | 'success'
@@ -57,7 +58,6 @@ export default function GuestbookFlow({
   const [fileIndex, setFileIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [submissionIds, setSubmissionIds] = useState<string[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const namePrompt = labels.namePrompt ?? 'Euer Name'
   const namePlaceholder = labels.namePlaceholder ?? 'Von wem ist der Gruß?'
@@ -205,30 +205,29 @@ export default function GuestbookFlow({
     <GuestShell brandName={brandName} eventName={eventName}>
       {/* ── Landing ──────────────────────────────────────────────────────── */}
       {step === 'landing' && (
-        <div className="space-y-4">
-          {description && <p className="text-gray-600 text-sm">{description}</p>}
-          <p className="text-gray-700">{labels.landingHeadline}</p>
+        <div className="gs-guest-step">
+          {description && <p className="gs-guest-lead">{description}</p>}
+          <p className="gs-guest-text">{labels.landingHeadline}</p>
 
-          <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                className="mt-0.5 w-4 h-4 accent-indigo-600"
-                checked={consentChecked}
-                onChange={(e) => setConsentChecked(e.target.checked)}
-              />
-              <span className="text-sm text-gray-600">{labels.consentText}</span>
-            </label>
-          </div>
+          <label className="gs-guest-consent">
+            <input
+              type="checkbox"
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+            />
+            <span>{labels.consentText}</span>
+          </label>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && (
+            <p className="gs-guest-error" role="alert">
+              {error}
+            </p>
+          )}
 
           <button
             onClick={handleConsentContinue}
             disabled={!consentChecked}
-            className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium
-                       disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700
-                       transition-colors"
+            className="btn btn-primary gs-guest-btn"
           >
             Weiter
           </button>
@@ -237,37 +236,34 @@ export default function GuestbookFlow({
 
       {/* ── Form (Name + Glückwunsch + Medien) ───────────────────────────── */}
       {step === 'form' && (
-        <div className="space-y-5">
-          <div>
-            <label htmlFor="guest-name" className="block text-sm font-medium text-gray-700 mb-1.5">
+        <div className="gs-guest-step">
+          <div className="gs-guest-field">
+            <label htmlFor="guest-name" className="gs-guest-label">
               {namePrompt}
             </label>
             <input
               id="guest-name"
+              className="input"
               type="text"
               maxLength={80}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={namePlaceholder}
-              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
 
-          <div>
-            <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1.5">
+          <div className="gs-guest-field">
+            <label htmlFor="message" className="gs-guest-label">
               {labels.commentPrompt}
             </label>
             <textarea
               id="message"
+              className="input"
               rows={4}
               maxLength={1000}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={labels.commentPlaceholder}
-              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm
-                         focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
-                         resize-none"
             />
           </div>
 
@@ -275,59 +271,42 @@ export default function GuestbookFlow({
           {labels.questions
             .filter((q) => q.type === 'text')
             .map((q) => (
-              <div key={q.id}>
-                <label
-                  htmlFor={`q-${q.id}`}
-                  className="block text-sm font-medium text-gray-700 mb-1.5"
-                >
-                  {q.prompt} <span className="font-normal text-gray-400">(optional)</span>
+              <div key={q.id} className="gs-guest-field">
+                <label htmlFor={`q-${q.id}`} className="gs-guest-label">
+                  {q.prompt} <span className="gs-guest-optional">(optional)</span>
                 </label>
                 <input
                   id={`q-${q.id}`}
+                  className="input"
                   type="text"
                   maxLength={q.maxLength ?? 280}
                   value={answers[q.id] ?? ''}
                   onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
             ))}
 
-          <div>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center
-                         cursor-pointer hover:border-indigo-400 transition-colors"
-            >
-              {files.length > 0 ? (
-                <p className="text-sm text-gray-700">
-                  {files.length === 1 ? files[0]?.name : `${files.length} Dateien ausgewählt`}
-                </p>
-              ) : (
-                <p className="text-sm text-gray-400">Fotos/Videos hinzufügen (optional)</p>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,video/mp4,video/quicktime"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-400">
-              JPEG, PNG, MP4 oder MOV · max. {MAX_FILES} Dateien · je max. 50 MB
+          <GuestPick
+            empty="Fotos/Videos hinzufügen (optional)"
+            chosen={
+              files.length === 0
+                ? null
+                : files.length === 1
+                  ? (files[0]?.name ?? null)
+                  : `${files.length} Dateien ausgewählt`
+            }
+            hint={`JPEG, PNG, MP4 oder MOV · max. ${MAX_FILES} Dateien · je max. 50 MB`}
+            multiple
+            onChange={handleFileSelect}
+          />
+
+          {error && (
+            <p className="gs-guest-error" role="alert">
+              {error}
             </p>
-          </div>
+          )}
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-
-          <button
-            onClick={handleSubmit}
-            className="w-full py-3 px-4 bg-indigo-600 text-white rounded-xl font-medium
-                       hover:bg-indigo-700 transition-colors"
-          >
+          <button onClick={handleSubmit} className="btn btn-primary gs-guest-btn">
             Absenden
           </button>
         </div>
@@ -335,17 +314,14 @@ export default function GuestbookFlow({
 
       {/* ── Submitting ───────────────────────────────────────────────────── */}
       {step === 'submitting' && (
-        <div className="space-y-4 py-4">
-          <p className="text-gray-700 font-medium text-center">Wird gesendet…</p>
+        <div className="gs-guest-wait">
+          <p className="gs-guest-label">Wird gesendet…</p>
           {files.length > 0 && (
             <>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
+              <div className="gs-guest-progress">
+                <i style={{ width: `${progress}%` }} />
               </div>
-              <p className="text-center text-sm text-gray-500">
+              <p className="gs-guest-progress-label" aria-live="polite">
                 {files.length > 1 ? `Datei ${fileIndex + 1} von ${files.length} · ` : ''}
                 {progress}%
               </p>
@@ -356,16 +332,15 @@ export default function GuestbookFlow({
 
       {/* ── Success ──────────────────────────────────────────────────────── */}
       {step === 'success' && (
-        <div className="space-y-4 text-center">
-          <div className="text-5xl">💐</div>
-          <p className="text-gray-800 font-semibold text-lg">{labels.successText}</p>
-          <p className="text-gray-500 text-sm">Das Brautpaar freut sich über euren Beitrag.</p>
+        <div className="gs-guest-done">
+          <span className="gs-guest-done-mark" aria-hidden="true">
+            💐
+          </span>
+          <h2 className="gs-guest-done-title">{labels.successText}</h2>
+          <p className="gs-guest-lead">Das Brautpaar freut sich über euren Beitrag.</p>
 
           {submissionIds.length > 0 && (
-            <button
-              onClick={handleDelete}
-              className="text-xs text-red-400 hover:text-red-600 underline mt-2"
-            >
+            <button onClick={handleDelete} className="gs-guest-quiet">
               Beitrag löschen (DSGVO)
             </button>
           )}

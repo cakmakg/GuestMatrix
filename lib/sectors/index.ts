@@ -218,6 +218,25 @@ export function resolveDashboardTheme(
   return fromBusinessType ?? fromSector ?? DEFAULT_DASHBOARD_THEME
 }
 
+/**
+ * Welches Erscheinungsbild der GÄSTE-Flow trägt (die Seite hinter dem QR). Dieselbe Achse wie
+ * `resolveDashboardTheme`, nur eine andere Eingabe: gästeseitig gibt es keinen angemeldeten
+ * Tenant, aber der Kampagnentyp steht im öffentlichen Payload und kennt seinen Sektor.
+ *
+ * Bewusst NICHT über die `business_type`: die ist eine Betreiber-Angabe und hat auf einer
+ * öffentlichen Seite nichts zu suchen. Am Ergebnis ändert sie ohnehin nichts — beide
+ * tourism-Geschäftsmodelle teilen `operator`.
+ *
+ * Der Gäste-Flow ist damit die zweite Fläche auf der Themen-Achse. Sichtbar wird das vor allem
+ * dort, wo vorher NICHTS davon galt: bis hierhin stand er im :root-Rückfall (Signalrot, keine
+ * Rundungen) und sah aus wie ein anderes Produkt als das Dashboard desselben Kunden.
+ */
+export function resolveGuestTheme(campaignType: string | null | undefined): DashboardTheme {
+  const sector =
+    campaignType && isCampaignType(campaignType) ? CAMPAIGN_TYPES[campaignType]?.sector : undefined
+  return resolveDashboardTheme(sector, null)
+}
+
 // ─── Betreiber-Dashboard: Panels ──────────────────────────────────────────────
 
 /**
