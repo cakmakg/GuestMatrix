@@ -32,9 +32,27 @@ export function hrefWithout(
   active: Readonly<Record<string, string | undefined>>,
   dropKey: string,
 ): string {
+  return hrefWith(basePath, active, { [dropKey]: undefined })
+}
+
+/**
+ * Dieselbe Seite mit geänderten Werten — der Weg für Sortier-Überschriften.
+ *
+ * Der Grund, warum das nicht einfach ein `?sort=…` am Pfad ist: die Adresse trägt bereits die
+ * Filter, und ein Klick auf eine Spaltenüberschrift darf keinen davon abwerfen. Umgekehrt genauso
+ * wichtig — `undefined` im Patch ENTFERNT einen Wert, darauf setzt `hrefWithout` auf.
+ *
+ * Ein überschriebener Schlüssel behält seine Position in der Query (Objekt-Spreizung), damit
+ * dieselbe Ansicht immer dieselbe Adresse hat und nicht je nach Klickweg anders aussieht.
+ */
+export function hrefWith(
+  basePath: string,
+  active: Readonly<Record<string, string | undefined>>,
+  patch: Readonly<Record<string, string | undefined>>,
+): string {
   const params = new URLSearchParams()
-  for (const [key, value] of Object.entries(active)) {
-    if (key !== dropKey && value !== undefined && value !== '') params.set(key, value)
+  for (const [key, value] of Object.entries({ ...active, ...patch })) {
+    if (value !== undefined && value !== '') params.set(key, value)
   }
   const query = params.toString()
   return query === '' ? basePath : `${basePath}?${query}`
@@ -51,9 +69,16 @@ export function buildFilterChips(
   basePath: string,
   active: Readonly<Record<string, string | undefined>>,
   labels: Readonly<Record<string, string>>,
+  /**
+   * Parameter, die in der Adresse MITREISEN, aber keinen Chip bekommen — die Sortierung, seit sie
+   * ihren Zustand in der Tabellenkopfzeile selbst zeigt. Sie müssen in `active` bleiben, nicht
+   * weggelassen werden: jeder Chip-href wird aus `active` gebaut, und einen Filter abzuwerfen darf
+   * nicht die Sortierung zurücksetzen.
+   */
+  silent: readonly string[] = [],
 ): FilterChip[] {
   return Object.entries(active)
-    .filter(([, value]) => value !== undefined && value !== '')
+    .filter(([key, value]) => value !== undefined && value !== '' && !silent.includes(key))
     .map(([key, value]) => ({
       key,
       label: labels[`${key}:${value}`] ?? `${key}: ${value}`,

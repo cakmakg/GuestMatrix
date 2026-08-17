@@ -63,4 +63,27 @@ describe('buildFilterChips', () => {
     expect(chips).toHaveLength(1)
     expect(chips[0]?.label).toBe('campaign: evt-1')
   })
+
+  // Die Sortierung zeigt ihren Zustand seit den klickbaren Spaltenüberschriften selbst — ein Chip
+  // daneben wäre dieselbe Aussage zweimal.
+  it('gives no chip to a silent parameter', () => {
+    const chips = buildFilterChips(BASE, { state: 'open', sort: 'name', dir: 'asc' }, labels, [
+      'sort',
+      'dir',
+    ])
+
+    expect(chips.map((c) => c.key)).toEqual(['state'])
+  })
+
+  // Der Grund, warum die stille Sortierung in `active` BLEIBEN muss statt weggelassen zu werden:
+  // jeder Chip-href wird daraus gebaut. Einen Filter abzuwerfen darf die Ordnung nicht
+  // zurücksetzen — sonst sprang die Liste beim Aufräumen der Filter unbemerkt um.
+  it('keeps a silent parameter in the href of every chip', () => {
+    const chips = buildFilterChips(BASE, { state: 'open', sort: 'name', dir: 'asc' }, labels, [
+      'sort',
+      'dir',
+    ])
+
+    expect(chips[0]?.href).toBe(`${BASE}?sort=name&dir=asc`)
+  })
 })

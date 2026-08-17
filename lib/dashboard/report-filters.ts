@@ -12,17 +12,50 @@
 
 import { z } from 'zod'
 
+import { SORT_DIR_TUPLE, type SortDir, withDir } from './sort'
+
 /** Formular- und URL-Format: `YYYY-MM-DD` (entspricht <input type="date">). */
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
-export const reportFilterSchema = z.object({
-  from: z.string().regex(ISO_DATE).optional().catch(undefined),
-  to: z.string().regex(ISO_DATE).optional().catch(undefined),
-})
+/**
+ * Sortierung des Kampagnen-Vergleichs. Sie gehört zu den Filtern, weil sie denselben Weg nimmt
+ * (searchParams) — sie beschneidet aber nichts und wandert deshalb NICHT in den CSV-Export
+ * (`rangeQuery` schickt weiterhin nur den Zeitraum: eine Datei hat keine Spaltenüberschrift, auf
+ * die man klickt, und die Tabellenordnung des Bildschirms sagt über den Inhalt nichts aus).
+ */
+export const REPORT_SORT_TUPLE = ['average', 'responses', 'name'] as const
+
+export type ReportSort = (typeof REPORT_SORT_TUPLE)[number]
+
+/** Richtung beim ersten Klick — und Rückfall für eine Adresse ohne `dir` (wie bei Experiences). */
+export const REPORT_FIRST_DIR: Record<ReportSort, SortDir> = {
+  average: 'desc',
+  responses: 'desc',
+  name: 'asc',
+}
+
+export const reportFilterSchema = z
+  .object({
+    from: z.string().regex(ISO_DATE).optional().catch(undefined),
+    to: z.string().regex(ISO_DATE).optional().catch(undefined),
+    sort: z.enum(REPORT_SORT_TUPLE).catch('average'),
+    dir: z.enum(SORT_DIR_TUPLE).optional().catch(undefined),
+  })
+  .transform(({ from, to, sort, dir }) => ({
+    from,
+    to,
+    sort,
+    dir: dir ?? REPORT_FIRST_DIR[sort],
+  }))
 
 export type ReportFilters = z.infer<typeof reportFilterSchema>
 
-export const DEFAULT_REPORT_FILTERS: ReportFilters = { from: undefined, to: undefined }
+export const DEFAULT_REPORT_FILTERS: ReportFilters = {
+  from: undefined,
+  to: undefined,
+  sort: 'average',
+  dir: REPORT_FIRST_DIR.average,
+}
 
 export function parseReportFilters(input: unknown): ReportFilters {
   return reportFilterSchema.parse(input ?? {})
@@ -79,6 +112,37 @@ export function applyDateRange<T extends DatedItemLike>(
     if (Number.isNaN(time)) return false
     return time >= start && time <= end
   })
+}
+
+/** Eine Zeile des Kampagnen-Vergleichs, soweit sortiert wird. */
+export type CampaignRowLike = {
+  name: string
+  responses: number
+  /** `null`, solange niemand bewertet hat. */
+  average: number | null
+}
+
+/**
+ * Aufsteigende Komparatoren; die Richtung dreht `withDir` (wie bei den Experiences).
+ *
+ * `average` behandelt `null` wie 0 — genau das tat die feste Sortierung vorher auch. Die Zeilen
+ * des Vergleichs haben ohnehin mindestens eine Bewertung (die Seite filtert `responses > 0`);
+ * der Fall bleibt nur, damit der Typ nicht lügt.
+ */
+const REPORT_COMPARATORS: Record<ReportSort, (a: CampaignRowLike, b: CampaignRowLike) => number> = {
+  average: (a, b) => (a.average ?? 0) - (b.average ?? 0),
+  responses: (a, b) => a.responses - b.responses,
+  name: (a, b) => a.name.localeCompare(b.name, 'de'),
+}
+
+/** Sortiert eine Kopie des Kampagnen-Vergleichs; die Eingabe bleibt unberührt. */
+export function sortCampaignRows<T extends CampaignRowLike>(
+  rows: readonly T[],
+  order: ReportSort,
+  dir: SortDir = REPORT_FIRST_DIR[order],
+): T[] {
+  const compare = REPORT_COMPARATORS[order]
+  return [...rows].sort((a, b) => withDir(compare(a, b), dir))
 }
 
 /** Hängt den Zeitraum an einen Pfad, damit der CSV-Link denselben Ausschnitt exportiert. */

@@ -556,10 +556,91 @@ textarea.input {
   margin-top: 2px;
 }
 
-/* Spaltenüberschriften einer Tabelle aus `.gs-row`-Zeilen. Teilt sich deren Spaltenquelle. */
+/* Spaltenüberschriften einer Tabelle aus `.gs-row`-Zeilen. Teilt sich deren Spaltenquelle.
+   Aussehen und Polsterung stehen HIER und nicht mehr inline in den Seiten: ein inline `padding`
+   schlüge die Regel, und mit der klebenden Kopfzeile hängt am Abstand jetzt mehr als Geschmack
+   (der deckende Grund muss die durchlaufenden Zeilen wirklich verdecken). */
 .gs-row-head {
   display: grid;
   grid-template-columns: var(--gs-row-cols, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 4px 8px;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  /* Bleibt stehen, während die Liste darunter durchläuft — bei 40 archivierten Feiern ist sonst
+     nach dem dritten Bildschirm nicht mehr klar, welche Spalte welche ist.
+     Der Versatz ist die Höhe der Kopfleiste: die klebt selbst, aber erst unterhalb von 1024px
+     (`--gs-topbar-h`). Ohne Dashboard-Gerüst greift der Rückfall 0. */
+  position: sticky;
+  top: var(--gs-topbar-h, 0px);
+  z-index: 2;
+  /* Deckend, sonst scheinen die Zeilen durch. Der Ton der FLÄCHE (Panel), nicht der der Seite. */
+  background: var(--color-surface);
+}
+
+/* — Klickbare Spaltenüberschrift —
+   Sie ERSETZT das frühere Sortier-Auswahlfeld der Filterleiste: der Zustand gehört dorthin, wo er
+   wirkt. Ein Link und kein Knopf, weil die Sortierung in der Adresse steht — teilbar, ohne
+   JavaScript bedienbar, und der Zurück-Knopf führt zur vorigen Ordnung. */
+.gs-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--radius-control, var(--radius-sm));
+}
+.gs-sort:hover {
+  color: var(--color-text);
+}
+.gs-sort[data-active='true'] {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.gs-sort[data-align='end'] {
+  width: 100%;
+  justify-content: flex-end;
+}
+.gs-sort-caret {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  /* Der Pfeil der aktiven Spalte steht, der der übrigen erscheint beim Überfahren: so ist
+     erkennbar, dass eine Spalte überhaupt sortierbar ist, ohne fünf Pfeile in die Kopfzeile zu
+     setzen. */
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.gs-sort:hover .gs-sort-caret,
+.gs-sort:focus-visible .gs-sort-caret {
+  opacity: 0.45;
+}
+.gs-sort[data-active='true'] .gs-sort-caret {
+  opacity: 1;
+}
+.gs-sort-caret svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* `desc` ist die Grundlage des Symbols (Pfeil nach unten), `asc` dreht ihn. */
+.gs-sort[data-dir='asc'] .gs-sort-caret {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-sort-caret {
+    transition: none;
+  }
 }
 
 .gs-bar {
@@ -1108,6 +1189,23 @@ textarea.input {
   }
 }
 
+/* ── 1025–1200px: engere Spaltenaufteilung, wo die Seitenleiste noch steht ──────
+   Der unangenehmste Bereich des Gerüsts: die Seitenleiste kostet 232px, das Stapeln der Zeilen
+   beginnt aber erst bei 640px. Dazwischen bekommt die Namensspalte (`1fr`) nur die Reste — bei
+   sechs Spalten brach „Kappadokien-Rundreise" auf drei Zeilen, während rechts eine halbleere
+   Prozentspalte stand.
+   Über dieselbe Custom Property wie überall (`rowCols(…, narrow)`), damit die Entscheidung bei der
+   LISTE bleibt: welche ihrer Spalten Luft abgeben kann, weiß nur sie. Ohne zweiten Wert ändert
+   sich nichts. */
+@media (min-width: 1025px) and (max-width: 1200px) {
+  .gs-row,
+  .gs-row-head {
+    grid-template-columns: var(--gs-row-cols-md, var(--gs-row-cols, 1fr));
+    /* Fünf Spaltenabstände sind hier 20px, die die Namensspalte besser gebrauchen kann. */
+    gap: 12px;
+  }
+}
+
 /* ── ≤1024px: Gerüst auf eine Spalte, Navigation nach unten ────────────────── */
 @media (max-width: 1024px) {
   .gs-shell {
@@ -1129,6 +1227,15 @@ textarea.input {
     position: sticky;
     top: 0;
     z-index: 30;
+    /* Erzwingt die Höhe, die `--gs-topbar-h` behauptet — sonst müsste jede klebende Kopfzeile
+       darunter die Polsterung nachrechnen. */
+    min-height: var(--gs-topbar-h);
+  }
+  /* Nur hier gesetzt, weil die Kopfleiste nur hier klebt: alles, was ebenfalls klebt
+     (Tabellen-Kopfzeilen), muss unterhalb von ihr beginnen. Oberhalb von 1024px scrollt sie mit
+     und der Versatz ist 0. */
+  .gs-shell {
+    --gs-topbar-h: 56px;
   }
   .gs-page {
     /* 88px unten: Höhe der Leiste plus Luft, damit der letzte Eintrag erreichbar bleibt. */
@@ -1169,9 +1276,32 @@ textarea.input {
     padding: 14px 2px;
   }
 
-  /* Ohne Spalten keine Spaltenüberschriften. */
+  /* Ohne Spalten keine Spaltenüberschriften — die Beschriftungen tragen die Zellen selbst (oben,
+     `[data-label]`). Ganz verschwinden darf die Kopfzeile aber nicht mehr: seit die Sortierung an
+     ihr hängt, wäre sie auf dem Telefon sonst überhaupt nicht erreichbar. Übrig bleibt genau das,
+     was klickbar IST — als Chipzeile.
+
+     Das ist der Grund, warum das Auswahlfeld aus der Filterleiste verschwinden konnte, ohne dem
+     Telefon etwas zu nehmen: EIN Bedienelement, zwei Darstellungen — dasselbe Verhältnis wie
+     zwischen Seitenleiste und unterer Leiste. */
   .gs-row-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 2px 12px;
+  }
+  .gs-row-head > *:not(.gs-sort) {
     display: none;
+  }
+  .gs-row-head > .gs-sort {
+    /* 44px: hier ist die Überschrift ein Ziel für den Daumen, keine Beschriftung am Rand. */
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--color-divider);
+  }
+  .gs-row-head > .gs-sort[data-active='true'] {
+    background: var(--color-accent-100);
+    border-color: var(--color-accent-300);
   }
 
   /* … dafür trägt jede Zelle ihre Beschriftung selbst.

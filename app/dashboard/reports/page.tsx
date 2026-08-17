@@ -18,15 +18,19 @@ import {
 import type { DimensionSummary } from '@/lib/dashboard/feedback-summary'
 import { formatNumber } from '@/lib/dashboard/metrics'
 import {
+  DEFAULT_REPORT_FILTERS,
+  REPORT_FIRST_DIR,
   applyDateRange,
   hasActiveRange,
   parseReportFilters,
   rangeQuery,
+  sortCampaignRows,
 } from '@/lib/dashboard/report-filters'
 import { getCampaignConfig, isCampaignType, resolveDashboardCapabilities } from '@/lib/sectors'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { rowCols } from '../row-cols'
+import { SortHeader } from '../SortHeader'
 
 /** Spalten der Kampagnen-Vergleichstabelle — Kopf und Zeilen teilen sie sich. */
 const CAMPAIGN_GRID = 'minmax(0, 1fr) 130px 92px 1fr 60px'
@@ -240,7 +244,24 @@ export default async function ReportsPage({ searchParams }: Props) {
       }
     })
     .filter((row) => row.responses > 0)
-    .sort((a, b) => (b.average ?? 0) - (a.average ?? 0))
+  const perCampaignSorted = sortCampaignRows(perCampaign, filters.sort, filters.dir)
+
+  /**
+   * Gemeinsame Argumente der Spaltenüberschriften. Der Zeitraum reist mit — ein Klick auf eine
+   * Überschrift darf ihn nicht abwerfen; die Sortierung selbst bleibt aus der Adresse heraus,
+   * solange sie der Standard ist.
+   */
+  const sortProps = {
+    basePath: '/dashboard/reports',
+    query: {
+      from: filters.from,
+      to: filters.to,
+      sort: filters.sort === DEFAULT_REPORT_FILTERS.sort ? undefined : filters.sort,
+      dir: filters.dir === REPORT_FIRST_DIR[filters.sort] ? undefined : filters.dir,
+    },
+    activeSort: filters.sort,
+    activeDir: filters.dir,
+  }
 
   const hasAnswers = answerSets.some((set) => Object.keys(set).length > 0)
 
@@ -273,6 +294,11 @@ export default async function ReportsPage({ searchParams }: Props) {
           <form method="GET" className="gs-panel gs-filters">
             <DateField label="Von" name="from" value={filters.from ?? ''} />
             <DateField label="Bis" name="to" value={filters.to ?? ''} />
+
+            {/* Die Sortierung des Kampagnen-Vergleichs sitzt in seiner Kopfzeile, muss aber
+                mitreisen: ein GET-Formular schickt nur seine eigenen Felder. */}
+            <input type="hidden" name="sort" value={filters.sort} />
+            <input type="hidden" name="dir" value={filters.dir} />
 
             <button className="btn btn-primary" type="submit">
               Anwenden
@@ -555,30 +581,40 @@ export default async function ReportsPage({ searchParams }: Props) {
             </div>
           </div>
 
-          {perCampaign.length === 0 ? (
+          {perCampaignSorted.length === 0 ? (
             <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Noch keine bewertete Kampagne.</p>
           ) : (
             <div>
-              <div
-                className="gs-row-head"
-                style={{
-                  ...rowCols(CAMPAIGN_GRID),
-                  gap: 16,
-                  padding: '0 2px 8px',
-                  fontSize: 10,
-                  letterSpacing: '.1em',
-                  textTransform: 'uppercase',
-                  color: MUTED,
-                }}
-              >
-                <div>Kampagne</div>
+              {/* Dieser Vergleich hatte bisher gar keine Sortierung — er stand fest nach Note.
+                  „Welche Kampagne hat die schwächste Note" war damit ablesbar, „welche hat die
+                  meisten Antworten" nicht. Die Note behält die Rolle des Standards.
+                  `Typ` bleibt stumm (bei einem Tenant immer derselbe), und `Ø` ist dieselbe Zahl
+                  wie der Balken daneben — zwei Überschriften für einen Schlüssel wären zwei Wege
+                  zum selben Ziel, deshalb sortiert nur „Bewertung". */}
+              <div className="gs-row-head" style={rowCols(CAMPAIGN_GRID)}>
+                <SortHeader
+                  label="Kampagne"
+                  column="name"
+                  firstDir={REPORT_FIRST_DIR.name}
+                  {...sortProps}
+                />
                 <div>Typ</div>
-                <div>Antworten</div>
-                <div>Bewertung</div>
+                <SortHeader
+                  label="Antworten"
+                  column="responses"
+                  firstDir={REPORT_FIRST_DIR.responses}
+                  {...sortProps}
+                />
+                <SortHeader
+                  label="Bewertung"
+                  column="average"
+                  firstDir={REPORT_FIRST_DIR.average}
+                  {...sortProps}
+                />
                 <div style={{ textAlign: 'right' }}>Ø</div>
               </div>
 
-              {perCampaign.map((row) => (
+              {perCampaignSorted.map((row) => (
                 <div key={row.id} className="gs-row" style={rowCols(CAMPAIGN_GRID)}>
                   <div style={{ minWidth: 0, font: '600 14px/1.3 var(--font-body)' }}>
                     {row.name}

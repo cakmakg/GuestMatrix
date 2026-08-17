@@ -6,6 +6,7 @@ import { requireTenantAuth } from '@/lib/auth/session'
 import { BRAND } from '@/lib/brand'
 import {
   DEFAULT_EXPERIENCE_FILTERS,
+  EXPERIENCE_FIRST_DIR,
   applyExperienceFilters,
   hasActiveExperienceFilters,
   parseExperienceFilters,
@@ -19,6 +20,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 import { setEventArchivedAction } from '../actions'
 import { rowCols } from '../row-cols'
+import { SortHeader } from '../SortHeader'
 
 export const metadata: Metadata = { title: `Kampagnen – ${BRAND.name}` }
 
@@ -37,7 +39,13 @@ type Props = {
 }
 
 const MUTED = 'color-mix(in srgb, var(--color-text) 55%, transparent)'
-const GRID = 'minmax(0, 1fr) 130px 92px 128px 108px'
+// Das Datum hat eine eigene Spalte, seit die Kopfzeile sortiert: als Unterzeile beim Namen wäre es
+// eine Spalte ohne Überschrift — man könnte nach ihm ordnen, aber nirgends darauf klicken.
+const GRID = 'minmax(0, 1fr) 96px 130px 92px 128px 108px'
+// 1025–1200px: die Seitenleiste steht noch, sechs Spalten passen aber nicht mehr bequem. Alle
+// Festbreiten geben etwas ab, damit der Name nicht auf drei Zeilen bricht; die Handlungsspalte
+// nicht, in ihr stehen zwei Beschriftungen nebeneinander.
+const GRID_NARROW = 'minmax(0, 1fr) 82px 104px 80px 100px 108px'
 
 /**
  * Auswahlmöglichkeiten der Filter — als Konstanten, weil sie an ZWEI Stellen gebraucht werden:
@@ -48,11 +56,6 @@ const STATE_OPTIONS = [
   { value: 'active', label: 'Nur aktive' },
   { value: 'archived', label: 'Nur archivierte' },
   { value: 'all', label: 'Alle' },
-]
-const SORT_OPTIONS = [
-  { value: 'date', label: 'Datum (neueste zuerst)' },
-  { value: 'responses', label: 'Antworten (meiste zuerst)' },
-  { value: 'name', label: 'Name (A–Z)' },
 ]
 
 const ICON_FILTER = (
@@ -161,23 +164,42 @@ export default async function ExperiencesPage({ searchParams }: Props) {
       : event.campaign_type,
   }))
 
-  const visible = sortExperiences(applyExperienceFilters(rows, filters), filters.sort)
+  const visible = sortExperiences(applyExperienceFilters(rows, filters), filters.sort, filters.dir)
   const activeCount = rows.filter((row) => !row.archived).length
   const now = Date.now()
 
+  /**
+   * Der Zustand, den JEDER Link dieser Seite mitschleppen muss — Chips wie Sortier-Überschriften.
+   * Standardwerte bleiben `undefined` und damit aus der Adresse heraus: sonst trüge jede URL den
+   * vollständigen Zustand mit sich herum.
+   */
+  const activeQuery = {
+    state: filters.state === DEFAULT_EXPERIENCE_FILTERS.state ? undefined : filters.state,
+    sort: filters.sort === DEFAULT_EXPERIENCE_FILTERS.sort ? undefined : filters.sort,
+    dir: filters.dir === EXPERIENCE_FIRST_DIR[filters.sort] ? undefined : filters.dir,
+  }
+
   // Nur was vom Standard ABWEICHT wird zum Chip; „Nur aktive" ist hier der Standard und damit
   // kein Filter, sondern die Grundeinstellung.
+  //
+  // `sort`/`dir` reisen in der Adresse mit, bekommen aber KEINEN Chip: ihren Zustand zeigt die
+  // Kopfzeile der Tabelle selbst (Pfeil + Akzentfarbe). Ein Chip daneben wäre dieselbe Aussage
+  // zweimal — und ein zweiter Ausschalter für etwas, das man nicht abschalten kann (irgendeine
+  // Ordnung hat die Liste immer).
   const chips = buildFilterChips(
     '/dashboard/experiences',
-    {
-      state: filters.state === DEFAULT_EXPERIENCE_FILTERS.state ? undefined : filters.state,
-      sort: filters.sort === DEFAULT_EXPERIENCE_FILTERS.sort ? undefined : filters.sort,
-    },
-    {
-      ...Object.fromEntries(STATE_OPTIONS.map((o) => [`state:${o.value}`, o.label])),
-      ...Object.fromEntries(SORT_OPTIONS.map((o) => [`sort:${o.value}`, o.label])),
-    },
+    activeQuery,
+    Object.fromEntries(STATE_OPTIONS.map((o) => [`state:${o.value}`, o.label])),
+    ['sort', 'dir'],
   )
+
+  /** Gemeinsame Argumente der Spaltenüberschriften — dreimal dasselbe wäre dreimal Drift. */
+  const sortProps = {
+    basePath: '/dashboard/experiences',
+    query: activeQuery,
+    activeSort: filters.sort,
+    activeDir: filters.dir,
+  }
 
   return (
     <div className="gs-page">
@@ -216,7 +238,12 @@ export default async function ExperiencesPage({ searchParams }: Props) {
 
           <form method="GET" className="gs-panel gs-filters">
             <Field label="Status" name="state" value={filters.state} options={STATE_OPTIONS} />
-            <Field label="Sortierung" name="sort" value={filters.sort} options={SORT_OPTIONS} />
+
+            {/* Die Sortierung hat hier kein Auswahlfeld mehr — sie sitzt in der Kopfzeile der
+                Tabelle. Sie muss aber MITREISEN: ein GET-Formular schickt nur seine eigenen
+                Felder, und ohne diese beiden Zeilen würfe jedes „Anwenden" die Ordnung ab. */}
+            <input type="hidden" name="sort" value={filters.sort} />
+            <input type="hidden" name="dir" value={filters.dir} />
 
             <button className="btn btn-primary" type="submit">
               Anwenden
@@ -282,24 +309,34 @@ export default async function ExperiencesPage({ searchParams }: Props) {
           </p>
         ) : (
           <div>
-            {/* Spaltenüberschriften ergeben nur Sinn, solange es Spalten gibt — auf dem Telefon
-                stapeln die Zeilen, dann wäre diese Leiste eine Beschriftung für nichts. */}
-            <div
-              className="gs-row-head"
-              style={{
-                ...rowCols(GRID),
-                gap: 16,
-                padding: '0 4px 8px',
-                fontSize: 10,
-                letterSpacing: '.1em',
-                textTransform: 'uppercase',
-                color: MUTED,
-              }}
-            >
-              <div>Name</div>
+            {/* Die Kopfzeile trägt die Sortierung: klickbar ist, was eine Ordnung hergibt.
+                `Typ` und `Status` bleiben absichtlich stumm — der Kampagnentyp ist bei einem
+                Tenant immer derselbe (seine business_type erlaubt genau einen), und nach dem
+                Status ordnet bereits der Status-FILTER. Beides wäre ein Bedienelement, das
+                nichts bewegt.
+                Auf dem Telefon stapeln die Zeilen und die Beschriftungen wandern an die Zellen
+                (`[data-label]`); von dieser Leiste bleiben dort nur die Sortier-Chips stehen. */}
+            <div className="gs-row-head" style={rowCols(GRID, GRID_NARROW)}>
+              <SortHeader
+                label="Name"
+                column="name"
+                firstDir={EXPERIENCE_FIRST_DIR.name}
+                {...sortProps}
+              />
+              <SortHeader
+                label="Datum"
+                column="date"
+                firstDir={EXPERIENCE_FIRST_DIR.date}
+                {...sortProps}
+              />
               <div>Typ</div>
               <div>Status</div>
-              <div>Auslastung</div>
+              <SortHeader
+                label="Auslastung"
+                column="responses"
+                firstDir={EXPERIENCE_FIRST_DIR.responses}
+                {...sortProps}
+              />
               <div />
             </div>
 
@@ -307,20 +344,27 @@ export default async function ExperiencesPage({ searchParams }: Props) {
               const pct = quotaPercent(row.responses, planConfig.maxUploadsPerEvent)
 
               return (
-                <div key={row.id} className="gs-row" style={rowCols(GRID)}>
+                <div key={row.id} className="gs-row" style={rowCols(GRID, GRID_NARROW)}>
                   <div style={{ minWidth: 0 }}>
                     <div className="name">{row.name}</div>
                     <div className="kind">
-                      {new Date(row.date).toLocaleDateString('de-DE')} · {row.responses}{' '}
-                      {row.responses === 1 ? 'Antwort' : 'Antworten'}
+                      {row.responses} {row.responses === 1 ? 'Antwort' : 'Antworten'}
                       {row.lastResponse
                         ? ` · zuletzt ${formatRelative(row.lastResponse, now)}`
                         : ''}
                     </div>
                   </div>
 
-                  {/* data-label: auf dem Telefon stapeln die Zellen und die Kopfzeile ist weg —
-                      dann trägt jede Zelle ihre Beschriftung selbst (siehe globals.css). */}
+                  {/* data-label: auf dem Telefon stapeln die Zellen und die Kopfzeile trägt dort
+                      nur noch die Sortier-Chips — dann trägt jede Zelle ihre Beschriftung selbst
+                      (siehe globals.css). */}
+                  <div
+                    style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}
+                    data-label="Datum"
+                  >
+                    {new Date(row.date).toLocaleDateString('de-DE')}
+                  </div>
+
                   <div style={{ fontSize: 13 }} data-label="Typ">
                     {row.typeLabel}
                   </div>

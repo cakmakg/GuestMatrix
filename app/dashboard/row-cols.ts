@@ -11,7 +11,14 @@ import type { CSSProperties } from 'react'
  *
  * Die Typzusicherung ist unvermeidbar: Reacts `CSSProperties` kennt keine Custom Properties.
  * Sie steht bewusst nur an dieser einen Stelle, statt an jedem Aufrufort wiederholt zu werden.
+ *
+ * `narrow` ist die Aufteilung für den Bereich 1025–1200px — dort steht die Seitenleiste noch, und
+ * was daneben bleibt, reicht einer breiten Tabelle nicht mehr: die Namensspalte (das `1fr`)
+ * bekommt dann die Reste und bricht auf drei Zeilen. Ein Haltepunkt in globals.css liest die
+ * Variable; wer sie nicht mitgibt, bleibt bei einer Aufteilung für alle Breiten.
  */
-export function rowCols(columns: string): CSSProperties {
-  return { '--gs-row-cols': columns } as CSSProperties
+export function rowCols(columns: string, narrow?: string): CSSProperties {
+  return narrow === undefined
+    ? ({ '--gs-row-cols': columns } as CSSProperties)
+    : ({ '--gs-row-cols': columns, '--gs-row-cols-md': narrow } as CSSProperties)
 }
