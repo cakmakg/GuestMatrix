@@ -126,6 +126,9 @@ describe('drawerNavItems (hamburger)', () => {
 
   // Zusammen müssen beide Formen jedes Ziel der Seitenleiste abdecken: was in keiner von beiden
   // steht, ist auf dem Telefon unerreichbar — und das fiele erst am Gerät auf.
+  //
+  // Nur der Betriebspfad: der Sammel-Flow zeigt die Schublade nicht und ist die Ausnahme, die
+  // der nächste Test festhält.
   it('bottom bar and drawer together cover every sidebar destination', () => {
     for (const { labels, can } of [HOTEL, AGENCY]) {
       const reachable = new Set([
@@ -136,6 +139,46 @@ describe('drawerNavItems (hamburger)', () => {
         expect(reachable.has(item.id), `${item.id} ist auf dem Telefon nicht erreichbar`).toBe(true)
       }
     }
+  })
+
+  // Die Feier-Oberfläche kommt ohne Menüknopf aus (`!can.contributionCentric` in layout.tsx), auf
+  // dem Telefon navigiert dort also allein die untere Leiste. Was dadurch außerhalb bleibt, steht
+  // hier als Erwartung — nicht, weil ein fehlendes Ziel richtig wäre, sondern damit ein NEUES
+  // Seitenleisten-Ziel diese Liste verändert und den Test bricht. Dann ist zu entscheiden, wohin
+  // es gehört, statt dass es auf dem Telefon still verschwindet. Genau so ist `experiences`
+  // einmal durchgefallen: die Begründung im Layout behauptete, die vier Plätze deckten alles ab.
+  //
+  // Ersatzwege beider Ausnahmen liegen auf der Übersicht (app/dashboard/page.tsx):
+  // `responses` über die erste Kennzahl und „Letzte Aktivität → Alle ansehen",
+  // `experiences` über „Alle {experiences} (mit Archiv)" unter den Kennzahlen.
+  it('documents exactly which sidebar destinations the guestbook reaches outside the phone nav', () => {
+    const inBottomBar = new Set(bottomNavItems(WEDDING.labels, WEDDING.can).map((i) => i.id))
+    const outside = dashboardNavItems(WEDDING.labels, WEDDING.can)
+      .map((i) => i.id)
+      .filter((id) => !inBottomBar.has(id))
+
+    expect(outside).toEqual(['experiences', 'responses'])
+  })
+
+  // Der Ersatzweg für „Glückwünsche" ist in der reinen Schicht prüfbar: die erste Kennzahl des
+  // Kampagnen-Kopfes ist ein Link auf die Liste. Fiele das href weg, wäre die Liste im
+  // Sammel-Flow nur noch über „Letzte Aktivität" erreichbar.
+  it('keeps the greetings list reachable from the overview, not only from the nav', () => {
+    const stats = heroStats(
+      {
+        responses: 42,
+        media: 17,
+        photos: 12,
+        videos: 5,
+        guests: 9,
+        openItems: 0,
+        averageRating: null,
+      },
+      WEDDING.labels,
+      WEDDING.can,
+    )
+
+    expect(stats.find((s) => s.id === 'responses')?.href).toBe('/dashboard/feedback')
   })
 })
 

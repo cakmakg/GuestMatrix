@@ -305,6 +305,7 @@ function CampaignHero({
   kicker,
   stats,
   guestUrl,
+  experiencesLabel,
 }: {
   event: EventRow
   /** Kampagnentyp — vor der Feier mit Countdown, siehe countdownKicker. */
@@ -312,6 +313,8 @@ function CampaignHero({
   stats: HeroStat[]
   /** Die Adresse hinter dem QR-Code — zum Weitergeben ohne Ausdruck. */
   guestUrl: string
+  /** Plural aus der Registry („Feiern", „Aufenthalte") für den Weg zur vollständigen Liste. */
+  experiencesLabel: string
 }): React.ReactElement {
   const date = new Date(event.date).toLocaleDateString('de-DE', {
     day: 'numeric',
@@ -375,6 +378,29 @@ function CampaignHero({
           </Link>
         ))}
       </div>
+
+      {/* Der Weg zur vollständigen Liste — und im Sammel-Flow (Gästebuch) auf dem Telefon der
+          EINZIGE. Zwei Dinge treffen hier zusammen: bei genau einer laufenden Kampagne entfällt
+          die Kurzliste weiter unten (sie wäre eine zweite Schaltfläche für die Überschrift), und
+          die untere Leiste des Sammel-Flows trägt die Kampagnenliste nicht — dort steht die
+          Galerie, weil sie öfter gebraucht wird. Ohne diese Zeile wäre das Archiv der Feiern auf
+          dem Telefon unerreichbar; das Brautpaar sucht es nach der Feier aber genau dort.
+          Der Betriebspfad findet die Liste zusätzlich in der Schublade — ein zweiter Weg zum
+          selben Ziel ist hier kein Fehler, sondern derselbe Satz in beiden Formen. */}
+      <Link
+        className="btn btn-ghost"
+        href="/dashboard/experiences"
+        // 44px: auf dem Telefon ist das ein Ziel für den Daumen, kein Beiwerk am Rand.
+        style={{ alignSelf: 'flex-start', minHeight: 44 }}
+      >
+        Alle {experiencesLabel} (mit Archiv)
+        <span className="gs-icn" style={{ width: 12, height: 12 }}>
+          <svg viewBox="0 0 24 24">
+            <path d="M5 12h14" />
+            <path d="M13 5l7 7-7 7" />
+          </svg>
+        </span>
+      </Link>
     </section>
   )
 }
@@ -736,6 +762,7 @@ export default async function DashboardPage({
           kicker={soleKicker}
           stats={soleStats}
           guestUrl={soleGuestUrl}
+          experiencesLabel={labels.experiences}
         />
       ) : (
         <>

@@ -159,9 +159,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
       {/* ═══ MAIN ═══ */}
       <div className="gs-main">
         <header className="gs-topbar">
-          {/* Nur wo die untere Leiste nicht alles abdeckt. Im Gästebuch decken ihre vier Plätze
-              den gesamten Umfang ab — ein Hamburger, der eine leere Liste öffnet, wäre dort ein
-              Versprechen auf nichts. */}
+          {/* Zwei Bedingungen, zwei verschiedene Gründe.
+              `drawerItems.length > 0`: ein Hamburger, der eine leere Liste öffnet, ist ein
+              Versprechen auf nichts.
+              `!can.contributionCentric`: die Feier-Oberfläche soll ohne Menüknopf auskommen. Ihre
+              Schublade wäre NICHT leer (sie hielte „Feiern" und „Glückwünsche"), beide Ziele
+              hängen deshalb als Links an der Übersicht — die Kennzahl und „Letzte Aktivität" für
+              die Grüße, „Alle Feiern (mit Archiv)" unter dem Kampagnen-Kopf für die Liste.
+              Der Preis dieser Ausnahme steht im Kopf von `drawerNavItems`: ein neues
+              Seitenleisten-Ziel wäre hier auf dem Telefon still unerreichbar. Der Test
+              `tests/dashboard-nav.test.ts` schlägt an, sobald die Ausnahmeliste wächst. */}
           {drawerItems.length > 0 && !can.contributionCentric && (
             <NavDrawer
               items={drawerItems}

@@ -94,8 +94,17 @@ export function bottomNavItems(labels: DashboardLabels, can: DashboardCapabiliti
  * aufzuzählen, kostete einen Fingertipp mehr als eine Schublade — und war selbst ein Ziel, das
  * in der Leiste einen der knappen Plätze belegte.
  *
- * Kann leer sein (Gästebuch: die vier Plätze decken bereits alles ab). Dann rendert der Aufrufer
- * keinen Hamburger — ein Knopf, der eine leere Liste öffnet, ist schlimmer als keiner.
+ * Kann leer sein; dann rendert der Aufrufer keinen Hamburger — ein Knopf, der eine leere Liste
+ * öffnet, ist schlimmer als keiner.
+ *
+ * ── Der Sammel-Flow zeigt diese Schublade NICHT (`app/dashboard/layout.tsx`) ─────
+ * Nicht, weil sie dort leer wäre — sie enthält `experiences` und `responses` —, sondern weil die
+ * Feier-Oberfläche ohne Menüknopf auskommen soll. Beide Ziele werden dort über Links auf der
+ * Übersicht erreicht: `responses` über die erste Kennzahl des Kampagnen-Kopfes und über
+ * „Letzte Aktivität → Alle ansehen", `experiences` über „Alle {experiences} (mit Archiv)" unter
+ * den Kennzahlen. Das ist eine bewusste Ausnahme mit einem Preis: ein NEUES Seitenleisten-Ziel
+ * wäre im Sammel-Flow auf dem Telefon sonst still unerreichbar. `tests/dashboard-nav.test.ts`
+ * hält die Ausnahmeliste deshalb als Erwartung fest und schlägt an, sobald sie wächst.
  *
  * Der CSV-Export erscheint hier NICHT als eigener Punkt: er hängt immer an einem Zeitraum
  * (Berichte) oder an einer Kampagne (Detailseite) und wäre ohne diesen Kontext eine Datei
