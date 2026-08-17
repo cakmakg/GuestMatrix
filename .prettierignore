@@ -3,6 +3,10 @@ node_modules/
 supabase/.temp/
 *.lock
 
+# `*.lock` trifft package-lock.json NICHT (die Datei heißt nicht `…​.lock`) — sie lief deshalb bei
+# jedem Formatieren mit: 600 kB erzeugte JSON, deren Form npm bestimmt und nicht wir.
+package-lock.json
+
 # Von `supabase gen types` erzeugt — nicht handbearbeitet (CLAUDE.md); Prettier würde bei
 # jeder Neugenerierung erneut abweichen.
 types/database.ts

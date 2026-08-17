@@ -1,0 +1,25 @@
+# Zeilenenden: im Repository UND in der Arbeitskopie immer LF.
+#
+# Ohne diese Datei entscheidet die lokale Git-Einstellung, was auf der Platte landet: auf dieser
+# Windows-Maschine steht `core.autocrlf=true`, der Checkout schreibt also CRLF — während Prettier
+# (Standard `endOfLine: "lf"`, siehe .prettierrc) LF erwartet. Ergebnis war ein `format:check`, das
+# 96 Dateien anmeckerte, ohne dass an einer davon etwas falsch formatiert war: die Prüfung konnte
+# auf Windows gar nicht bestehen, während sie im CI (Linux, LF-Checkout) grün war.
+#
+# `text=auto` lässt Git selbst erkennen, was Text ist; `eol=lf` legt fest, was der Checkout daraus
+# macht — auf jedem Betriebssystem dasselbe.
+* text=auto eol=lf
+
+# Binärdateien bleiben unangetastet. `text=auto` erkennt sie zwar von allein, aber eine falsch
+# erkannte Datei wäre still beschädigt — deshalb ausdrücklich.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.mp4 binary
+*.mov binary
