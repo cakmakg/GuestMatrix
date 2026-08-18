@@ -35,3 +35,7 @@ supabase/.branches/
 supabase/.temp/
 # Studio-SQL-Editor-Schnipsel (lokaler Scratch, kein Repo-Artefakt)
 supabase/snippets/
+
+# Lokale Arbeitsablage (Screenshots, Notizen) — nichts, was das Projekt zum Bauen braucht.
+# Screenshots von Dashboard-Ansichten können außerdem echte Gäste-/Kundennamen zeigen.
+data/
