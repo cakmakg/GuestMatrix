@@ -51,8 +51,12 @@ export default function FeedbackFlow({
   // Nach `rating` gefiltert wie im GalleryFlow: eine Freitextfrage bekäme hier sonst Sterne und
   // schickte eine Zahl an ein Textfeld, was validate_feedback_answers (DB) ablehnt.
   const questions = (labels.questions ?? []).filter((q) => q.type === 'rating')
+  const namePrompt = labels.namePrompt ?? 'Dein Name'
+  const namePlaceholder = labels.namePlaceholder ?? 'Vor- und Nachname'
   const [step, setStep] = useState<Step>('landing')
   const [consentChecked, setConsentChecked] = useState(false)
+  // Freiwillig: ohne Namen bleibt die Rückmeldung anonym (siehe guestNameEnabled in lib/sectors).
+  const [name, setName] = useState('')
   const [rating, setRating] = useState<number>(0)
   const [answers, setAnswers] = useState<Record<string, number>>({})
   const [comment, setComment] = useState('')
@@ -77,11 +81,19 @@ export default function FeedbackFlow({
   }, [])
 
   const uploadMedia = useCallback(
-    async (file: File): Promise<string> => {
+    async (file: File, trimmedName: string): Promise<string> => {
       const presignRes = await fetch('/api/submissions/presign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, fileName: file.name, mimeType: file.type, consent: true }),
+        body: JSON.stringify({
+          eventId,
+          fileName: file.name,
+          mimeType: file.type,
+          consent: true,
+          // Mit Medien entsteht die Zeile hier; der /feedback-Aufruf danach hängt sich nur an sie
+          // und kann guest_name nicht mehr setzen (attach_feedback schreibt ihn nicht).
+          guestName: trimmedName !== '' ? trimmedName : undefined,
+        }),
       })
       if (!presignRes.ok) {
         const body = (await presignRes.json()) as { error?: string }
@@ -101,6 +113,7 @@ export default function FeedbackFlow({
 
   const handleSubmit = useCallback(async () => {
     const trimmed = comment.trim()
+    const trimmedName = name.trim()
     const hasAnswers = Object.keys(answers).length > 0
     if (rating === 0 && trimmed === '' && !selectedFile && !hasAnswers) {
       setError('Bitte gib eine Bewertung oder einen Kommentar ab.')
@@ -113,7 +126,7 @@ export default function FeedbackFlow({
     try {
       let sid: string | undefined
       if (selectedFile) {
-        sid = await uploadMedia(selectedFile)
+        sid = await uploadMedia(selectedFile, trimmedName)
       }
 
       const res = await fetch(`/api/events/${eventId}/feedback`, {
@@ -124,6 +137,9 @@ export default function FeedbackFlow({
           comment: trimmed !== '' ? trimmed : undefined,
           answers: hasAnswers ? answers : undefined,
           submissionId: sid,
+          // Wirkt nur im medienlosen Pfad (dort entsteht die Zeile). Mit Medien steht der Name
+          // schon aus dem presign auf der Zeile; der Handler ignoriert ihn dann bewusst.
+          guestName: trimmedName !== '' ? trimmedName : undefined,
         }),
       })
       if (!res.ok) {
@@ -137,7 +153,7 @@ export default function FeedbackFlow({
       setError(err instanceof Error ? err.message : 'Feedback fehlgeschlagen.')
       setStep('feedback')
     }
-  }, [comment, answers, rating, selectedFile, eventId, uploadMedia])
+  }, [comment, name, answers, rating, selectedFile, eventId, uploadMedia])
 
   const handleDelete = useCallback(async () => {
     if (!submissionId) return
@@ -189,6 +205,21 @@ export default function FeedbackFlow({
       {/* ── Feedback ─────────────────────────────────────────────────────── */}
       {step === 'feedback' && (
         <div className="gs-guest-step">
+          <div className="gs-guest-field">
+            <label htmlFor="guest-name" className="gs-guest-label">
+              {namePrompt} <span className="gs-guest-optional">(optional)</span>
+            </label>
+            <input
+              id="guest-name"
+              className="input"
+              type="text"
+              maxLength={80}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={namePlaceholder}
+            />
+          </div>
+
           <div className="gs-guest-field">
             <p className="gs-guest-label">{labels.ratingPrompt}</p>
             <GuestStars label={labels.ratingPrompt} value={rating} onChange={setRating} />

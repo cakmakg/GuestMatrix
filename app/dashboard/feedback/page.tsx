@@ -381,8 +381,12 @@ export default async function FeedbackPage({ searchParams }: Props) {
 
                   {/* Inhalt */}
                   <div style={{ minWidth: 0 }}>
-                    {/* Im Gästebuch ist der Absender die Überschrift, nicht eine Randnotiz. */}
-                    {can.guestNameEnabled && (
+                    {/* Im Gästebuch ist der Absender die Überschrift, nicht eine Randnotiz —
+                        im Betrieb ist die Rückmeldung selbst die Botschaft und der Name eine
+                        Angabe dazu. Deshalb `contributionCentric` und nicht `guestNameEnabled`:
+                        seit hotel/agency den Namen freiwillig erheben, wäre sonst jede zweite
+                        Zeile mit einem großen „Anonym" überschrieben. */}
+                    {can.contributionCentric && (
                       <div style={{ font: '600 14px/1.3 var(--font-body)', marginBottom: 3 }}>
                         {row.guestName && row.guestName.trim() !== '' ? row.guestName : 'Anonym'}
                       </div>
@@ -398,7 +402,7 @@ export default async function FeedbackPage({ searchParams }: Props) {
 
                     <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
                       {/* Steht der Name schon als Überschrift, wäre er hier eine Dopplung. */}
-                      {!can.guestNameEnabled && (
+                      {!can.contributionCentric && (
                         <>
                           {row.guestName && row.guestName.trim() !== '' ? row.guestName : 'Anonym'}{' '}
                           ·{' '}

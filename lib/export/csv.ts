@@ -11,6 +11,8 @@ export type ExportSubmissionRow = {
   id: string
   media_url: string | null
   file_type: 'image' | 'video' | null
+  /** Freiwillig angegeben; leer heißt anonym (siehe guestNameEnabled in lib/sectors). */
+  guest_name: string | null
   uploaded_at: string | null
   deleted_at: string | null
   moderation_flag: boolean
@@ -52,7 +54,7 @@ function mediaTypeLabel(fileType: 'image' | 'video' | null): string {
 /**
  * Baut die Feedback-Export-CSV eines Events.
  *
- * Spalten: submission_id, datum, bewertung, <je Frage eine Dimensions-Spalte>, kommentar,
+ * Spalten: submission_id, datum, gast, bewertung, <je Frage eine Dimensions-Spalte>, kommentar,
  * gesperrt (Moderations-Status, ja/nein — die eigene Zeile des Tenants bleibt sichtbar),
  * medien_typ, medien_url (kurzlebige signierte URL, siehe signedUrlByPath).
  *
@@ -71,6 +73,7 @@ export function buildEventFeedbackCsv(
   const header: string[] = [
     'submission_id',
     'datum',
+    'gast',
     'bewertung',
     ...questions.map((q) => q.prompt),
     'kommentar',
@@ -82,6 +85,9 @@ export function buildEventFeedbackCsv(
   const body: string[][] = rows.map((s) => [
     s.id,
     formatDate(s.uploaded_at),
+    // Leer statt „Anonym": eine Tabelle wird gefiltert und sortiert, und „Anonym" wäre dort ein
+    // Name wie jeder andere. Auf dem Bildschirm steht es ausgeschrieben, hier nicht.
+    s.guest_name ?? '',
     s.rating !== null ? String(s.rating) : '',
     ...questions.map((q) => {
       const value = s.feedback_answers?.[q.id]
@@ -127,6 +133,7 @@ export function buildTenantFeedbackCsv(
     'kampagne',
     'submission_id',
     'datum',
+    'gast',
     'bewertung',
     ...questions.map((q) => q.prompt),
     'kommentar',
@@ -139,6 +146,7 @@ export function buildTenantFeedbackCsv(
     eventNameById.get(s.event_id) ?? '',
     s.id,
     formatDate(s.uploaded_at),
+    s.guest_name ?? '',
     s.rating !== null ? String(s.rating) : '',
     ...questions.map((q) => {
       const value = s.feedback_answers?.[q.id]

@@ -57,7 +57,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const { data, error } = await supabase
       .from('submissions')
       .select(
-        'id, event_id, media_url, file_type, uploaded_at, deleted_at, moderation_flag, resolved_at, rating, comment, feedback_answers',
+        'id, event_id, media_url, file_type, guest_name, uploaded_at, deleted_at, moderation_flag, resolved_at, rating, comment, feedback_answers',
       )
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)

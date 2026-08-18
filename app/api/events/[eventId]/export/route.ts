@@ -60,7 +60,7 @@ export async function GET(
     const { data, error } = await supabase
       .from('submissions')
       .select(
-        'id, media_url, file_type, uploaded_at, deleted_at, moderation_flag, rating, comment, feedback_answers',
+        'id, media_url, file_type, guest_name, uploaded_at, deleted_at, moderation_flag, rating, comment, feedback_answers',
       )
       .eq('event_id', eventId)
       .eq('tenant_id', tenantId)

@@ -42,7 +42,20 @@ export type CampaignCapabilities = {
   reciprocityEnabled: boolean
   ratingEnabled: boolean
   commentEnabled: boolean
-  // Erfasst zusätzlich den Gastnamen (z. B. Gästebuch-Gruß). Nur im guestbook-Modus.
+  /**
+   * Der Ablauf fragt nach dem Namen des Gastes.
+   *
+   * Im `guestbook` ist er PFLICHT (ein Gruß ohne Absender ist kein Gruß), in `gallery` und
+   * `feedback` FREIWILLIG: dort war bis 2026-08-17 jede Rückmeldung anonym, und der Betreiber
+   * konnte eine Beschwerde niemandem zuordnen — „wir wissen nicht, wer das Feedback gegeben hat".
+   * Erzwungen wird der Name dort aber nicht: wer ihn abgeben MUSS, schreibt entweder weniger
+   * ehrlich oder einen erfundenen Namen, und ein ehrliches anonymes Urteil ist mehr wert als ein
+   * erfundener Name darüber.
+   *
+   * Ob der Name eine ÜBERSCHRIFT ist oder eine Randnotiz, sagt dieses Feld NICHT — das folgt aus
+   * `contributionCentric`: im Gästebuch ist der Absender die halbe Botschaft, im Betrieb ist die
+   * Rückmeldung selbst die Botschaft und der Name eine Angabe dazu.
+   */
   guestNameEnabled: boolean
   // Service Recovery: ein Beitrag kann als bearbeitet markiert werden (`submissions.resolved_at`,
   // Migration 0020). Ein Beschwerde-Abarbeitungslauf — im Gästebuch gibt es nichts abzuarbeiten:
@@ -75,7 +88,9 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     ratingEnabled: true,
     // Öffentliche Beschreibung/Caption zum Foto (für reziproke Gäste in der Galerie sichtbar).
     commentEnabled: true,
-    guestNameEnabled: false,
+    // Freiwillig, und NUR für den Betreiber: die Galerie-Antwort (/api/events/[id]/gallery) gibt
+    // `guest_name` nicht aus, andere Gäste sehen weiterhin nur Foto und Beschreibung.
+    guestNameEnabled: true,
     serviceRecoveryEnabled: true,
     reportsEnabled: true,
     exportEnabled: true,
@@ -87,7 +102,9 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
     reciprocityEnabled: false,
     ratingEnabled: true,
     commentEnabled: true,
-    guestNameEnabled: false,
+    // Freiwillig. Ohne Namen bleibt die Rückmeldung anonym („Anonym" im Panel) — das ist ein
+    // gültiges Ergebnis, kein Fehlzustand.
+    guestNameEnabled: true,
     serviceRecoveryEnabled: true,
     reportsEnabled: true,
     exportEnabled: true,
@@ -114,16 +131,21 @@ export const FLOW_MODE_CAPABILITIES: Record<FlowMode, CampaignCapabilities> = {
 // Modus-abhängige Texte (Sichtbarkeit vs. privates Feedback).
 export const FLOW_MODE_LABELS: Record<FlowMode, { consentText: string; successText: string }> = {
   gallery: {
+    // Der Name steht ausdrücklich getrennt von dem, was ALLE sehen: Foto und Beschreibung sind
+    // öffentlich, der Name geht nur an den Veranstalter. Eine Einwilligung, die beides in einen
+    // Satz packt, verspricht dem Gast weniger Schutz, als die Software ihm gibt.
     consentText:
       'Ich stimme zu, dass meine Fotos/Videos und meine Beschreibung gespeichert und für ' +
-      'alle Gäste sichtbar gemacht werden. Ich kann meine Einwilligung jederzeit widerrufen ' +
-      'und meine Daten löschen lassen.',
+      'alle Gäste sichtbar gemacht werden. Meinen Namen gebe ich freiwillig an; er wird nur dem ' +
+      'Veranstalter gezeigt, nicht den anderen Gästen. Ich kann meine Einwilligung jederzeit ' +
+      'widerrufen und meine Daten löschen lassen.',
     successText: 'Danke für deinen Beitrag!',
   },
   feedback: {
     consentText:
       'Ich stimme zu, dass mein Feedback (und ggf. Fotos/Videos) gespeichert und an den ' +
-      'Veranstalter übermittelt wird. Ich kann meine Einwilligung jederzeit widerrufen und ' +
+      'Veranstalter übermittelt wird. Meinen Namen gebe ich freiwillig an; ohne ihn bleibt ' +
+      'meine Rückmeldung anonym. Ich kann meine Einwilligung jederzeit widerrufen und ' +
       'meine Daten löschen lassen.',
     successText: 'Danke für dein Feedback!',
   },

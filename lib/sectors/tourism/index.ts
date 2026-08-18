@@ -57,6 +57,10 @@ export const tourism = {
         ratingPrompt: 'Wie war deine Reise?',
         commentPrompt: 'Dein Kommentar (optional)',
         commentPlaceholder: 'Was hat dir besonders gefallen?',
+        // Freiwillig — die Agentur soll zuordnen können, wer geschrieben hat, ohne dass ein
+        // Name die Voraussetzung dafür wird, überhaupt etwas zu schreiben.
+        namePrompt: 'Dein Name',
+        namePlaceholder: 'Vor- und Nachname',
       },
       // Strukturierte Zusatzfragen für Agentur-Reisen — alle optional („anbieten, nicht erzwingen"),
       // gestapelt auf den gallery-Flow. Die id ist ein stabiler Speicherschlüssel (feedback_answers)
@@ -79,6 +83,10 @@ export const tourism = {
         ratingPrompt: 'Wie bewertest du deinen Aufenthalt?',
         commentPrompt: 'Dein Kommentar (optional)',
         commentPlaceholder: 'Was hat dir gefallen? Was können wir verbessern?',
+        // Freiwillig: ein Hotel kann einer Beschwerde nur nachgehen, wenn es weiß, wer sie
+        // geschrieben hat — erzwingen würde aber nur erfundene Namen erzeugen.
+        namePrompt: 'Dein Name',
+        namePlaceholder: 'Vor- und Nachname',
       },
       // Strukturierte Zusatzfragen für Aufenthalte — alle optional. Die id ist ein stabiler
       // Speicherschlüssel (feedback_answers) und darf nicht geändert werden.

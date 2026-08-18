@@ -53,8 +53,12 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
   // es hier heute nicht gibt) bekäme sonst Sterne und schickte eine Zahl an ein Textfeld — die
   // DB-Validierung (validate_feedback_answers) würde den ganzen Beitrag ablehnen.
   const questions = (labels.questions ?? []).filter((q) => q.type === 'rating')
+  const namePrompt = labels.namePrompt ?? 'Dein Name'
+  const namePlaceholder = labels.namePlaceholder ?? 'Vor- und Nachname'
   const [step, setStep] = useState<Step>('landing')
   const [consentChecked, setConsentChecked] = useState(false)
+  // Freiwillig: ohne Namen bleibt der Beitrag anonym (siehe guestNameEnabled in lib/sectors).
+  const [name, setName] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [rating, setRating] = useState<number>(0)
   const [answers, setAnswers] = useState<Record<string, number>>({})
@@ -89,6 +93,7 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
       setError('Bitte wähle ein Foto oder Video aus.')
       return
     }
+    const trimmedName = name.trim()
     setError(null)
     setStep('submitting')
     setProgress(0)
@@ -102,6 +107,9 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
           fileName: selectedFile.name,
           mimeType: selectedFile.type,
           consent: true,
+          // Nur beim presign: attach_feedback (der zweite Aufruf unten) kann guest_name nicht
+          // schreiben, und Gäste haben keine UPDATE-Policy auf submissions.
+          guestName: trimmedName !== '' ? trimmedName : undefined,
         }),
       })
       if (!presignRes.ok) {
@@ -140,7 +148,7 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
       setError(err instanceof Error ? err.message : 'Upload fehlgeschlagen.')
       setStep('form')
     }
-  }, [selectedFile, rating, comment, answers, eventId])
+  }, [selectedFile, name, rating, comment, answers, eventId])
 
   const handleViewGallery = useCallback(async () => {
     setGalleryLoading(true)
@@ -206,6 +214,21 @@ export default function GalleryFlow({ eventId, eventName, brandName, description
       {/* ── Ein Kart: Foto + Bewertung + Beschreibung ────────────────────── */}
       {step === 'form' && (
         <div className="gs-guest-step">
+          <div className="gs-guest-field">
+            <label htmlFor="guest-name" className="gs-guest-label">
+              {namePrompt} <span className="gs-guest-optional">(optional)</span>
+            </label>
+            <input
+              id="guest-name"
+              className="input"
+              type="text"
+              maxLength={80}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={namePlaceholder}
+            />
+          </div>
+
           <GuestPick
             label="Foto oder Video"
             empty="Foto oder Video auswählen"

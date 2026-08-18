@@ -179,6 +179,10 @@ export const feedbackSchema = z
     comment: z.string().max(1000, 'Comment is too long.').trim().optional(),
     answers: feedbackAnswersSchema.optional(),
     submissionId: uuid.optional(),
+    // Freiwillig (gallery/feedback). Ein Name ALLEIN ist bewusst keine gültige Rückmeldung —
+    // dafür sorgt das `refine` unten, das weiterhin Note, Kommentar, Antworten oder eine
+    // Einreichung verlangt.
+    guestName: guestName.optional(),
   })
   .refine(
     (data) =>

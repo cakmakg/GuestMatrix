@@ -395,15 +395,26 @@ export default async function EventDetailPage({
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', minWidth: 0 }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     {/* Im Gästebuch steht der Absender oben — dort ist der Name die Überschrift,
-                        nicht das Kleingedruckte. Mit Noten steht die Note vorn. */}
-                    {can.guestNameEnabled ? (
+                        nicht das Kleingedruckte. Mit Noten steht die Note vorn; der (freiwillige)
+                        Name erscheint dann in der Zeile darunter. */}
+                    {can.contributionCentric ? (
                       <div style={{ font: '600 14px/1.3 var(--font-body)' }}>
                         {sub.guest_name && sub.guest_name.trim() !== '' ? sub.guest_name : 'Anonym'}
                       </div>
                     ) : (
-                      <div style={{ font: '800 18px/1 var(--font-heading)' }}>
-                        {sub.rating !== null ? `${sub.rating} / 5` : '—'}
-                      </div>
+                      <>
+                        <div style={{ font: '800 18px/1 var(--font-heading)' }}>
+                          {sub.rating !== null ? `${sub.rating} / 5` : '—'}
+                        </div>
+                        {/* „Anonym" ausdrücklich statt einer leeren Zeile: der Name ist freiwillig,
+                            und der Betreiber soll sehen, DASS keiner angegeben wurde — sonst wirkt
+                            es wie ein fehlender Wert. */}
+                        <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>
+                          {sub.guest_name && sub.guest_name.trim() !== ''
+                            ? sub.guest_name
+                            : 'Anonym'}
+                        </div>
+                      </>
                     )}
 
                     {sub.comment && sub.comment.trim() !== '' ? (

@@ -28,6 +28,7 @@ function row(overrides: Partial<ExportSubmissionRow> = {}): ExportSubmissionRow 
     id: '00000000-0000-0000-0000-000000000001',
     media_url: null,
     file_type: null,
+    guest_name: null,
     uploaded_at: '2026-07-31T14:03:00.000Z',
     deleted_at: null,
     moderation_flag: false,
@@ -52,7 +53,9 @@ describe('buildEventFeedbackCsv', () => {
   it('schreibt Dimensions-Spalten aus dem Fragenkatalog in die Kopfzeile', () => {
     const csv = buildEventFeedbackCsv([], STAY_QUESTIONS, new Map())
     const header = csv.split('\r\n')[0]
-    expect(header).toContain('submission_id,datum,bewertung,Sauberkeit,Service,kommentar,gesperrt')
+    expect(header).toContain(
+      'submission_id,datum,gast,bewertung,Sauberkeit,Service,kommentar,gesperrt',
+    )
   })
 
   it('rendert Bewertung, Dimensionswerte, Kommentar und signierte Medien-URL', () => {
@@ -217,5 +220,27 @@ describe('Bericht-Export-Route ist RLS-aktiv und Zod-validiert', () => {
   it('validiert den Zeitraum über das Zod-Schema', () => {
     expect(routeSource).toContain('reportFilterSchema')
     expect(routeSource).toContain('safeParse')
+  })
+})
+
+describe('guest name in the export', () => {
+  // Der Name ist freiwillig (gallery/feedback). Er gehört in den Export, weil dort die Arbeit
+  // stattfindet: einer Beschwerde nachgehen kann nur, wer weiß, von wem sie kommt.
+  it('carries the name when one was given', () => {
+    const csv = buildEventFeedbackCsv([row({ guest_name: 'Ayşe Yılmaz' })], [], new Map())
+    expect(csv.split(/\r\n/)[1]).toContain('Ayşe Yılmaz')
+  })
+
+  // Leer statt „Anonym": in einer Tabelle wäre „Anonym" ein Name wie jeder andere und würde beim
+  // Sortieren und Filtern mitlaufen.
+  it('leaves the cell empty for an anonymous submission', () => {
+    const csv = buildEventFeedbackCsv([row({ guest_name: null })], [], new Map())
+    const cells = csv.split(/\r\n/)[1]?.split(',') ?? []
+    expect(cells[2]).toBe('')
+  })
+
+  it('escapes a name that contains a comma', () => {
+    const csv = buildEventFeedbackCsv([row({ guest_name: 'Yılmaz, Ayşe' })], [], new Map())
+    expect(csv).toContain('"Yılmaz, Ayşe"')
   })
 })

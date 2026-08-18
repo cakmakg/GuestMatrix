@@ -23,7 +23,7 @@ export async function POST(
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid request.')
     }
-    const { rating, comment, answers, submissionId } = parsed.data
+    const { rating, comment, answers, submissionId, guestName } = parsed.data
 
     // Server client so RLS enforces guest_user_id = auth.uid()
     const supabase = await createSupabaseServerClient()
@@ -66,6 +66,10 @@ export async function POST(
     // guest_user_id = auth.uid() und aktualisiert NUR rating/comment/feedback_answers. Kein
     // Treffer = fremde/fehlende Einreichung → NotFoundError.
     if (submissionId) {
+      // `guestName` wird hier ABSICHTLICH ignoriert: attach_feedback (SECURITY DEFINER) schreibt
+      // nur rating/comment/feedback_answers, und Gäste haben keine UPDATE-Policy auf submissions.
+      // Der Name steht auf dieser Zeile bereits — der Medienpfad legt ihn beim presign an (INSERT).
+      // Ihn hier zusätzlich anzunehmen würde eine Wirkung vortäuschen, die es nicht gibt.
       const { data: attachedId, error } = await supabase.rpc('attach_feedback', {
         p_submission_id: submissionId,
         p_rating: rating,
@@ -94,6 +98,9 @@ export async function POST(
         rating: rating ?? null,
         comment: comment ?? null,
         feedback_answers: answersJson,
+        // Medienlose Rückmeldung: hier entsteht die Zeile, also wird der (freiwillige) Name hier
+        // gesetzt. Leer bleibt leer — im Panel steht dann „Anonym", und das ist ein Ergebnis.
+        guest_name: guestName ?? null,
       })
       .select('id')
       .single<{ id: string }>()

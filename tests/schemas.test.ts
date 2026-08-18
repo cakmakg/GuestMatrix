@@ -359,6 +359,19 @@ describe('feedbackSchema', () => {
     expect(feedbackSchema.safeParse({ comment: '   ' }).success).toBe(false)
   })
 
+  // Der Name ist freiwillig — er darf mit, macht aus einer leeren Rückmeldung aber KEINE gültige:
+  // ein Name ohne Note, Kommentar oder Antwort ist nichts, was ein Betrieb lesen könnte.
+  it('takes an optional guest name alongside real feedback', () => {
+    expect(feedbackSchema.safeParse({ rating: 4, guestName: 'Ayşe Yılmaz' }).success).toBe(true)
+    expect(feedbackSchema.safeParse({ rating: 4 }).success).toBe(true)
+    expect(feedbackSchema.safeParse({ guestName: 'Ayşe Yılmaz' }).success).toBe(false)
+  })
+
+  it('rejects a blank or oversized name instead of storing it', () => {
+    expect(feedbackSchema.safeParse({ rating: 4, guestName: '   ' }).success).toBe(false)
+    expect(feedbackSchema.safeParse({ rating: 4, guestName: 'x'.repeat(81) }).success).toBe(false)
+  })
+
   it('rejects a comment that is too long', () => {
     expect(feedbackSchema.safeParse({ comment: 'x'.repeat(1001) }).success).toBe(false)
   })

@@ -348,10 +348,34 @@ describe('guestbook is active for event/wedding (0018)', () => {
     expect(isFlowMode('none')).toBe(false)
   })
 
-  it('wedding drives the guestbook mode, which captures the guest name', () => {
+  it('wedding drives the guestbook mode, which requires the guest name', () => {
     expect(resolveFlowMode('wedding')).toBe('guestbook')
-    // guestbook ist der einzige Modus, der den Gastnamen erfasst (privater Gruß ans Brautpaar).
     expect(getCapabilities('guestbook').guestNameEnabled).toBe(true)
+  })
+
+  // Seit 2026-08-17 fragt JEDER Modus nach dem Namen — im Gästebuch als Pflicht, in gallery und
+  // feedback freiwillig. Vorher konnte ein Betrieb einer Beschwerde niemanden zuordnen.
+  it('asks for the guest name in every flow mode', () => {
+    for (const mode of ['gallery', 'feedback', 'guestbook'] as const) {
+      expect(getCapabilities(mode).guestNameEnabled).toBe(true)
+    }
+  })
+
+  // Der Name ist personenbezogen: sammeln darf man ihn nur, wenn die Einwilligung ihn NENNT.
+  // Diese Prüfung ist die Erinnerung daran, dass beides zusammengehört.
+  it('names the guest name in the consent text of every mode that collects it', () => {
+    for (const mode of ['gallery', 'feedback', 'guestbook'] as const) {
+      expect(getCapabilities(mode).guestNameEnabled).toBe(true)
+      expect(resolveConsentText(mode, 'private')).toMatch(/Name/)
+    }
+  })
+
+  // In der Galerie ist die Trennung entscheidend: Foto und Beschreibung sehen ALLE Gäste, der
+  // Name nur der Veranstalter. Der Text muss diese Grenze aussprechen.
+  it('promises the gallery guest that only the operator sees the name', () => {
+    const text = resolveConsentText('gallery', 'private')
+    expect(text).toMatch(/nur dem Veranstalter/)
+    expect(text).toMatch(/nicht den anderen Gästen/)
   })
 })
 
@@ -476,7 +500,8 @@ describe('resolveDashboardCapabilities', () => {
     expect(can.commentEnabled).toBe(true)
     // Aufenthalts-Feedback ist privat — es gibt keine Gäste-Galerie.
     expect(can.galleryEnabled).toBe(false)
-    expect(can.guestNameEnabled).toBe(false)
+    // Freiwilliger Name (seit 2026-08-17): ohne ihn kann ein Hotel einer Beschwerde nicht nachgehen.
+    expect(can.guestNameEnabled).toBe(true)
   })
 
   it('gives an agency the gallery panels', () => {
@@ -485,7 +510,7 @@ describe('resolveDashboardCapabilities', () => {
     expect(can.ratingEnabled).toBe(true)
   })
 
-  // Der Kern: das Gästebuch kennt weder Noten noch eine Galerie, dafür einen Absender.
+  // Der Kern: das Gästebuch kennt weder Noten noch eine Galerie — der Absender bleibt.
   it('denies rating and gallery for a wedding tenant but keeps the guest name', () => {
     const can = resolveDashboardCapabilities('event', null)
     expect(can.ratingEnabled).toBe(false)
