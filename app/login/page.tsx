@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 
+import { BRAND } from '@/lib/brand'
+
 import { loginAction } from './actions'
 
-export const metadata: Metadata = { title: 'Anmelden – GuestMatrix' }
+export const metadata: Metadata = { title: `Anmelden – ${BRAND.name}` }
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'E-Mail-Adresse oder Passwort ist falsch.',
@@ -32,7 +34,7 @@ export default async function LoginPage({ searchParams }: Props) {
   return (
     <main style={styles.main}>
       <div style={styles.card}>
-        <h1 style={styles.heading}>GuestMatrix</h1>
+        <h1 style={styles.heading}>{BRAND.name}</h1>
         <p style={styles.subtitle}>Tenant-Anmeldung</p>
 
         {successMessage && (

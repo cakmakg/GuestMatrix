@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 
+import { BRAND } from '@/lib/brand'
+
 import { resetPasswordAction } from './actions'
 
-export const metadata: Metadata = { title: 'Neues Passwort – GuestMatrix' }
+export const metadata: Metadata = { title: `Neues Passwort – ${BRAND.name}` }
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_link: 'Dieser Reset-Link ist ungültig oder abgelaufen.',

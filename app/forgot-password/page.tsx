@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 
+import { BRAND } from '@/lib/brand'
+
 import { forgotPasswordAction } from './actions'
 
-export const metadata: Metadata = { title: 'Passwort vergessen – GuestMatrix' }
+export const metadata: Metadata = { title: `Passwort vergessen – ${BRAND.name}` }
 
 type Props = {
   searchParams: Promise<{ sent?: string }>

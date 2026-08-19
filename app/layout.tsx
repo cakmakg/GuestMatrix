@@ -16,7 +16,8 @@ const archivo = Archivo({
 
 export const metadata: Metadata = {
   title: BRAND.name,
-  description: 'QR tabanlı guest UGC & feedback platformu',
+  description:
+    'Sammle Fotos, Videos und Feedback direkt von deinen Gästen — mit einem einzigen QR-Code.',
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
