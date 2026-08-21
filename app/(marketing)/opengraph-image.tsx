@@ -14,23 +14,23 @@ import { BRAND } from '@/lib/brand'
  * dort ist jede geteilte Adresse ein Versehen, und ein hübsches Kärtchen dazu lädt zum
  * Weiterleiten ein.
  *
- * Zur Schrift: hier steht die Standardschrift der Bilderzeugung, nicht Space Grotesk. Die
+ * Zur Schrift: hier steht die Standardschrift der Bilderzeugung, nicht DM Serif Display. Die
  * Schriften der Seite kommen über `next/font` und liegen nach dem Build als Dateien mit
  * Prüfsummen-Namen — es gibt keinen stabilen Pfad, den man hier laden könnte, und ein
- * nachgeladener Webfont scheitert an der CSP. Ein Bild in der Zweitschrift ist der kleinere
- * Preis; die Form (Papier, Streifen, harte Kanten) trägt die Marke ohnehin deutlicher als die
- * Buchstabenform.
+ * nachgeladener Webfont scheitert an der CSP. Das trifft die neue Sprache härter als die alte,
+ * weil sie ihre Wirkung stärker aus der Serifenschrift zieht. Deshalb trägt das Bild sie über
+ * die FORM: Papierton, Goldlinie, die runde Marke und die Pillenform der Merkmale.
  */
 export const alt = `${BRAND.name} — ${BRAND.slogan}`
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
 const PAPER = '#efeadd'
-const INK = '#2d3235'
-const MUTED = '#5a5f63'
-const RED = '#c24b46'
-const ORANGE = '#d67035'
-const YELLOW = '#e8b056'
+const INK = '#1a1a1a'
+const INK_2 = '#2a2622'
+const MUTED = '#7a746a'
+const LINE = '#d8cfbc'
+const GOLD = '#b08a2e'
 
 const CHIPS = ['Ohne App', 'Ohne Anmeldung', 'DSGVO-konform']
 
@@ -44,64 +44,69 @@ export default function OpengraphImage(): ImageResponse {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '0 88px',
         background: PAPER,
         color: INK,
       }}
     >
-      <div style={{ display: 'flex', width: '100%' }}>
-        {[RED, ORANGE, YELLOW, INK].map((color) => (
-          <div key={color} style={{ height: 20, flex: 1, background: color }} />
-        ))}
+      {/* Die Marke: dieselbe runde Scheibe wie im Tab und in der Kopfleiste. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '50%',
+            background: INK,
+            color: PAPER,
+            fontSize: 26,
+            fontWeight: 600,
+          }}
+        >
+          {BRAND.name.charAt(0)}
+        </div>
+        <div style={{ display: 'flex', fontSize: 44, letterSpacing: '-0.01em' }}>{BRAND.name}</div>
       </div>
+
+      <div style={{ display: 'flex', width: 220, height: 2, background: GOLD, margin: '40px 0' }} />
 
       <div
         style={{
-          flex: 1,
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '0 80px',
+          fontSize: 92,
+          fontWeight: 600,
+          letterSpacing: '-0.03em',
+          lineHeight: 1.05,
         }}
       >
-        <div style={{ display: 'flex', fontSize: 104, fontWeight: 700, letterSpacing: '-0.03em' }}>
-          <span style={{ color: RED }}>{BRAND.name}</span>
-          <span style={{ color: INK }}>.</span>
-        </div>
+        {BRAND.slogan}
+      </div>
 
-        <div
-          style={{
-            display: 'flex',
-            fontSize: 52,
-            fontWeight: 600,
-            marginTop: 12,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          {BRAND.slogan}
-        </div>
+      <div style={{ display: 'flex', fontSize: 30, color: MUTED, marginTop: 24, maxWidth: 900 }}>
+        Fotos, Videos und Feedback — mit einem einzigen QR-Code.
+      </div>
 
-        <div style={{ display: 'flex', fontSize: 30, color: MUTED, marginTop: 20 }}>
-          Fotos, Videos und Feedback — mit einem einzigen QR-Code.
-        </div>
-
-        <div style={{ display: 'flex', gap: 16, marginTop: 44 }}>
-          {CHIPS.map((chip) => (
-            <div
-              key={chip}
-              style={{
-                display: 'flex',
-                border: `3px solid ${INK}`,
-                background: '#ffffff',
-                padding: '12px 22px',
-                fontSize: 26,
-                fontWeight: 600,
-                boxShadow: `6px 6px 0 ${INK}`,
-              }}
-            >
-              {chip}
-            </div>
-          ))}
-        </div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 48 }}>
+        {CHIPS.map((chip) => (
+          <div
+            key={chip}
+            style={{
+              display: 'flex',
+              border: `2px solid ${LINE}`,
+              borderRadius: 999,
+              background: '#ffffff',
+              padding: '14px 30px',
+              fontSize: 26,
+              fontWeight: 600,
+              color: INK_2,
+            }}
+          >
+            {chip}
+          </div>
+        ))}
       </div>
     </div>,
     size,
