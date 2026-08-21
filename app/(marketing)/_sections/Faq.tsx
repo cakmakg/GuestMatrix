@@ -17,11 +17,11 @@ import { FAQ_ITEMS } from '@/lib/marketing/faq'
  */
 export function Faq(): ReactElement {
   return (
-    <div className="gs-mkt-shell">
-      <section id="faq" className="gs-mkt-section">
-        <div className="gs-mkt-section-head">
-          <p className="gs-mkt-kicker">▪ Häufige Fragen</p>
-          <h2>
+    <section id="faq" className="gs-mkt-section" data-tone="paper">
+      <div className="gs-mkt-shell">
+        <div className="gs-mkt-section-head" data-align="center">
+          <p className="gs-mkt-kicker">Häufige Fragen</p>
+          <h2 className="gs-mkt-section-title">
             Bevor du <span className="gs-mkt-em">fragst</span>.
           </h2>
         </div>
@@ -40,7 +40,7 @@ export function Faq(): ReactElement {
             </details>
           ))}
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   )
 }

@@ -60,11 +60,18 @@ const GUARANTEES: readonly Guarantee[] = [
 
 export function Privacy(): ReactElement {
   return (
-    <div className="gs-mkt-shell">
-      <section id="datenschutz" className="gs-mkt-section">
+    <section id="datenschutz" className="gs-mkt-section">
+      <div className="gs-mkt-shell">
+        <div className="gs-mkt-chapter">
+          <div className="gs-mkt-chapter-row">
+            <p className="gs-mkt-kicker">▪ Datenschutz</p>
+            <p className="gs-mkt-note">Kap. 02 — Das Vertrauen</p>
+          </div>
+          <hr className="gs-mkt-rule" />
+        </div>
+
         <div className="gs-mkt-section-head">
-          <p className="gs-mkt-kicker">▪ Datenschutz</p>
-          <h2>
+          <h2 className="gs-mkt-section-title">
             Gästemedien sind <span className="gs-mkt-em">personenbezogene Daten</span>.
           </h2>
           <p className="gs-mkt-section-sub">
@@ -89,7 +96,7 @@ export function Privacy(): ReactElement {
           Beitrag technisch brauchen. Deshalb steht hier auch kein Cookie-Banner. Einzelheiten in
           der <Link href="/datenschutz">Datenschutzerklärung</Link>.
         </p>
-      </section>
-    </div>
+      </div>
+    </section>
   )
 }

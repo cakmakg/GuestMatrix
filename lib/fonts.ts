@@ -1,4 +1,4 @@
-import { JetBrains_Mono, Playfair_Display, Space_Grotesk } from 'next/font/google'
+import { DM_Serif_Display, Manrope, Playfair_Display } from 'next/font/google'
 
 /**
  * Anzeigeschrift der gemeinsamen Sprache (`[data-theme]` in app/globals.css) — als
@@ -36,21 +36,37 @@ export const displayFont = Playfair_Display({
  * scheitert an der CSP (`style-src 'self'`, `font-src 'self'` in next.config.ts). Das ist der
  * Grund, warum die Vorlage an dieser Stelle nicht 1:1 übernommen werden kann.
  */
-export const marketingDisplayFont = Space_Grotesk({
+
+/**
+ * Anzeigeschrift der Marketing-Fläche.
+ *
+ * DM Serif Display gibt es NUR in einem Schnitt (400) — das ist keine Auslassung, die Familie hat
+ * keinen zweiten. Die Vorlage baut ihre Hierarchie deshalb über Grad und Kursive, nicht über
+ * Fettung: `font-weight: 700` auf einer Überschrift ergäbe hier eine vom Browser gerechnete
+ * Kunstfettung. globals.css setzt an den Überschriften darum ausdrücklich `font-weight: 400`.
+ *
+ * `Playfair Display` steht in der Vorlage als Rückfall und ist über `displayFont` ohnehin im
+ * Projekt — aber NICHT auf dieser Fläche eingehängt. Als Rückfallname bleibt sie trotzdem
+ * sinnvoll: sie greift nur, wenn der Besucher sie lokal installiert hat.
+ */
+export const marketingDisplayFont = DM_Serif_Display({
   subsets: ['latin'],
-  weight: ['500', '600', '700'],
+  weight: ['400'],
+  style: ['normal', 'italic'],
   variable: '--font-mkt-display',
   display: 'swap',
 })
 
 /**
- * Fließtext der Marketing-Fläche. Eine Monospace als Lauftext ist eine Gestaltungsentscheidung
- * der Vorlage (technischer, gedruckter Ton) — deshalb nur hier und nicht in der Anwendung, wo
- * Tabellen und Listen die schmalere Archivo brauchen.
+ * Fließtext der Marketing-Fläche.
+ *
+ * Manrope statt der bisherigen Monospace: die neue Vorlage setzt einen editorialen Ton (Serifen
+ * für die Aussage, ruhige Grotesk für alles andere). Die vier Schnitte werden alle gebraucht —
+ * 400 im Fließtext, 500/600 in Marken- und Navigationszeilen, 700 in den Kennzahlen.
  */
-export const marketingBodyFont = JetBrains_Mono({
+export const marketingBodyFont = Manrope({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-mkt-mono',
+  variable: '--font-mkt-sans',
   display: 'swap',
 })

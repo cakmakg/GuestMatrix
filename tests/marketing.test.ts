@@ -37,9 +37,17 @@ describe('Segmente folgen der Registrierungs-Auswahl', () => {
     ])
   })
 
-  it('gibt jedem Segment eine eigene Akzentfarbe', () => {
+  it('gibt jedem Segment einen eigenen Platz in der Rangfolge', () => {
     const accents = MARKETING_SEGMENTS.map((segment) => segment.card.accent)
     expect(new Set(accents).size).toBe(accents.length)
+  })
+
+  it('stellt genau eine Paket-Kachel dunkel heraus', () => {
+    // Dieselbe Regel wie bei den Tarifen („hebt genau einen Tarif hervor"): die neue
+    // Design-Sprache kennt einen einzigen Akzent und EINE hervorgehobene Kachel. Zwei dunkle
+    // Kacheln heben einander auf, keine lässt das Raster ohne Schwerpunkt.
+    const dark = MARKETING_SEGMENTS.filter((segment) => segment.card.accent === 'ink')
+    expect(dark).toHaveLength(1)
   })
 
   it('benennt nur Symbole, die es auch gibt', () => {

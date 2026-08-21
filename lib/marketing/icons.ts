@@ -26,6 +26,7 @@ export const ICON_NAMES = [
   'shield',
   'star',
   'trash',
+  'trend',
   'upload',
   'video',
   'window',

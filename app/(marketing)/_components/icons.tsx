@@ -89,6 +89,12 @@ const ICON_PATHS: Record<IconName, ReactElement> = {
       <path d="M10 11v6M14 11v6" />
     </>
   ),
+  trend: (
+    <>
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+      <polyline points="16 7 22 7 22 13" />
+    </>
+  ),
   upload: <path d="M12 3v14M6 9l6-6 6 6M4 21h16" />,
   video: (
     <>

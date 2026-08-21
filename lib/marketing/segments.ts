@@ -47,7 +47,15 @@ export type SectorCardContent = {
   qrHint: string
   chips: readonly MarketingChip[]
   ctaLabel: string
-  accent: 'red' | 'orange' | 'yellow'
+  /**
+   * Der Platz der Karte in der Rangfolge der Paket-Kacheln — keine Farbe.
+   *
+   * Die vorige Design-Sprache kodierte Segmente über vier gleichrangige Akzentfarben. Die neue
+   * kennt einen einzigen Akzent (Gold) und stellt genau EINE Kachel dunkel heraus, so wie die
+   * Tarif-Registry genau einen Tarif hervorhebt. `sand` und `linen` sind die beiden hellen
+   * Papiertöne, `ink` die dunkle Kachel.
+   */
+  accent: 'sand' | 'linen' | 'ink'
 }
 
 export type UseCaseContent = {
@@ -90,7 +98,7 @@ const CONTENT: Partial<Record<string, SegmentContent>> = {
         { icon: 'message', label: 'Feedback', claim: 'commentEnabled' },
       ],
       ctaLabel: 'Erfahrung teilen',
-      accent: 'red',
+      accent: 'sand',
     },
     useCase: {
       title: 'Hotels',
@@ -122,7 +130,7 @@ const CONTENT: Partial<Record<string, SegmentContent>> = {
         { icon: 'album', label: 'Album', claim: 'galleryEnabled' },
       ],
       ctaLabel: 'Reisemoment teilen',
-      accent: 'orange',
+      accent: 'linen',
     },
     useCase: {
       title: 'Reiseagenturen',
@@ -153,7 +161,7 @@ const CONTENT: Partial<Record<string, SegmentContent>> = {
         { icon: 'heart', label: 'Gästebuch' },
       ],
       ctaLabel: 'Glückwunsch senden',
-      accent: 'yellow',
+      accent: 'ink',
     },
     useCase: {
       title: 'Hochzeiten & Events',
